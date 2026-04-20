@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.env
+.venv/
+venv/
+
+# Generated chart output (reproducible by running scripts)
+eda_output/
+cluster_output/
+cluster_compare_output/
+resample_output/
+dbscan_output/
+hdbscan_output/
+boundary_output/
+
+# Large client files
+pal-pitch-deck.pdf
+
+# macOS
+.DS_Store
