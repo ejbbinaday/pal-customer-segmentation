@@ -1,19 +1,19 @@
 # PAL Customer Segmentation — ML Pipeline Methodology
 
 **Client:** Philippine Airlines (PAL)
-**Version:** v0.3 — 19 April 2026
+**Version:** v0.4 — 11 May 2026
 
 ---
 
 ## Overview
 
-This document describes the end-to-end machine learning pipeline for the PAL Customer Segmentation project. The objective is to produce a baseline segmentation model over PNR booking data, assigning each booking record to one of ten commercially meaningful customer segments. The pipeline combines rule-based proxy labelling, density-based clustering, penalty-weighted feature scaling, and a human-in-the-loop annotation queue, with semi-supervised label diffusion and asymmetric cost validation planned for the final phase.
+This document describes the end-to-end machine learning pipeline for the PAL Customer Segmentation project. The objective is to produce a baseline segmentation model over PNR booking data, assigning each booking record to one of ten commercially meaningful customer segments. The pipeline combines rule-based proxy labelling, density-based clustering, penalty-weighted feature scaling, and direct nearest-centroid assignment for ambiguous records.
 
 ---
 
 ## Target Segments
 
-The model targets ten segments (expanded from an original scope of six):
+The model targets ten segments:
 
 | # | Segment | Penalty Weight |
 |---|---------|---------------|
@@ -28,7 +28,7 @@ The model targets ten segments (expanded from an original scope of six):
 | 9 | Last-Minute | ×1 |
 | 10 | Budget/Adventure | ×1 |
 
-Penalty weights reflect the business cost of misclassifying a record into the wrong segment. Higher-penalty segments (Corporate, Mabuhay Loyalist, OFW/Migrant) demand greater recall and drive several design decisions downstream, including penalty-weighted feature scaling (Stage 6) and the annotation queue priority order (Stage 8).
+Penalty weights reflect the business cost of misclassifying a record into the wrong segment. Higher-penalty segments (Corporate, Mabuhay Loyalist, OFW/Migrant) demand greater recall and drive the penalty-weighted feature scaling in Stage 5.
 
 ---
 
@@ -43,16 +43,16 @@ Penalty weights reflect the business cost of misclassifying a record into the wr
 
 ### Known Data Gaps (Blocking)
 
-The following fields are present in the schema but contain no data in the current extract. Each gap blocks one or more segmentation signals:
+The following fields are present in the schema but contain no data in the current extract. Each gap limits one or more proxy segmentation signals:
 
-| Feature | Blocks |
+| Feature | Limits |
 |---------|--------|
-| `Loyalty status` | Mabuhay Loyalist segment; 4 of 6 negative learning rules |
-| `Length of stay` | Corporate vs. Leisure separation |
+| `Loyalty status` | Mabuhay Loyalist segment; strengthens Corporate and OFW proxy separation |
+| `Length of stay` | Corporate vs. Leisure separation; Digital Nomad identification |
 | `Departure Time` | Early-AM Corporate signal |
-| `Cargo/baggage add-on` | OFW/Balikbayan negative rule |
+| `Cargo/baggage add-on` | OFW/Balikbayan confirmation signal |
 
-Until these fields are populated from source systems, the affected rules remain inactive and the Mabuhay Loyalist segment cannot be assigned via proxy labelling.
+Until these fields are populated from source systems, the Mabuhay Loyalist segment cannot be assigned via proxy labelling.
 
 ---
 
@@ -125,31 +125,11 @@ Because no ground-truth labels exist, a rule-based waterfall assigns proxy label
 | Unassigned | 7,084 | 23.6% |
 | **Total** | **29,985** | **100%** |
 
----
-
-### Stage 4 — Resampling Analysis (Rejected)
-
-**Script:** `resample_compare.py`
-
-Five resampling strategies were evaluated against a Random Forest classifier to test whether class imbalance could be addressed at this stage:
-
-- Random Oversample
-- Random Undersample
-- SMOTE
-- ADASYN
-- Tomek Links
-
-**Decision: all resampling strategies rejected.** Three reasons:
-
-**(a) Circular validation artifact.** Proxy labels are derived from the same features used for classification. F1 scores of 0.99+ reflect the model re-learning the labelling rules, not a generalisation signal.
-
-**(b) SMOTE/ADASYN produce semantically invalid synthetic points.** Proxy label boundaries are sharp rule-based thresholds. Interpolated synthetic records land in regions that violate the rules that defined their class, introducing noise rather than signal.
-
-**(c) Class imbalance is handled downstream.** The asymmetric penalty matrix in Stage 10 is the correct mechanism for managing the cost consequences of imbalanced classes; resampling at this stage would double-count the adjustment.
+**Note on resampling:** Five resampling strategies (Random Oversample, Undersample, SMOTE, ADASYN, Tomek Links) were evaluated and rejected. Proxy labels are derived from the same features used for classification, so F1 scores of 0.99+ reflect the model re-learning the labelling rules — not a generalisation signal. Class imbalance is handled downstream via the asymmetric penalty matrix in Stage 7.
 
 ---
 
-### Stage 5 — Clustering Algorithm Evaluation
+### Stage 4 — Clustering Algorithm Evaluation
 
 **Script:** `cluster_compare.py`
 
@@ -168,15 +148,13 @@ Seven algorithms were evaluated on the full 40-feature scaled matrix. The target
 **Decision: HDBSCAN selected.** Rationale:
 
 1. Does not assume spherical clusters — follows actual density contours in feature space.
-2. Naturally identifies noise (7.1% ≈ 2,100 records). These are genuine boundary cases better resolved by human annotation than by forced cluster assignment.
-3. 78 micro-clusters can be merged to 10 named segments via nearest-centroid mapping (Stage 7).
+2. Naturally identifies noise (7.1% ≈ 2,100 records) — genuine boundary cases that are resolved by nearest-centroid assignment rather than forced cluster membership.
+3. 78 micro-clusters can be merged to 10 named segments via nearest-centroid mapping (Stage 6).
 4. KMeans forces every borderline record into its nearest centroid, silently polluting proxy seeds. HDBSCAN flags them as noise instead, surfacing the ambiguity explicitly.
-
-DBSCAN produced stronger separation metrics but returned 221 clusters with higher noise — not directly mappable to 10 segments without a further reduction step.
 
 ---
 
-### Stage 6 — Penalty-Weighted Feature Scaling
+### Stage 5 — Penalty-Weighted Feature Scaling
 
 **Script:** `hdbscan_final.py`
 
@@ -198,57 +176,27 @@ Apply weights to scaled feature matrix before HDBSCAN fit
 
 ---
 
-### Stage 7 — HDBSCAN Cluster to Segment Mapping
+### Stage 6 — Cluster → Segment Mapping & Noise Assignment
 
 **Script:** `hdbscan_final.py`
 
-HDBSCAN returns 78 micro-clusters plus a noise set (label = −1). This stage maps micro-clusters to the ten named segments and prioritises the noise queue for human review.
+HDBSCAN returns 78 micro-clusters plus a noise set (label = −1). This stage maps all records — micro-clusters and noise alike — to the ten named segments.
 
-**Cluster assignment:**
+**Micro-cluster assignment:**
 
 1. Compute the centroid of each HDBSCAN cluster in penalty-weighted feature space.
 2. Compute the centroid of each proxy-labelled segment (from Stage 3) in the same space.
 3. Assign each cluster to its nearest segment centroid by Euclidean distance.
 
-**Noise queue scoring:**
+**Noise record assignment:**
 
-Records with label = −1 are ranked for annotation by a penalty risk score:
+Records with label = −1 (~7.1% of the dataset) are automatically assigned to their nearest segment centroid using the same penalty-weighted feature space. This is consistent with the micro-cluster assignment logic and requires no human intervention. The penalty-weighted distance metric already biases the space so that high-stakes segments (Corporate, OFW/Migrant) pull nearby ambiguous records correctly.
 
-```
-penalty_risk_score = penalty_weight[nearest_segment] / distance_to_nearest_centroid
-```
-
-Higher scores indicate records that are both high-stakes (high penalty) and geometrically ambiguous (close to a centroid boundary). These are annotated first.
+**Result:** All 29,985 records receive a final segment label. No records remain unassigned.
 
 ---
 
-### Stage 8 — Annotation Queue (Human-in-the-Loop)
-
-**Script:** `hdbscan_final.py`
-
-Noise records are presented to human annotators in descending order of penalty risk score:
-
-1. **First annotated:** noise records near the Corporate and OFW/Migrant centroids — high penalty, high ambiguity.
-2. **Last annotated:** noise records near the Budget/Adventure centroid — low penalty, low business risk if incorrectly classified.
-
-Ground-truth labels produced by annotation are added as additional seeds and fed into Stage 9.
-
----
-
-### Stage 9 — Label Diffusion (Planned)
-
-A graph-based semi-supervised learning step will propagate confirmed labels from seeds (Stage 7 cluster assignments + annotated noise from Stage 8) to the remaining unlabelled records.
-
-**Approach:**
-
-1. Construct a k-nearest-neighbour graph over all 29,985 records in penalty-weighted feature space.
-2. Use `sklearn.semi_supervised.LabelSpreading` or `LabelPropagation` to propagate labels from labelled seeds to unlabelled neighbours, weighted by feature similarity.
-
-This stage is pending completion of the annotation queue.
-
----
-
-### Stage 10 — Validate (Asymmetric Cost Matrix)
+### Stage 7 — Validate (Asymmetric Cost Matrix)
 
 Final label quality is evaluated using the segment penalty matrix rather than standard accuracy or macro-F1.
 
@@ -264,7 +212,7 @@ Final label quality is evaluated using the segment penalty matrix rather than st
 
 ---
 
-### Stage 11 — Dashboard (Power BI)
+### Stage 8 — Dashboard (Power BI)
 
 **Deliverable:** Executive Power BI dashboard at Origin & Destination (O&D) level, segmented by travel month.
 
@@ -289,7 +237,7 @@ Final label quality is evaluated using the segment penalty matrix rather than st
 | `resample_compare.py` | 5 resampling strategies comparison | Resampling evaluation (rejected) |
 | `dbscan_viz.py` | DBSCAN deep-dive | 8 charts |
 | `pca_boundaries.py` | Decision boundary visualisation, per-segment zoom grid | Boundary plots |
-| `hdbscan_final.py` | HDBSCAN with penalty-weighted features, segment mapping, noise queue | Final cluster assignments, annotation queue |
+| `hdbscan_final.py` | HDBSCAN with penalty-weighted features, segment mapping, noise auto-assignment | Final cluster assignments |
 | `pal_colors.py` | Canonical 10-segment colour palette | Shared colour constants |
 
 ---
@@ -309,28 +257,20 @@ sample-features.csv
 [Stage 3] Proxy Label Waterfall   22,907 labelled / 7,084 Unassigned
         |
         v
-[Stage 4] Resampling (Rejected)
+[Stage 4] Algorithm Comparison    HDBSCAN selected
         |
         v
-[Stage 5] Algorithm Comparison    HDBSCAN selected
+[Stage 5] Penalty-Weighted Scaling
         |
         v
-[Stage 6] Penalty-Weighted Scaling
+[Stage 6] Cluster → Segment Map   78 micro-clusters → 10 segments
+          + Noise Auto-Assignment  ~2,100 noise → nearest centroid
         |
         v
-[Stage 7] Cluster → Segment Map   78 micro-clusters → 10 segments
-        |                         ~2,100 noise records → annotation queue
-        v
-[Stage 8] Annotation Queue        Human review, priority by penalty risk score
+[Stage 7] Validate                Asymmetric cost matrix, per-segment recall
         |
         v
-[Stage 9] Label Diffusion         (Planned) k-NN graph, LabelSpreading
-        |
-        v
-[Stage 10] Validate               Asymmetric cost matrix, per-segment recall
-        |
-        v
-[Stage 11] Power BI Dashboard     O&D × segment × travel month
+[Stage 8] Power BI Dashboard      O&D × segment × travel month
 ```
 
 ---
@@ -342,9 +282,9 @@ The current pipeline runs on a **29,999-row January 2025 snapshot**. Key constra
 | Limitation | Impact |
 |-----------|--------|
 | All flight dates are January 2025 only | Seasonality signals (Pilgrimage, Balikbayan, OFW deployment) cannot be validated on flight date |
-| `Loyalty status`, `Departure Time`, `Length of stay` are 100% null | Mabuhay Loyalist has zero proxy-labelled records; 4/6 negative learning rules inactive |
+| `Loyalty status`, `Departure Time`, `Length of stay` are 100% null | Mabuhay Loyalist has zero proxy-labelled records; Corporate and OFW proxy rules are weaker |
 | No RFM history | Booking frequency and recency cannot be computed per passenger |
-| No cargo/ancillary flags | OFW/Balikbayan negative learning rule is inactive |
+| No cargo/ancillary flags | OFW/Balikbayan confirmation signal is absent |
 
 ---
 
@@ -356,7 +296,7 @@ PAL holds **~6 million PNR records spanning 5 years**. The following actions are
 
 | Action | Reason |
 |--------|--------|
-| Request `Loyalty status` (Mabuhay Miles tier) from PAL | Unlocks Mabuhay Loyalist segment and 4/6 negative learning rules |
+| Request `Loyalty status` (Mabuhay Miles tier) from PAL | Unlocks Mabuhay Loyalist segment; strengthens Corporate and OFW proxy rules |
 | Request flight schedule data | Provides `Departure Time` — early-AM Corporate signal |
 | Request return PNR pairing | Derives `Length of stay` — short stay = Corporate, long stay = Leisure |
 | Request ancillary / SSR data | Cargo add-on = OFW/Balikbayan signal; seat selection = Corporate |
@@ -375,7 +315,6 @@ PAL holds **~6 million PNR records spanning 5 years**. The following actions are
 | Data loading | `pandas` | `polars` or chunked `pandas` |
 | HDBSCAN | `min_cluster_size=150` | `min_cluster_size=500–1000`, `algorithm='prims_kdtree'` |
 | Nearest-neighbour search | `sklearn` brute | FAISS approximate nearest neighbours |
-| Annotation queue | CSV export | Dedicated annotation interface (Label Studio or similar) |
 
 ### Full Retrain Sequence
 
@@ -384,15 +323,25 @@ PAL holds **~6 million PNR records spanning 5 years**. The following actions are
 [2] Clean, engineer RFM + temporal features, filter COVID years
 [3] Refit penalty-weighted StandardScaler on full dataset
 [4] Refit HDBSCAN (min_cluster_size=500–1000)
-[5] Re-run cluster → segment mapping (Stage 7)
-[6] Annotate noise queue — ~528K records expected at 8.8%
-[7] Run label diffusion (Stage 9) on full 6M k-NN graph
-[8] Validate with asymmetric cost matrix (Stage 10)
-[9] Build Power BI dashboard on final labelled dataset
-[10] Define monthly refresh pipeline for production scoring
+[5] Re-run cluster → segment mapping + noise auto-assignment (Stage 6)
+[6] Validate with asymmetric cost matrix (Stage 7)
+[7] Build Power BI dashboard on final labelled dataset
+[8] Define monthly refresh pipeline for production scoring
 ```
 
 ---
 
+## Future Enhancements (When Blocking Data Arrives)
+
+Once `Loyalty status`, `Cargo/baggage add-on`, `Length of stay`, and `Departure Time` are available from PAL systems, the proxy waterfall can be extended with exclusion rules that narrow segment assignments further. For example:
+
+- A record booked 60+ days out in Economy with no loyalty ID is unlikely to be Corporate.
+- A record with a cargo add-on on a Manila–Riyadh route is unlikely to be Premium Bleisure.
+- A Business-cabin same-day return with loyalty status narrows to Corporate or Premium Bleisure only.
+
+These rules are not implemented in the current pipeline because the required fields are 100% null in the sample dataset and would have no effect. They are documented here as a planned extension, not a current dependency.
+
+---
+
 *Document prepared for Philippine Airlines internal use.*
-*v0.3 — 19 April 2026*
+*v0.4 — 11 May 2026*

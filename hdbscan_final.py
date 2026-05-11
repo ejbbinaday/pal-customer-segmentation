@@ -5,18 +5,18 @@ Pipeline:
   2. Penalty-weighted feature re-scaling (high-penalty segments → upweighted dims)
   3. HDBSCAN clustering
   4. Map N micro-clusters → 10 segments via nearest proxy-label centroid
-  5. Noise records → annotation queue sorted by penalty risk score
+  5. Noise records → auto-assign to nearest proxy-label centroid (same logic as step 4)
   6. Decision boundary visualisation (KNN on PCA-2D of weighted features)
 
 Outputs (hdbscan_output/):
-  fig_h01_feature_weights.png     — penalty-weighted feature importance bar
-  fig_h02_hdbscan_raw.png         — HDBSCAN clusters in PCA-2D (weighted space)
-  fig_h03_cluster_sizes.png       — cluster size distribution
-  fig_h04_mapping_bar.png         — clusters-per-segment + PNR-per-segment
-  fig_h05_final_pca.png           — 10 mapped segments + KNN decision boundaries
-  fig_h06_noise_queue.png         — annotation queue, top records by penalty risk
+  fig_h01_feature_weights.png      — penalty-weighted feature importance bar
+  fig_h02_hdbscan_raw.png          — HDBSCAN clusters in PCA-2D (weighted space)
+  fig_h03_cluster_sizes.png        — cluster size distribution
+  fig_h04_mapping_bar.png          — clusters-per-segment + PNR-per-segment (all records)
+  fig_h05_final_pca.png            — 10 mapped segments + KNN decision boundaries
+  fig_h06_noise_assignment.png     — auto-assigned noise records distribution
   fig_h07_segment_distribution.png — final segment PNR counts vs proxy baseline
-  fig_h08_centroid_heatmap.png    — segment centroid feature heatmap
+  fig_h08_centroid_heatmap.png     — segment centroid feature heatmap
 """
 
 import warnings
@@ -304,7 +304,7 @@ nn = NearestNeighbors(n_neighbors=1, algorithm="brute").fit(seg_cent_matrix)
 _, nn_idx = nn.kneighbors(clust_cent_matrix)
 cluster_to_seg = {cid: seg_names_present[nn_idx[i, 0]]
                   for i, cid in enumerate(cluster_ids)}
-cluster_to_seg[-1] = "Unassigned"   # noise stays unassigned for now
+cluster_to_seg[-1] = "Unassigned"   # placeholder; overridden below by auto-assignment
 
 df["hdb_cluster"]  = hdb_labels
 df["hdb_segment"]  = df["hdb_cluster"].map(cluster_to_seg)
@@ -314,12 +314,11 @@ hdb_seg_counts = df["hdb_segment"].value_counts()
 print(hdb_seg_counts.to_string())
 
 # ══════════════════════════════════════════════════════════════════════════════
-# 6.  NOISE → ANNOTATION QUEUE  (sorted by penalty risk score)
+# 6.  NOISE → AUTO-ASSIGN TO NEAREST SEGMENT CENTROID
 # ══════════════════════════════════════════════════════════════════════════════
-print("\nBuilding annotation queue from noise records ...")
+print("\nAuto-assigning noise records to nearest segment centroid ...")
 
-noise_df  = df[noise_mask].copy()
-noise_X   = X_weighted[noise_mask]
+noise_X = X_weighted[noise_mask]
 
 # Distance from each noise record to each segment centroid
 dists = np.array([
@@ -327,36 +326,23 @@ dists = np.array([
     for s in seg_names_present
 ]).T   # (n_noise, n_segments)
 
-nearest_seg_idx   = dists.argmin(axis=1)
-nearest_seg       = [seg_names_present[i] for i in nearest_seg_idx]
-nearest_dist      = dists[np.arange(len(dists)), nearest_seg_idx]
-nearest_penalty   = [PENALTY.get(s, 1) for s in nearest_seg]
+nearest_seg_idx = dists.argmin(axis=1)
+nearest_seg     = [seg_names_present[i] for i in nearest_seg_idx]
+nearest_dist    = dists[np.arange(len(dists)), nearest_seg_idx]
 
-# Risk score: high penalty AND close to centroid → annotate first
-# risk = penalty / (distance + ε) — but normalise distance first
-dist_norm         = (nearest_dist - nearest_dist.min()) / (nearest_dist.max() - nearest_dist.min() + 1e-9)
-risk_score        = np.array(nearest_penalty) / (dist_norm + 0.1)
+# Override the "Unassigned" placeholder for noise records
+df.loc[noise_mask, "hdb_segment"] = nearest_seg
 
-noise_df["nearest_segment"] = nearest_seg
-noise_df["nearest_penalty"] = nearest_penalty
-noise_df["dist_to_centroid"]= nearest_dist
-noise_df["risk_score"]      = risk_score
-noise_df = noise_df.sort_values("risk_score", ascending=False).reset_index(drop=True)
-noise_df["queue_rank"]      = range(1, len(noise_df)+1)
+print(f"  Auto-assigned {n_noise:,} noise records")
+print("\nNoise auto-assignment distribution:")
+noise_assign_counts = pd.Series(nearest_seg).value_counts()
+for seg, cnt in noise_assign_counts.items():
+    pct = cnt / n_noise * 100
+    print(f"  {seg:<22} n={cnt:>5,}  ({pct:4.1f}%)")
 
-print(f"Annotation queue: {len(noise_df):,} records")
-print("Top-10 records:")
-print(noise_df[["queue_rank","nearest_segment","nearest_penalty",
-                "dist_to_centroid","risk_score","lead_time","fare_per_pax","PAX Count",
-                "Cabin","Region","Ticketing Channel"]].head(10).to_string(index=False))
-
-# Save queue to CSV
-queue_path = OUTPUT / "annotation_queue.csv"
-noise_df[["queue_rank","nearest_segment","nearest_penalty","risk_score",
-          "dist_to_centroid","lead_time","Average Fare","fare_per_pax",
-          "PAX Count","Cabin","Region","Farebrand","Ticketing Channel",
-          "Itinerary Type","Sector","DOW","booking_month"]].to_csv(queue_path, index=False)
-print(f"  saved → hdbscan_output/annotation_queue.csv")
+print("\nFinal segment distribution (all records):")
+final_counts = df["hdb_segment"].value_counts()
+print(final_counts.to_string())
 
 # ══════════════════════════════════════════════════════════════════════════════
 # FIG H04 — Mapping bar (clusters per segment + PNRs per segment)
@@ -365,7 +351,7 @@ seg_cluster_counts = (pd.Series(cluster_to_seg)
                       .drop(-1, errors="ignore")
                       .value_counts()
                       .reindex(seg_names_present, fill_value=0))
-seg_pnr_counts     = (df[~noise_mask]["hdb_segment"]
+seg_pnr_counts     = (df["hdb_segment"]
                       .value_counts()
                       .reindex(seg_names_present, fill_value=0))
 
@@ -393,7 +379,7 @@ for bar, val in zip(bars2, seg_pnr_counts.values):
     ax2.text(bar.get_x()+bar.get_width()/2, bar.get_height()+max(seg_pnr_counts)*0.01,
              f"{val:,}\n({val/len(df)*100:.1f}%)",
              ha="center", va="bottom", fontsize=7, color=SUBTEXT)
-ax2.set_title(f"PNRs per Segment  (noise={n_noise:,} excluded → annotation queue)",
+ax2.set_title(f"PNRs per Segment  (noise={n_noise:,} auto-assigned to nearest centroid)",
               color=TEXT, fontsize=10, fontweight="bold")
 ax2.set_ylabel("PNR Count")
 plt.setp(ax2.get_xticklabels(), rotation=30, ha="right", fontsize=8)
@@ -406,15 +392,14 @@ save(fig, "fig_h04_mapping_bar")
 # ══════════════════════════════════════════════════════════════════════════════
 print("\nBuilding decision boundaries (KNN-15 on PCA-2D) ...")
 
-# Train KNN on mapped (non-noise) records
-mapped_df   = df[~noise_mask].copy()
-le          = LabelEncoder()
+# Train KNN on all records (noise now assigned)
+le = LabelEncoder()
 le.fit(seg_names_present)
-y_mapped    = le.transform(mapped_df["hdb_segment"].values)
-X_pca_mapped = X_pca[~noise_mask]
+y_all     = le.transform(df["hdb_segment"].values)
+X_pca_all = X_pca
 
 knn = KNeighborsClassifier(n_neighbors=15, weights="distance", n_jobs=-1)
-knn.fit(X_pca_mapped, y_mapped)
+knn.fit(X_pca_all, y_all)
 
 PAD  = 0.6;  STEP = 0.04
 x1_min = X_pca[:,0].min()-PAD;  x1_max = X_pca[:,0].max()+PAD
@@ -438,17 +423,19 @@ for ax, show_boundaries in zip(axes, [True, False]):
         ax.contour(xx, yy, Z, levels=levels, colors="white",
                    linewidths=0.9, alpha=0.55, zorder=2)
 
-    # Noise (grey, small)
-    noise_pca = X_pca[noise_mask]
-    ax.scatter(noise_pca[::3, 0], noise_pca[::3, 1],
-               c="#4B5563", s=5, alpha=0.25, zorder=3, label="Noise (queue)")
-
-    # Mapped segments
+    # Previously-noise records (lighter alpha to distinguish auto-assigned)
     for seg in seg_names_present:
-        m = mapped_df["hdb_segment"] == seg
-        ax.scatter(X_pca_mapped[m, 0], X_pca_mapped[m, 1],
+        m_noise = noise_mask & (df["hdb_segment"] == seg)
+        if m_noise.sum() > 0:
+            ax.scatter(X_pca[m_noise, 0], X_pca[m_noise, 1],
+                       c=SEG_COLORS.get(seg, "#60A5FA"), s=5, alpha=0.25, zorder=3)
+
+    # Cluster-assigned records
+    for seg in seg_names_present:
+        m = (~noise_mask) & (df["hdb_segment"] == seg)
+        ax.scatter(X_pca[m, 0], X_pca[m, 1],
                    c=SEG_COLORS.get(seg, "#60A5FA"), s=8, alpha=0.55, zorder=4,
-                   label=f"{seg} ({m.sum():,})")
+                   label=f"{seg} ({(df['hdb_segment']==seg).sum():,})")
 
     title = ("With Decision Boundaries" if show_boundaries else "Scatter Only")
     ax.set_title(title, color=TEXT, fontsize=10, fontweight="bold")
@@ -459,7 +446,6 @@ for ax, show_boundaries in zip(axes, [True, False]):
 
 patches = [mpatches.Patch(color=SEG_COLORS.get(s,"#60A5FA"), label=s)
            for s in seg_names_present]
-patches.append(mpatches.Patch(color="#4B5563", label=f"Noise → queue ({n_noise:,})"))
 fig.legend(handles=patches, fontsize=7.5, loc="lower center", ncol=5,
            framealpha=0.35, facecolor=PANEL, edgecolor=BORDER,
            bbox_to_anchor=(0.5, -0.03))
@@ -467,50 +453,55 @@ fig.tight_layout()
 save(fig, "fig_h05_final_pca")
 
 # ══════════════════════════════════════════════════════════════════════════════
-# FIG H06 — Annotation queue visualisation
+# FIG H06 — Noise auto-assignment visualisation
 # ══════════════════════════════════════════════════════════════════════════════
+noise_seg_assigned = df.loc[noise_mask, "hdb_segment"]
+noise_assign_series = noise_seg_assigned.value_counts().reindex(seg_names_present, fill_value=0)
+noise_assign_series = noise_assign_series[noise_assign_series > 0]
+
 fig, axes = plt.subplots(1, 3, figsize=(18, 6), facecolor=BG)
-fig.suptitle(f"Annotation Queue  ·  {n_noise:,} Noise Records Sorted by Penalty Risk Score",
+fig.suptitle(f"Noise Auto-Assignment  ·  {n_noise:,} Records Assigned to Nearest Segment Centroid",
              fontsize=11, color=TEXT, fontweight="bold")
 
-# Left: queue distribution by nearest segment
+# Left: auto-assignment counts by segment
 ax1 = axes[0]
-q_counts = noise_df["nearest_segment"].value_counts()
-colors_q  = [SEG_COLORS.get(s,"#60A5FA") for s in q_counts.index]
-bars = ax1.bar(q_counts.index, q_counts.values, color=colors_q, width=0.65)
-for bar, val in zip(bars, q_counts.values):
+colors_na = [SEG_COLORS.get(s, "#60A5FA") for s in noise_assign_series.index]
+bars = ax1.bar(noise_assign_series.index, noise_assign_series.values,
+               color=colors_na, width=0.65)
+for bar, val in zip(bars, noise_assign_series.values):
     ax1.text(bar.get_x()+bar.get_width()/2, bar.get_height()+5,
              f"{val:,}", ha="center", va="bottom", fontsize=8, color=SUBTEXT)
-ax1.set_title("Noise Records by\nNearest Segment", color=TEXT, fontsize=9, fontweight="bold")
+ax1.set_title("Auto-Assigned Noise\nby Segment", color=TEXT, fontsize=9, fontweight="bold")
 ax1.set_ylabel("Count")
 plt.setp(ax1.get_xticklabels(), rotation=35, ha="right", fontsize=7.5)
 
-# Middle: risk score distribution
+# Middle: distance-to-centroid distribution for auto-assigned noise
 ax2 = axes[1]
-for seg in q_counts.index:
-    sub = noise_df[noise_df["nearest_segment"]==seg]["risk_score"]
-    ax2.scatter(np.full(len(sub), seg), sub,
-                c=SEG_COLORS.get(seg,"#60A5FA"), s=6, alpha=0.4)
-ax2.set_title("Risk Score Distribution\nby Nearest Segment", color=TEXT, fontsize=9, fontweight="bold")
-ax2.set_ylabel("Risk Score (↑ = annotate first)")
+for seg in noise_assign_series.index:
+    m_idx   = np.where(noise_mask)[0][np.array(nearest_seg) == seg]
+    sub_dist = nearest_dist[np.array(nearest_seg) == seg]
+    ax2.scatter(np.full(len(sub_dist), seg), sub_dist,
+                c=SEG_COLORS.get(seg, "#60A5FA"), s=6, alpha=0.4)
+ax2.set_title("Distance to Assigned Centroid\n(lower = more confident assignment)",
+              color=TEXT, fontsize=9, fontweight="bold")
+ax2.set_ylabel("Euclidean Distance to Centroid")
 plt.setp(ax2.get_xticklabels(), rotation=35, ha="right", fontsize=7.5)
 
-# Right: PCA scatter of noise coloured by nearest segment + penalty
+# Right: PCA scatter of noise records coloured by auto-assigned segment
 ax3 = axes[2]
-for seg in q_counts.index:
-    m = noise_df["nearest_segment"] == seg
-    sub_idx = noise_df[m].index
-    ax3.scatter(noise_df.loc[m, "pc1"], noise_df.loc[m, "pc2"],
-                c=SEG_COLORS.get(seg,"#60A5FA"), s=8, alpha=0.6,
-                label=f"{seg} (×{PENALTY.get(seg,1)})")
-ax3.set_title("Noise Records in PCA Space\n(colour = nearest segment, priority = ×penalty)",
+for seg in noise_assign_series.index:
+    m = noise_mask & (df["hdb_segment"] == seg)
+    ax3.scatter(X_pca[m, 0], X_pca[m, 1],
+                c=SEG_COLORS.get(seg, "#60A5FA"), s=8, alpha=0.65,
+                label=f"{seg} ({m.sum():,})")
+ax3.set_title("Auto-Assigned Noise in PCA Space\n(colour = assigned segment)",
               color=TEXT, fontsize=9, fontweight="bold")
 ax3.set_xlabel(f"PC1 ({var_exp[0]:.1f}%)", fontsize=8)
 ax3.set_ylabel(f"PC2 ({var_exp[1]:.1f}%)", fontsize=8)
 ax3.legend(fontsize=6.5, framealpha=0.3, facecolor=PANEL, edgecolor=BORDER, ncol=2)
 
 fig.tight_layout()
-save(fig, "fig_h06_noise_queue")
+save(fig, "fig_h06_noise_assignment")
 
 # ══════════════════════════════════════════════════════════════════════════════
 # FIG H07 — Proxy baseline vs HDBSCAN segment distribution comparison
@@ -518,24 +509,38 @@ save(fig, "fig_h06_noise_queue")
 proxy_counts = (df["segment"].value_counts()
                 .reindex(seg_names_present + ["Unassigned"], fill_value=0))
 hdb_counts   = (df["hdb_segment"].value_counts()
-                .reindex(seg_names_present + ["Unassigned"], fill_value=0))
+                .reindex(seg_names_present, fill_value=0))
 
-x     = np.arange(len(seg_names_present)+1)
-w     = 0.38
-segs  = seg_names_present + ["Unassigned"]
-cols  = [SEG_COLORS.get(s,"#4B5563") for s in segs]
+# Proxy: show all including Unassigned; HDBSCAN: all assigned (no Unassigned)
+proxy_segs = seg_names_present + ["Unassigned"]
+x_proxy = np.arange(len(proxy_segs))
+x_hdb   = np.arange(len(seg_names_present))
+w = 0.38
 
-fig, ax = plt.subplots(figsize=(16, 6), facecolor=BG)
-bars1 = ax.bar(x - w/2, [proxy_counts[s] for s in segs], width=w,
-               color=cols, alpha=0.55, label="Proxy waterfall", edgecolor=BORDER)
-bars2 = ax.bar(x + w/2, [hdb_counts[s]  for s in segs], width=w,
-               color=cols, alpha=0.95, label="HDBSCAN mapped",  edgecolor="white", linewidth=0.5)
-ax.set_xticks(x)
-ax.set_xticklabels(segs, rotation=30, ha="right", fontsize=8)
-ax.set_title("Segment Distribution: Proxy Waterfall  vs  HDBSCAN Mapped",
+fig, axes = plt.subplots(1, 2, figsize=(18, 6), facecolor=BG)
+fig.suptitle("Segment Distribution: Proxy Waterfall  vs  HDBSCAN Final (all records assigned)",
              fontsize=11, color=TEXT, fontweight="bold")
+
+ax = axes[0]
+cols_proxy = [SEG_COLORS.get(s, "#4B5563") for s in proxy_segs]
+bars1 = ax.bar(x_proxy, [proxy_counts[s] for s in proxy_segs], width=0.65,
+               color=cols_proxy, alpha=0.75, edgecolor=BORDER)
+ax.set_xticks(x_proxy)
+ax.set_xticklabels(proxy_segs, rotation=30, ha="right", fontsize=8)
+ax.set_title("Proxy Waterfall  (7,084 Unassigned)", color=TEXT, fontsize=10, fontweight="bold")
 ax.set_ylabel("PNR Count")
-ax.legend(fontsize=9, facecolor=PANEL, edgecolor=BORDER)
+
+ax = axes[1]
+cols_hdb = [SEG_COLORS.get(s, "#4B5563") for s in seg_names_present]
+bars2 = ax.bar(x_hdb, [hdb_counts[s] for s in seg_names_present], width=0.65,
+               color=cols_hdb, alpha=0.95, edgecolor="white", linewidth=0.5)
+ax.set_xticks(x_hdb)
+ax.set_xticklabels(seg_names_present, rotation=30, ha="right", fontsize=8)
+ax.set_title(f"HDBSCAN Final  (0 Unassigned — noise auto-assigned)",
+             color=TEXT, fontsize=10, fontweight="bold")
+ax.set_ylabel("PNR Count")
+
+fig = axes[0].figure
 fig.tight_layout()
 save(fig, "fig_h07_segment_distribution")
 
@@ -589,16 +594,14 @@ save(fig, "fig_h08_centroid_heatmap")
 print("\n" + "="*70)
 print("HDBSCAN FINAL SUMMARY  (penalty-weighted features)")
 print("="*70)
-print(f"Total records       : {len(df):,}")
-print(f"Clusters found      : {n_clusters}")
-print(f"Noise → queue       : {n_noise:,}  ({noise_pct:.2f}%)")
-print(f"\nFinal segment distribution:")
+print(f"Total records          : {len(df):,}")
+print(f"Clusters found         : {n_clusters}")
+print(f"Noise auto-assigned    : {n_noise:,}  ({noise_pct:.2f}%)")
+print(f"\nFinal segment distribution (all {len(df):,} records assigned):")
 for seg in seg_names_present:
     n   = (df["hdb_segment"]==seg).sum()
     pct = n / len(df) * 100
     pw  = PENALTY.get(seg, 1)
     print(f"  {seg:<22} n={n:>6,}  ({pct:4.1f}%)  penalty=×{pw}")
-print(f"\n  {'Noise (annotation queue)':<22} n={n_noise:>6,}  ({noise_pct:4.1f}%)")
-print(f"\nTop-5 annotation queue (annotate these first):")
-print(noise_df[["queue_rank","nearest_segment","nearest_penalty","risk_score"]].head(5).to_string(index=False))
+print(f"\n  Unassigned             n={0:>6,}  (all records assigned)")
 print("\nAll outputs saved to hdbscan_output/")

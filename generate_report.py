@@ -208,7 +208,7 @@ benchmarks = [
 missing_features = [
     {"name":"Loyalty Status / Mabuhay Tier","priority":"P1 — BLOCKING",
      "color":"#EF4444","source":"Mabuhay Miles DB",
-     "impact":"Required for 4 of 6 Negative Learning rules; identifies Corporate & Loyalist directly"},
+     "impact":"Enables Mabuhay Loyalist proxy rule; strengthens Corporate, Bleisure, and OFW proxy separation"},
     {"name":"Length of Stay","priority":"P1 — BLOCKING",
      "color":"#EF4444","source":"Return PNR pairing",
      "impact":"Separates Corporate (<4d) from Bleisure (5–14d), Balikbayan (14d+) and Digital Nomad (30d+)"},
@@ -257,7 +257,7 @@ nl_rules = [
 # ── chart definitions ──────────────────────────────────────────────────────────
 charts = [
     ("01_missing_values","Missing Value Rate by Feature",
-     "Three features — <strong>Loyalty status</strong>, <strong>Departure Time</strong>, and <strong>Length of stay</strong> — are 100% null across all 29,999 records. These are blocking inputs for 4 of 6 Negative Learning rules and must be sourced from PAL's Mabuhay Miles DB and flight schedule systems before modelling can begin."),
+     "Three features — <strong>Loyalty status</strong>, <strong>Departure Time</strong>, and <strong>Length of stay</strong> — are 100% null across all 29,999 records. These are blocking inputs for key proxy segmentation rules and must be sourced from PAL's Mabuhay Miles DB and flight schedule systems before full segment coverage can be achieved."),
     ("02_entity_split","Domestic vs International Split",
      "63.6% of bookings are domestic (DOM) and 36.4% international (INT). The model must perform well across both, with distinct segment distributions expected — Corporate and OFW are INT-heavy, while Budget Leisure and Family are DOM-heavy."),
     ("03_region_distribution","Booking Volume by Region",
@@ -674,13 +674,13 @@ footer strong{{color:var(--gold)}}
   </div>
   <div class="stats-grid">{stats_html}</div>
   <div class="callout">
-    <h3>⚠ Critical Data Gap — Action Required Before Modelling</h3>
+    <h3>⚠ Critical Data Gap — Action Required Before Full Segment Coverage</h3>
     <p>Three features — <strong style="color:var(--gold)">Loyalty status</strong>,
     <strong style="color:var(--gold)">Departure Time</strong>, and
     <strong style="color:var(--gold)">Length of Stay</strong> — are <strong style="color:#EF4444">100% null</strong>
-    in the sample. These are required inputs for the Negative Learning step and for correctly
+    in the sample. These are required inputs for correctly
     identifying the Mabuhay Loyalist, Corporate, Digital Nomad, and Premium Bleisure segments.
-    PAL must provide these from internal systems before the annotation pipeline can begin.</p>
+    PAL must provide these from internal systems to unlock full proxy rule coverage.</p>
   </div>
   {chart_grid([0], single=True)}
   <h3 style="margin:2.5rem 0 1rem;font-size:.9rem;color:var(--grey);text-transform:uppercase;letter-spacing:.1em">Feature Nullability Summary</h3>
@@ -926,8 +926,8 @@ footer strong{{color:var(--gold)}}
 <div class="section" id="model">
   <div class="section-header">
     <span class="section-tag">09 · Modelling Readiness</span>
-    <h2>Negative Learning Rules (Enhanced)</h2>
-    <p>9 proposed impossibility rules — 3 new rules added for Family, Pilgrimage, and Digital Nomad segments based on available features.</p>
+    <h2>Proxy Rule Feature Coverage</h2>
+    <p>Analysis of feature availability for each proxy segmentation signal. Rules marked as blocked require additional data from PAL systems.</p>
   </div>
   <table class="nl-table">
     <thead><tr><th>Condition</th><th>Ruled-Out / Narrowed To</th><th>Feature Coverage</th><th>Blocked By</th></tr></thead>
@@ -961,7 +961,7 @@ footer strong{{color:var(--gold)}}
     <h3>🚀 Recommended Next Steps</h3>
     <p>
       <strong style="color:var(--gold)">1.</strong> Request <strong style="color:var(--white)">Loyalty status + Mabuhay Miles tier</strong>
-      from the loyalty DB — unblocks 4 of 9 Negative Learning rules and enables the Mabuhay Loyalist segment entirely.<br><br>
+      from the loyalty DB — enables the Mabuhay Loyalist proxy rule and strengthens Corporate and OFW/Migrant proxy separation.<br><br>
       <strong style="color:var(--gold)">2.</strong> Source <strong style="color:var(--white)">Length of Stay</strong>
       by joining return PNRs — differentiates Corporate (&lt;4d), Bleisure (5–14d), Balikbayan (14d+), and Digital Nomad (30d+).<br><br>
       <strong style="color:var(--gold)">3.</strong> Append <strong style="color:var(--white)">Departure Time</strong>
