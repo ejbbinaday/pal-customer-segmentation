@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@200;300;400;600;700;800;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+:root{
+  --midnight:#060A16;
+  --gold:#C9A84C; --gold-lt:#E8C96C; --gold-dim:rgba(201,168,76,0.18);
+  --blue:#00D4FF; --white:#FFFFFF; --off-wh:#E8ECF4;
+  --g3:#CBD5E1; --g5:#5A6A82; --green:#4ADE80; --red:#FF4D6D;
+}
+
+html,body{background:var(--midnight);font-family:'Inter',sans-serif;color:var(--white);-webkit-font-smoothing:antialiased;}
+.deck{display:flex;flex-direction:column;align-items:center;gap:0;padding:0;margin:0;}
+
+.slide{width:1600px;height:900px;position:relative;overflow:hidden;background:var(--midnight);flex-shrink:0;}
+.t-bar{position:absolute;top:0;left:0;right:0;height:3px;z-index:10;background:linear-gradient(90deg,transparent 0%,var(--gold) 30%,var(--blue) 70%,transparent 100%);}
+.b-bar{position:absolute;bottom:0;left:0;right:0;height:3px;z-index:10;background:linear-gradient(90deg,var(--gold) 0%,var(--blue) 50%,var(--gold) 100%);}
+.grid-bg{position:absolute;inset:0;pointer-events:none;background-image:linear-gradient(rgba(255,255,255,0.022) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.022) 1px,transparent 1px);background-size:80px 80px;}
+.gb{position:absolute;border-radius:50%;filter:blur(100px);pointer-events:none;}
+
+.sh{position:absolute;top:34px;left:80px;right:80px;display:flex;justify-content:space-between;align-items:center;}
+.sh .brand{font-family:'Montserrat',sans-serif;font-weight:800;font-size:11px;letter-spacing:0.22em;text-transform:uppercase;color:var(--gold);display:flex;align-items:center;gap:12px;}
+.sh .brand::before{content:'';display:block;width:24px;height:2px;background:var(--gold);}
+.sh .tag{font-size:11px;color:var(--g5);letter-spacing:0.14em;text-transform:uppercase;}
+
+.sec-lbl{font-family:'Montserrat',sans-serif;font-weight:700;font-size:11px;letter-spacing:0.26em;text-transform:uppercase;color:var(--gold);margin-bottom:7px;}
+.page-h1{font-family:'Montserrat',sans-serif;font-weight:800;font-size:32px;color:var(--white);line-height:1.1;margin-bottom:3px;}
+.page-sub{font-size:13px;color:var(--g5);margin-bottom:0;}
+.hr-g{width:100%;height:1px;background:linear-gradient(90deg,transparent,var(--gold-dim),transparent);margin:12px 0;}
+
+/* ════════════════════════════════════════════
+   SLIDE 1 — METHODOLOGY
+═════════════════════════════════════════════ */
+#sM{background:linear-gradient(160deg,#07091A 0%,var(--midnight) 100%);}
+
+.meth-wrap{position:absolute;top:104px;left:72px;right:72px;display:flex;flex-direction:column;}
+.steps-row{display:flex;align-items:stretch;gap:0;}
+
+.step-card{
+  flex:1;position:relative;overflow:hidden;
+  border-radius:14px;padding:24px 20px 18px;
+  background:rgba(255,255,255,0.04);
+  border:1px solid rgba(255,255,255,0.09);
+  display:flex;flex-direction:column;
+}
+.step-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--sc,var(--gold));}
+.step-card .ghost-num{position:absolute;bottom:-12px;right:8px;font-family:'Montserrat',sans-serif;font-weight:900;font-size:96px;color:rgba(255,255,255,0.03);line-height:1;pointer-events:none;user-select:none;}
+
+.sc-badge-top{display:inline-flex;align-items:center;gap:7px;margin-bottom:12px;}
+.sc-num-circle{width:28px;height:28px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-family:'Montserrat',sans-serif;font-weight:900;font-size:13px;background:rgba(255,255,255,0.06);color:var(--sc,var(--gold));border:1.5px solid var(--sc,var(--gold));}
+.sc-step-label{font-family:'Montserrat',sans-serif;font-size:9px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:var(--sc,var(--gold));}
+.sc-icon{margin-bottom:10px;}
+.sc-title{font-family:'Montserrat',sans-serif;font-size:14.5px;font-weight:800;color:var(--white);line-height:1.2;margin-bottom:8px;}
+.sc-desc{font-size:11px;color:var(--g3);line-height:1.6;}
+.sc-out{margin-top:auto;padding-top:12px;font-family:'Montserrat',sans-serif;font-size:9px;font-weight:800;letter-spacing:0.1em;text-transform:uppercase;padding:6px 11px;border-radius:100px;display:inline-block;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.09);color:var(--sc,var(--gold));margin-top:12px;}
+.sc-arr{display:flex;align-items:center;justify-content:center;flex-shrink:0;width:34px;}
+
+/* req/report boxes above/below pipeline */
+.pipe-endpoint{
+  display:inline-flex;align-items:center;gap:8px;
+  padding:9px 20px;border-radius:10px;
+  background:rgba(255,255,255,0.06);
+  border:1.5px solid rgba(255,255,255,0.18);
+  font-family:'Montserrat',sans-serif;font-size:13px;font-weight:800;color:var(--off-wh);
+  width:fit-content;
+}
+.pipe-vert-arr{font-size:20px;color:var(--g5);margin:5px 0;padding-left:2px;}
+
+/* ════════════════════════════════════════════
+   SLIDE 2 — POC RESULTS
+═════════════════════════════════════════════ */
+#sP{background:linear-gradient(140deg,#060A16 0%,#090E1C 100%);}
+#sP .main{position:absolute;top:106px;left:80px;right:80px;bottom:34px;}
+
+.kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:16px;}
+.kpi-card{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:18px 17px 16px;position:relative;overflow:hidden;}
+.kpi-card::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--kc,var(--gold)),transparent);}
+.kl{font-size:9px;font-weight:600;letter-spacing:0.14em;text-transform:uppercase;color:var(--g5);margin-bottom:6px;}
+.kv{font-family:'Montserrat',sans-serif;font-weight:900;font-size:38px;line-height:1;color:var(--kc,var(--gold));margin-bottom:4px;}
+.ku{font-size:11px;color:var(--g5);line-height:1.45;}
+.kglow{position:absolute;bottom:-20px;right:-20px;width:80px;height:80px;border-radius:50%;filter:blur(28px);}
+
+.two-col{display:grid;gap:14px;}
+
+.recall-panel{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:12px;padding:16px 19px;display:flex;flex-direction:column;}
+.recall-panel h3{font-family:'Montserrat',sans-serif;font-size:10.5px;font-weight:700;color:var(--off-wh);margin-bottom:10px;letter-spacing:0.06em;display:flex;align-items:center;gap:10px;flex-shrink:0;}
+.nfr-tag{font-size:9px;font-weight:600;color:var(--red);letter-spacing:0.06em;font-family:'Inter',sans-serif;}
+.bars-wrap{display:flex;flex-direction:column;justify-content:space-between;flex:1;}
+.br{display:flex;align-items:center;gap:8px;}
+.bl{font-size:10px;color:var(--g3);width:120px;flex-shrink:0;text-align:right;line-height:1.2;}
+.btrack{flex:1;height:13px;background:rgba(255,255,255,0.05);border-radius:3px;position:relative;overflow:visible;}
+.bfill{height:100%;border-radius:3px;position:absolute;left:0;top:0;}
+.bpct{font-family:'Montserrat',sans-serif;font-size:9.5px;font-weight:700;color:var(--white);width:30px;flex-shrink:0;}
+.tmark{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--red);border-radius:1px;}
+.tlabel{position:absolute;top:-13px;font-size:7.5px;color:var(--red);font-weight:700;white-space:nowrap;transform:translateX(-50%);letter-spacing:0.06em;}
+
+.panel{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:12px;padding:16px 19px;}
+.panel h3{font-family:'Montserrat',sans-serif;font-size:10.5px;font-weight:700;color:var(--off-wh);margin-bottom:12px;letter-spacing:0.06em;}
+.ni{display:flex;gap:9px;margin-bottom:9px;font-size:12px;color:var(--g3);line-height:1.5;}
+.ni-ic{flex-shrink:0;margin-top:1px;font-size:12px;}
+
+.scatter-panel{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;}
+.scatter-label{padding:10px 14px 8px;flex-shrink:0;font-family:'Montserrat',sans-serif;font-size:10px;font-weight:700;color:var(--off-wh);letter-spacing:0.06em;border-bottom:1px solid rgba(255,255,255,0.07);}
+.scatter-sub{font-size:9px;font-weight:400;color:var(--g5);margin-top:2px;letter-spacing:0.04em;}
+.scatter-img{flex:1;min-height:0;background:#fff;overflow:hidden;}
+.scatter-img img{width:100%;height:100%;object-fit:contain;display:block;}
+</style>
+</head>
+<body>
+<div class="deck">
+
+<!-- ════════════════════════════════════════════════════════
+     SLIDE 1 — METHODOLOGY
+═════════════════════════════════════════════════════════ -->
+<div class="slide" id="sM">
+  <div class="t-bar"></div><div class="b-bar"></div><div class="grid-bg"></div>
+  <div class="gb" style="width:700px;height:350px;background:rgba(0,212,255,0.06);right:-100px;top:150px;"></div>
+  <div class="gb" style="width:280px;height:280px;background:rgba(201,168,76,0.04);left:-80px;bottom:60px;"></div>
+
+  <div class="sh">
+    <div class="brand">Philippine Airlines · Customer Intelligence</div>
+    <div class="tag">01 / Methodology</div>
+  </div>
+
+  <div class="meth-wrap">
+    <div class="sec-lbl">How It Works</div>
+    <h1 class="page-h1">From a Raw Booking File to a Fully Labelled Passenger Dataset</h1>
+    <p class="page-sub" style="margin-bottom:6px;">Fully automated &nbsp;·&nbsp; No historical labels required &nbsp;·&nbsp; Accuracy scored by revenue impact</p>
+
+    <!-- Pre-pipeline: Requirements Scoping -->
+    <div style="display:flex;flex-direction:column;margin-bottom:6px;">
+      <div class="pipe-endpoint">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="12" height="12" rx="3" stroke="rgba(255,255,255,0.5)" stroke-width="1.5"/><line x1="5" y1="6" x2="11" y2="6" stroke="rgba(255,255,255,0.5)" stroke-width="1.2"/><line x1="5" y1="9" x2="9" y2="9" stroke="rgba(255,255,255,0.5)" stroke-width="1.2"/></svg>
+        Requirements Scoping
+      </div>
+      <div class="pipe-vert-arr">↓</div>
+    </div>
+
+    <!-- 5 Step Cards -->
+    <div class="steps-row">
+
+      <!-- STEP 1 -->
+      <div class="step-card" style="--sc:var(--gold);">
+        <div class="sc-badge-top">
+          <div class="sc-num-circle">1</div>
+          <span class="sc-step-label">Collect &amp; Clean</span>
+        </div>
+        <div class="sc-icon">
+          <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+            <rect x="3" y="5" width="26" height="5" rx="2" fill="rgba(201,168,76,0.55)"/>
+            <rect x="3" y="13" width="26" height="5" rx="2" fill="rgba(201,168,76,0.38)"/>
+            <rect x="3" y="21" width="18" height="5" rx="2" fill="rgba(201,168,76,0.22)"/>
+          </svg>
+        </div>
+        <div class="sc-title">Ingestion &amp; Cleaning</div>
+        <div class="sc-desc">Raw PNR bookings loaded. Invalid or incomplete records removed automatically.</div>
+        <div class="sc-out">40+ features / record</div>
+        <div class="ghost-num">1</div>
+      </div>
+
+      <div class="sc-arr"><svg width="30" height="16" viewBox="0 0 30 16"><line x1="2" y1="8" x2="24" y2="8" stroke="rgba(255,255,255,0.18)" stroke-width="1.5"/><polygon points="19,3 28,8 19,13" fill="rgba(255,255,255,0.18)"/></svg></div>
+
+      <!-- STEP 2 -->
+      <div class="step-card" style="--sc:#60A5FA;">
+        <div class="sc-badge-top">
+          <div class="sc-num-circle" style="color:#60A5FA;border-color:#60A5FA;">2</div>
+          <span class="sc-step-label" style="color:#60A5FA;">Feature Engineering</span>
+        </div>
+        <div class="sc-icon">
+          <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+            <circle cx="7"  cy="9"  r="3" fill="rgba(96,165,250,0.6)"/>
+            <circle cx="16" cy="16" r="3" fill="rgba(96,165,250,0.45)"/>
+            <circle cx="25" cy="9"  r="3" fill="rgba(96,165,250,0.35)"/>
+            <circle cx="7"  cy="24" r="3" fill="rgba(96,165,250,0.35)"/>
+            <circle cx="25" cy="24" r="3" fill="rgba(96,165,250,0.45)"/>
+            <circle cx="16" cy="16" r="7" stroke="rgba(96,165,250,0.3)" stroke-width="1.5" fill="none"/>
+          </svg>
+        </div>
+        <div class="sc-title">Feature Engineering</div>
+        <div class="sc-desc">40 signals computed: lead time, fare, cabin class, O&amp;D pair, loyalty tier, group size.</div>
+        <div class="sc-out" style="color:#60A5FA;">40 signals per booking</div>
+        <div class="ghost-num" style="color:rgba(96,165,250,0.05);">2</div>
+      </div>
+
+      <div class="sc-arr"><svg width="30" height="16" viewBox="0 0 30 16"><line x1="2" y1="8" x2="24" y2="8" stroke="rgba(255,255,255,0.18)" stroke-width="1.5"/><polygon points="19,3 28,8 19,13" fill="rgba(255,255,255,0.18)"/></svg></div>
+
+      <!-- STEP 3 -->
+      <div class="step-card" style="--sc:#A78BFA;">
+        <div class="sc-badge-top">
+          <div class="sc-num-circle" style="color:#A78BFA;border-color:#A78BFA;">3</div>
+          <span class="sc-step-label" style="color:#A78BFA;">Label &amp; Cluster</span>
+        </div>
+        <div class="sc-icon">
+          <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+            <circle cx="16" cy="16" r="5" fill="rgba(167,139,250,0.55)"/>
+            <circle cx="6"  cy="8"  r="3" fill="rgba(167,139,250,0.4)"/>
+            <circle cx="26" cy="8"  r="3" fill="rgba(239,68,68,0.5)"/>
+            <circle cx="26" cy="24" r="3" fill="rgba(74,222,128,0.5)"/>
+            <circle cx="6"  cy="24" r="3" fill="rgba(251,191,36,0.5)"/>
+            <line x1="16" y1="11" x2="8"  y2="10" stroke="rgba(167,139,250,0.25)" stroke-width="1"/>
+            <line x1="16" y1="11" x2="24" y2="10" stroke="rgba(167,139,250,0.25)" stroke-width="1"/>
+            <line x1="16" y1="21" x2="24" y2="22" stroke="rgba(167,139,250,0.25)" stroke-width="1"/>
+            <line x1="16" y1="21" x2="8"  y2="22" stroke="rgba(167,139,250,0.25)" stroke-width="1"/>
+          </svg>
+        </div>
+        <div class="sc-title">ML Labelling &amp; Clustering</div>
+        <div class="sc-desc">9 business rules tag 76% instantly. HDBSCAN groups the rest into 78 clusters → 10 named segments.</div>
+        <div class="sc-out" style="color:#A78BFA;">10 segments · fully explained</div>
+        <div class="ghost-num" style="color:rgba(167,139,250,0.04);">3</div>
+      </div>
+
+      <div class="sc-arr"><svg width="30" height="16" viewBox="0 0 30 16"><line x1="2" y1="8" x2="24" y2="8" stroke="rgba(255,255,255,0.18)" stroke-width="1.5"/><polygon points="19,3 28,8 19,13" fill="rgba(255,255,255,0.18)"/></svg></div>
+
+      <!-- STEP 4 -->
+      <div class="step-card" style="--sc:#F87171;">
+        <div class="sc-badge-top">
+          <div class="sc-num-circle" style="color:#F87171;border-color:#F87171;">4</div>
+          <span class="sc-step-label" style="color:#F87171;">Validate</span>
+        </div>
+        <div class="sc-icon">
+          <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+            <rect x="4" y="4" width="24" height="26" rx="4" fill="rgba(248,113,113,0.15)" stroke="rgba(248,113,113,0.4)" stroke-width="1.5"/>
+            <polyline points="9,14 13,18 21,10" stroke="#4ADE80" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <line x1="9" y1="22" x2="13" y2="26" stroke="#FF4D6D" stroke-width="1.8" stroke-linecap="round"/>
+            <line x1="13" y1="22" x2="9"  y2="26" stroke="#FF4D6D" stroke-width="1.8" stroke-linecap="round"/>
+            <line x1="17" y1="24" x2="23" y2="24" stroke="rgba(248,113,113,0.35)" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="sc-title">Asymmetric Cost Validation</div>
+        <div class="sc-desc">Accuracy scored by peso impact, not raw %. A wrong Corporate label costs ×10 more than a wrong Budget label.</div>
+        <div class="sc-out" style="color:#F87171;">Revenue-weighted recall</div>
+        <div class="ghost-num" style="color:rgba(248,113,113,0.04);">4</div>
+      </div>
+
+      <div class="sc-arr"><svg width="30" height="16" viewBox="0 0 30 16"><line x1="2" y1="8" x2="24" y2="8" stroke="rgba(255,255,255,0.18)" stroke-width="1.5"/><polygon points="19,3 28,8 19,13" fill="rgba(255,255,255,0.18)"/></svg></div>
+
+      <!-- STEP 5 -->
+      <div class="step-card" style="--sc:var(--green);">
+        <div class="sc-badge-top">
+          <div class="sc-num-circle" style="color:var(--green);border-color:var(--green);">5</div>
+          <span class="sc-step-label" style="color:var(--green);">Deliver</span>
+        </div>
+        <div class="sc-icon">
+          <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+            <rect x="3" y="5" width="26" height="20" rx="3" fill="rgba(74,222,128,0.12)" stroke="rgba(74,222,128,0.4)" stroke-width="1.5"/>
+            <rect x="7" y="9"  width="8" height="7" rx="1.5" fill="rgba(74,222,128,0.3)"/>
+            <rect x="17" y="9" width="8" height="3"  rx="1.5" fill="rgba(74,222,128,0.25)"/>
+            <rect x="17" y="14" width="5" height="3" rx="1.5" fill="rgba(74,222,128,0.2)"/>
+            <rect x="7" y="19" width="18" height="2.5" rx="1" fill="rgba(74,222,128,0.15)"/>
+            <circle cx="25" cy="24" r="4" fill="#4ADE80" opacity="0.85"/>
+            <polyline points="23,24 25,26 28,22" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div class="sc-title">Dashboard &amp; Insights</div>
+        <div class="sc-desc">Labelled passenger table and Power BI dashboard — filterable by route, segment, and travel month.</div>
+        <div class="sc-out" style="color:var(--green);">Power BI · Day-1 ready</div>
+        <div class="ghost-num" style="color:rgba(74,222,128,0.04);">5</div>
+      </div>
+
+    </div><!-- /steps-row -->
+
+    <!-- Post-pipeline: Reporting & Insights -->
+    <div style="display:flex;flex-direction:column;align-items:flex-end;margin-top:6px;">
+      <div class="pipe-vert-arr" style="padding-right:100px;">↓</div>
+      <div class="pipe-endpoint" style="background:rgba(74,222,128,0.06);border-color:rgba(74,222,128,0.25);color:var(--green);">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="12" height="12" rx="3" stroke="rgba(74,222,128,0.6)" stroke-width="1.5"/><polyline points="4,8 7,11 12,5" stroke="rgba(74,222,128,0.6)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Reporting &amp; Insights
+      </div>
+    </div>
+
+  </div><!-- /meth-wrap -->
+</div><!-- /slide 1 -->
+
+
+<!-- ════════════════════════════════════════════════════════
+     SLIDE 2 — POC RESULTS
+═════════════════════════════════════════════════════════ -->
+<div class="slide" id="sP">
+  <div class="t-bar"></div><div class="b-bar"></div><div class="grid-bg"></div>
+  <div class="gb" style="width:600px;height:300px;background:rgba(0,212,255,0.05);right:-80px;top:200px;"></div>
+  <div class="gb" style="width:300px;height:300px;background:rgba(201,168,76,0.05);left:-80px;bottom:80px;"></div>
+
+  <div class="sh">
+    <div class="brand">Philippine Airlines · Customer Intelligence</div>
+    <div class="tag">03 / Proof of Concept Results</div>
+  </div>
+
+  <div class="main">
+    <div class="sec-lbl">POC Output</div>
+    <h1 class="page-h1" style="margin-bottom:2px;">Synthetic Dataset · Full Pipeline Validation</h1>
+    <p class="page-sub" style="margin-bottom:14px;">10,000 records structured to mirror real PAL bookings &nbsp;·&nbsp; All 8 stages completed automatically</p>
+
+    <!-- KPI row — 4 cards -->
+    <div class="kpi-row">
+
+      <div class="kpi-card" style="--kc:var(--gold);">
+        <div class="kl">Model Accuracy</div>
+        <div class="kv">77.7%</div>
+        <div class="ku">Labelled records · asymmetric scoring</div>
+        <div class="kglow" style="background:var(--gold);opacity:0.12;"></div>
+      </div>
+
+      <div class="kpi-card" style="--kc:var(--red);">
+        <div class="kl">Estimated Revenue Risk</div>
+        <div class="kv">₱18.1M</div>
+        <div class="ku">Misclassification cost · 5,055 evaluated</div>
+        <div class="kglow" style="background:var(--red);opacity:0.12;"></div>
+      </div>
+
+      <div class="kpi-card" style="--kc:var(--blue);">
+        <div class="kl">Corporate Recall</div>
+        <div class="kv">100%</div>
+        <div class="ku">Highest-penalty segment · ×10 cost weight</div>
+        <div class="kglow" style="background:var(--blue);opacity:0.12;"></div>
+      </div>
+
+      <div class="kpi-card" style="--kc:var(--green);">
+        <div class="kl">Micro-Clusters Found</div>
+        <div class="kv">78</div>
+        <div class="ku">Mapped to 10 named segments · fully explained</div>
+        <div class="kglow" style="background:var(--green);opacity:0.12;"></div>
+      </div>
+
+    </div><!-- /kpi-row -->
+
+    <!-- Two-column layout -->
+    <div class="two-col" style="grid-template-columns:1.15fr 1fr 0.82fr;height:calc(100% - 182px);">
+
+      <!-- Recall bars -->
+      <div class="recall-panel">
+        <h3>Per-Segment Recall <span class="nfr-tag">NFR-01 TARGET: 91%</span></h3>
+        <div class="bars-wrap">
+
+          <div class="br">
+            <div class="bl">Corporate ★</div>
+            <div class="btrack">
+              <div class="bfill" style="width:100%;background:linear-gradient(90deg,#38BDF8,#60A5FA);"></div>
+              <div class="tmark" style="left:91%;"></div><div class="tlabel" style="left:91%;">91%</div>
+            </div>
+            <div class="bpct" style="color:#38BDF8;">100%</div>
+          </div>
+
+          <div class="br">
+            <div class="bl">Digital Nomad</div>
+            <div class="btrack">
+              <div class="bfill" style="width:94.9%;background:#2DD4BF;"></div>
+              <div class="tmark" style="left:91%;"></div>
+            </div>
+            <div class="bpct" style="color:#2DD4BF;">95%</div>
+          </div>
+
+          <div class="br">
+            <div class="bl">Family</div>
+            <div class="btrack">
+              <div class="bfill" style="width:99.1%;background:#E879F9;"></div>
+              <div class="tmark" style="left:91%;"></div>
+            </div>
+            <div class="bpct" style="color:#E879F9;">99%</div>
+          </div>
+
+          <div class="br">
+            <div class="bl">Last-Minute</div>
+            <div class="btrack">
+              <div class="bfill" style="width:90.8%;background:#94A3B8;"></div>
+              <div class="tmark" style="left:91%;"></div>
+            </div>
+            <div class="bpct" style="color:#94A3B8;">91%</div>
+          </div>
+
+          <div class="br">
+            <div class="bl">Balikbayan / VFR</div>
+            <div class="btrack">
+              <div class="bfill" style="width:72.8%;background:#22C55E;"></div>
+              <div class="tmark" style="left:91%;"></div>
+            </div>
+            <div class="bpct" style="color:#22C55E;">73%</div>
+          </div>
+
+          <div class="br">
+            <div class="bl">Pilgrimage</div>
+            <div class="btrack">
+              <div class="bfill" style="width:53.6%;background:#F97316;"></div>
+              <div class="tmark" style="left:91%;"></div>
+            </div>
+            <div class="bpct" style="color:#F97316;">54%</div>
+          </div>
+
+          <div class="br">
+            <div class="bl">Mabuhay ★</div>
+            <div class="btrack">
+              <div class="bfill" style="width:62.8%;background:#FBBF24;"></div>
+              <div class="tmark" style="left:91%;"></div>
+            </div>
+            <div class="bpct" style="color:#FBBF24;">63%</div>
+          </div>
+
+          <div class="br">
+            <div class="bl">Prem. Bleisure</div>
+            <div class="btrack">
+              <div class="bfill" style="width:37.6%;background:#C084FC;"></div>
+              <div class="tmark" style="left:91%;"></div>
+            </div>
+            <div class="bpct" style="color:#C084FC;">38%</div>
+          </div>
+
+          <div class="br">
+            <div class="bl">OFW / Migrant ★</div>
+            <div class="btrack">
+              <div class="bfill" style="width:18%;background:#EF4444;"></div>
+              <div class="tmark" style="left:91%;"></div>
+            </div>
+            <div class="bpct" style="color:#EF4444;">18%</div>
+          </div>
+
+          <div class="br">
+            <div class="bl">Budget / Adventure</div>
+            <div class="btrack">
+              <div class="bfill" style="width:22.3%;background:#A3E635;"></div>
+              <div class="tmark" style="left:91%;"></div>
+            </div>
+            <div class="bpct" style="color:#A3E635;">22%</div>
+          </div>
+
+        </div><!-- /bars-wrap -->
+      </div><!-- /recall-panel -->
+
+      <!-- Scatter plot -->
+      <div class="scatter-panel">
+        <div class="scatter-label">
+          Segment Cluster Separation
+          <div class="scatter-sub">Penalty-Weighted PCA · Synthetic POC Data</div>
+        </div>
+        <div class="scatter-img">
+          <img src="../poc_output/dark/poc_scatter_dark.png" alt="PCA cluster scatter">
+        </div>
+      </div>
+
+      <!-- Notes panel -->
+      <div class="panel" style="display:flex;flex-direction:column;">
+        <h3>Key Findings</h3>
+        <div class="ni"><span class="ni-ic" style="color:var(--green);">✓</span><span><strong style="color:var(--white);">Pipeline runs end-to-end</strong> — fully automated, zero manual steps.</span></div>
+        <div class="ni"><span class="ni-ic" style="color:var(--green);">✓</span><span><strong style="color:var(--white);">Corporate captured at 100%</strong> — highest-revenue segment perfectly identified.</span></div>
+        <div class="ni"><span class="ni-ic" style="color:var(--gold);">▲</span><span><strong style="color:var(--white);">OFW &amp; Budget recall low</strong> — addressable once Mabuhay loyalty data is available.</span></div>
+        <div class="ni"><span class="ni-ic" style="color:var(--blue);">◆</span><span><strong style="color:var(--white);">78 distinct clusters found</strong> — segments are real and separable, not arbitrary.</span></div>
+
+        <div style="margin-top:auto;">
+          <div style="height:1px;background:linear-gradient(90deg,transparent,rgba(201,168,76,0.2),transparent);margin:12px 0;"></div>
+          <div style="font-size:10px;color:var(--g5);line-height:1.6;">
+            <strong style="color:var(--gold);font-family:'Montserrat',sans-serif;font-size:9px;letter-spacing:0.1em;text-transform:uppercase;">Next Step</strong><br>
+            Run on full January 2025 PAL extract. OFW &amp; Mabuhay recall will improve materially once loyalty tier is included.
+          </div>
+        </div>
+      </div><!-- /notes-panel -->
+
+    </div><!-- /two-col -->
+  </div><!-- /main -->
+</div><!-- /slide 2 -->
+
+</div><!-- /deck -->
+</body>
+</html>
