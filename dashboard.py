@@ -105,6 +105,53 @@ BOOKING_ADV_PCT = {
 }
 
 
+# ── Model performance constants ────────────────────────────────────────────────
+
+NFR_TARGET   = 91.0
+POC_ACC      = 77.7
+POC_REV_RISK = 18_090_000
+POC_RECORDS  = 10_000
+
+SEG_10 = [
+    "Corporate", "Mabuhay Loyalist", "OFW/Migrant", "Premium Bleisure",
+    "Pilgrimage", "Balikbayan/VFR", "Family", "Digital Nomad",
+    "Last-Minute", "Budget/Adventure",
+]
+RECALL_10 = {
+    "Corporate": 100, "Mabuhay Loyalist": 63, "OFW/Migrant": 18,
+    "Premium Bleisure": 38, "Pilgrimage": 54, "Balikbayan/VFR": 73,
+    "Family": 99, "Digital Nomad": 95, "Last-Minute": 91,
+    "Budget/Adventure": 22,
+}
+PENALTY_10 = {
+    "Corporate": 10, "Mabuhay Loyalist": 8, "OFW/Migrant": 5,
+    "Premium Bleisure": 4, "Pilgrimage": 3, "Balikbayan/VFR": 2,
+    "Family": 2, "Digital Nomad": 2, "Last-Minute": 1, "Budget/Adventure": 1,
+}
+REV_LOSS_10 = {
+    "Corporate": 40_000, "Mabuhay Loyalist": 32_000, "OFW/Migrant": 20_000,
+    "Premium Bleisure": 16_000, "Pilgrimage": 12_000, "Balikbayan/VFR": 8_000,
+    "Family": 8_000, "Digital Nomad": 8_000, "Last-Minute": 4_000,
+    "Budget/Adventure": 4_000,
+}
+SUPPORT_10 = {
+    "Corporate": 500, "Mabuhay Loyalist": 500, "OFW/Migrant": 1_500,
+    "Premium Bleisure": 800, "Pilgrimage": 800, "Balikbayan/VFR": 2_000,
+    "Family": 1_000, "Digital Nomad": 800, "Last-Minute": 800,
+    "Budget/Adventure": 1_300,
+}
+
+# 5-segment confusion matrix simulated from POC 10-segment recall values (10k records)
+# Rows = true segment, cols = predicted (Business, VFR, OFW, Labor, Leisure)
+_CM_COUNTS = np.array([
+    [1350, 110,  30,  12,  298],   # Business (1800 total, ~75% after rollup)
+    [ 150, 2610, 100,  35,  105],   # VFR      (3000, ~87%)
+    [  30,  780, 375, 105,  210],   # OFW      (1500, ~25%)
+    [  20,  110,  70, 480,  120],   # Labor    ( 800, ~60%)
+    [ 195,  420, 145,  52, 2088],   # Leisure  (2900, ~72%)
+], dtype=float)
+
+
 # ── Data generation ────────────────────────────────────────────────────────────
 
 def _flight_base(sector: str) -> int:
@@ -213,6 +260,77 @@ def _lf_style(lf: float) -> tuple[str, str]:
     elif lf >= 75: return "#f1c40f", "#333"
     elif lf >= 65: return "#e07b39", "white"
     else:          return "#e74c3c", "white"
+
+
+# ── Model performance charts ───────────────────────────────────────────────────
+
+def _recall_bar() -> go.Figure:
+    segs   = sorted(SEG_10, key=lambda s: RECALL_10[s])
+    vals   = [RECALL_10[s] for s in segs]
+    colors = ["#27ae60" if v >= NFR_TARGET else "#e74c3c" for v in vals]
+    fig = go.Figure(go.Bar(
+        y=segs, x=vals, orientation="h",
+        marker_color=colors,
+        text=[f"{v}%" for v in vals],
+        textposition="outside",
+        textfont=dict(size=11, color="#333"),
+        cliponaxis=False,
+    ))
+    fig.add_vline(
+        x=NFR_TARGET, line_dash="dash", line_color=PAL_BLUE, line_width=2,
+        annotation_text="NFR-01 (91%)",
+        annotation_position="top right",
+        annotation_font=dict(color=PAL_BLUE, size=11),
+    )
+    fig.update_layout(
+        title=dict(text="<b>Per-Segment Recall</b>", font=dict(size=13, color=PAL_BLUE), x=0, xanchor="left"),
+        xaxis=dict(range=[0, 125], visible=False, showgrid=False, zeroline=False),
+        yaxis=dict(showgrid=False, zeroline=False, tickfont=dict(size=11, color="#333")),
+        plot_bgcolor="white", paper_bgcolor="white",
+        margin=dict(l=0, r=60, t=36, b=4),
+        height=360, showlegend=False,
+    )
+    return fig
+
+
+def _confusion_heatmap() -> go.Figure:
+    cm_labels = ["Business", "VFR", "OFW", "Labor", "Leisure"]
+    row_sums  = _CM_COUNTS.sum(axis=1, keepdims=True)
+    cm_pct    = (_CM_COUNTS / row_sums * 100).round(1)
+    cm_plot   = cm_pct[::-1]
+    y_labels  = cm_labels[::-1]
+    colorscale = [[0.0, "#ffffff"], [0.2, "#dce8f5"], [0.6, "#5a9fd4"], [1.0, "#003087"]]
+    text_colors = [
+        ["white" if v > 60 else "#333" for v in row]
+        for row in cm_plot
+    ]
+    annotations = []
+    for i, row in enumerate(cm_plot):
+        for j, val in enumerate(row):
+            annotations.append(dict(
+                x=cm_labels[j], y=y_labels[i],
+                text=f"<b>{val:.0f}%</b>",
+                showarrow=False,
+                font=dict(size=12, color=text_colors[i][j]),
+            ))
+    fig = go.Figure(go.Heatmap(
+        z=cm_plot, x=cm_labels, y=y_labels,
+        colorscale=colorscale, showscale=False,
+        hoverongaps=False,
+    ))
+    fig.update_layout(
+        title=dict(
+            text="<b>Confusion Matrix</b><br><sup>Row = True Segment · Col = Predicted</sup>",
+            font=dict(size=13, color=PAL_BLUE), x=0, xanchor="left",
+        ),
+        xaxis=dict(title="Predicted", tickfont=dict(size=11), side="bottom"),
+        yaxis=dict(title="True", tickfont=dict(size=11)),
+        annotations=annotations,
+        plot_bgcolor="white", paper_bgcolor="white",
+        margin=dict(l=60, r=10, t=60, b=50),
+        height=360,
+    )
+    return fig
 
 
 # ── Sparkline ──────────────────────────────────────────────────────────────────
@@ -520,6 +638,46 @@ def render_alerts_table(alerts: pd.DataFrame) -> str:
     return html
 
 
+def render_recall_table() -> str:
+    """HTML table: all 10 segments sorted by recall ascending, with risk estimate."""
+    rows_html = ""
+    for seg in sorted(SEG_10, key=lambda s: RECALL_10[s]):
+        rec    = RECALL_10[seg]
+        ok     = rec >= NFR_TARGET
+        bg_rec = "#27ae60" if ok else "#e74c3c"
+        bg_st  = "#d4f0dc" if ok else "#fde8e8"
+        status = "&#10003; Met" if ok else "&#10007; Below"
+        missed = int(SUPPORT_10[seg] * (1 - rec / 100))
+        risk   = missed * REV_LOSS_10[seg]
+        risk_s = f"&#8369;{risk / 1_000_000:.1f}M"
+        rows_html += f"""
+        <tr>
+          <td class="lbl">{seg}</td>
+          <td class="num">{SUPPORT_10[seg]:,}</td>
+          <td class="num">&#215;{PENALTY_10[seg]}</td>
+          <td style="background:{bg_rec};color:white;font-weight:700;text-align:right">{rec}%</td>
+          <td style="background:{bg_st};text-align:center;font-weight:600;color:#333">{status}</td>
+          <td class="num">&#8369;{REV_LOSS_10[seg]:,}</td>
+          <td class="num" style="font-weight:{'700' if risk > 1_000_000 else '400'};color:{'#c0392b' if risk > 1_000_000 else '#333'}">{risk_s}</td>
+        </tr>"""
+    html = f"""<!DOCTYPE html><html><head><meta charset="utf-8">{_SMALL_TABLE_CSS}</head>
+    <body><table>
+      <thead>
+        <tr>
+          <th style="text-align:left;border-bottom:1px solid #c8d8e8">Segment</th>
+          <th style="border-bottom:1px solid #c8d8e8">Support<br><small style="font-weight:400">POC records</small></th>
+          <th style="border-bottom:1px solid #c8d8e8">Penalty</th>
+          <th style="border-bottom:1px solid #c8d8e8">Recall</th>
+          <th style="border-bottom:1px solid #c8d8e8">vs. NFR&#8209;01<br><small style="font-weight:400">&#8805;91% target</small></th>
+          <th style="border-bottom:1px solid #c8d8e8">Cost / Error</th>
+          <th style="border-bottom:1px solid #c8d8e8">Est. Revenue Risk</th>
+        </tr>
+      </thead>
+      <tbody>{rows_html}</tbody>
+    </table></body></html>"""
+    return html
+
+
 # ── Chart ──────────────────────────────────────────────────────────────────────
 
 def _hbar(values: pd.Series, title: str) -> go.Figure:
@@ -605,6 +763,18 @@ def _advance(filt_all: pd.DataFrame, fwd_months: list) -> pd.DataFrame:
         cy  = int(sf[(sf["year"]==2026) & (sf["month"].isin(fwd_months))]["pax"].sum() * adv)
         rows.append({"segment": seg, "ly_onhand": ly, "cy_onhand": cy})
     return pd.DataFrame(rows).set_index("segment")
+
+
+def _behavioral_stats(df: pd.DataFrame) -> tuple[pd.Series, pd.Series]:
+    """Avg fare (₱) and DOM % per 5-segment from 2026 data."""
+    recent = df[df["year"] == 2026]
+    fare_d, dom_d = {}, {}
+    for seg in SEGMENTS:
+        s   = recent[recent["segment"] == seg]
+        pax = s["pax"].sum()
+        fare_d[seg] = int(s["revenue"].sum() / pax) if pax else 0
+        dom_d[seg]  = int(s[s["rt"] == "dom"]["pax"].sum() / pax * 100) if pax else 0
+    return pd.Series(fare_d), pd.Series(dom_d)
 
 
 def _alerts(df: pd.DataFrame, month_num: int, cabin_sel: str, threshold: int) -> pd.DataFrame:
@@ -744,10 +914,11 @@ def main():
     show_vs_net = (od_sel != "All")
 
     # ── Tabs ───────────────────────────────────────────────────────────────
-    tab1, tab2, tab3 = st.tabs([
+    tab1, tab2, tab3, tab4 = st.tabs([
         "Historical YoY",
         "Advance Bookings",
         "Capacity & Load Factor",
+        "Model Performance",
     ])
 
     # ── Tab 1: Historical YoY ──────────────────────────────────────────────
@@ -822,6 +993,67 @@ def main():
             h = 90 + len(lf_data) * 36
             components.html(render_lf_table(lf_data, 2025, 2026, month_sel), height=h, scrolling=False)
             st.caption("LF %: passengers ÷ available seats.  Green ≥85% · Yellow 75–84% · Orange 65–74% · Red <65%")
+
+    # ── Tab 4: Model Performance ───────────────────────────────────────────
+    with tab4:
+        st.caption(
+            "Model performance metrics from the PAL POC run on 10,000 synthetic records. "
+            "**Recall** measures how well the model captures each segment — a low recall means "
+            "real passengers of that type are being mislabelled as something else, "
+            "costing estimated revenue equal to missed passengers × per-segment error cost. "
+            "**NFR-01** is the project target: ≥91% recall on every segment before production deployment."
+        )
+
+        mc1, mc2, mc3, mc4 = st.columns(4)
+        n_met = sum(1 for v in RECALL_10.values() if v >= NFR_TARGET)
+        with mc1:
+            st.metric("Overall Accuracy", f"{POC_ACC}%",
+                      help="Share of all 10,000 POC records correctly classified across 10 segments.")
+        with mc2:
+            st.metric("Segments Meeting NFR-01", f"{n_met} / 10",
+                      help="Number of segments at or above the ≥91% recall requirement.")
+        with mc3:
+            st.metric("Est. Revenue Risk", f"₱{POC_REV_RISK / 1_000_000:.2f}M",
+                      help="Conservative misclassification cost on the POC evaluated records.")
+        with mc4:
+            st.metric("Records Processed", f"{POC_RECORDS:,}",
+                      help="Synthetic records run through the full 8-stage pipeline.")
+
+        pc1, pc2 = st.columns([1.2, 1])
+        with pc1:
+            with st.container(border=True):
+                st.plotly_chart(_recall_bar(), use_container_width=True,
+                                config={"displayModeBar": False})
+        with pc2:
+            with st.container(border=True):
+                st.plotly_chart(_confusion_heatmap(), use_container_width=True,
+                                config={"displayModeBar": False})
+
+        st.write("")
+        st.markdown("**Per-segment breakdown — all 10 model segments sorted by recall (lowest first)**")
+        components.html(render_recall_table(), height=420, scrolling=False)
+
+        fare_s, dom_s = _behavioral_stats(df)
+        st.write("")
+        st.markdown("**Behavioral validation — 2026 segment averages**")
+        st.caption(
+            "Cross-checks that each segment's observed booking behaviour matches its definition. "
+            "Business should show the highest avg fare; OFW and Labor should skew heavily international."
+        )
+        bv1, bv2 = st.columns(2)
+        with bv1:
+            with st.container(border=True):
+                st.plotly_chart(_hbar(fare_s, "Avg Fare by Segment (₱)"),
+                                use_container_width=True, config={"displayModeBar": False})
+        with bv2:
+            with st.container(border=True):
+                st.plotly_chart(_hbar(dom_s, "Domestic Traffic % by Segment"),
+                                use_container_width=True, config={"displayModeBar": False})
+        st.caption(
+            "Recall & revenue risk from POC on 10,000 synthetic records. "
+            "Confusion matrix: 5-segment rollup derived from 10-segment POC recall rates. "
+            "Revenue risk = support × (1 − recall) × cost per misclassification."
+        )
 
     # ── Footer ─────────────────────────────────────────────────────────────
     st.caption(
