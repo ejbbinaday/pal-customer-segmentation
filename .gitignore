@@ -11,17 +11,16 @@ build/
 .venv/
 venv/
 
-# Generated chart output (reproducible by running scripts)
-eda_output/
-cluster_output/
-cluster_compare_output/
-resample_output/
-dbscan_output/
-hdbscan_output/
-boundary_output/
+# Tooling caches
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+
+# Generated analysis output (reproducible by running scripts in src/)
+outputs/
 
 # Large client files
-pal-pitch-deck.pdf
+assets/pal-pitch-deck.pdf
 
 # macOS
 .DS_Store

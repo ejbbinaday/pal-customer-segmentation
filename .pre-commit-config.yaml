@@ -1,0 +1,33 @@
+# Pre-commit hooks for the PAL Customer Segmentation project.
+# Setup:  pip install -r requirements-dev.txt && pre-commit install
+# Run on everything once:  pre-commit run --all-files
+# Bump hook versions:  pre-commit autoupdate
+# Generated deliverables & deck sources are never touched by hooks.
+exclude: ^(reports|assets)/
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: ["--maxkb=1024"]
+        # Tracked deck deliverables / reports are intentionally large.
+        exclude: ^(reports|assets)/
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.22
+    hooks:
+      - id: ruff            # lint (auto-fix what it safely can)
+        args: ["--fix"]
+      - id: ruff-format     # formatter
+
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.9.4
+    hooks:
+      - id: bandit
+        args: ["-c", "pyproject.toml"]
+        additional_dependencies: ["bandit[toml]"]

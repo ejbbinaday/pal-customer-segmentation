@@ -1,0 +1,36 @@
+# Tooling config for the PAL Customer Segmentation project.
+# This project is a set of scripts (not a packaged library), so only [tool.*]
+# tables are defined here — ruff (lint + format) and bandit (security).
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+# Never lint generated artifacts, deck sources, or the scratchpad.
+extend-exclude = ["outputs", "reports", "assets", "scratchpad", "docs"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes (unused imports/vars, undefined names)
+    "W",   # pycodestyle warnings
+    "I",   # isort (import ordering)
+    "UP",  # pyupgrade (modern syntax)
+    "B",   # flake8-bugbear (likely bugs)
+]
+ignore = [
+    "E501",  # line length — long matplotlib rcParams / plotting lines are fine
+    "E402",  # module import not at top — a few scripts bootstrap sys.path first
+    "E741",  # ambiguous names (l, I) — common in plotting/math code
+    "B008",  # function call in default arg — monitor_metrics uses ROOT / "..." as a default
+    "B905",  # zip() without strict= — 41 hits in plotting code where lengths are known equal
+]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.bandit]
+# Scan source only; skip generated output, decks, and the scratchpad.
+exclude_dirs = ["outputs", "reports", "assets", "scratchpad", ".git", "__pycache__"]
+skips = [
+    "B101",  # assert_used — not security-relevant in analysis scripts
+]

@@ -1,0 +1,42 @@
+Field,Description
+DateOfIssuance,Issuance date of the PNR
+PointofOrigin,"Country code where the passenger originated from, in example ""PH"" for Philippines"
+CountryCodeOfIssue,Country code where the PNR was issued or ticketed
+CouponNumber,"Coupon number, not necessarily a unique identifier as passengers in the same group can have the same number"
+CurrentCouponStatus,"Status of the coupon, whether it is already ticketed or unticketed"
+BookingClass,"Booking class code of the PNR (economy: O,U,T,E,K,X,B,V,Q,H,M,L,S,Y; premium: N,W; Business: D,C,J)"
+SoldBookingClass,Booking class sold during the time of booking
+SoldOperatingCabinClass,Current booking class based on the number of days before the end of month
+TripOD,"Origin and Destination of passenger, considering the extended code share network, using IATA's airport code standard. i.e: ""MNL"" for Manila"
+OnlineOD,"Origin and Destination of passenger, considering only PAL's own operating network, using IATA's airport code standard. i.e: ""MNL"" for Manila"
+Sector,"Segment traversed by passenger. i.e. ""MNLLAX"" from Manila to LosAngeles"
+DepartureDate,Date of departure from origin by the passenger
+DaysBeforeMonthEnd,Number of days before the end of month the data was recorded
+OperatingCarrierCode,"Aircraft carrier code standard, operating the flight. i.e: ""PR"" for Philippine Airlines"
+OperatingFlightNumber,Flight number used departing from the origin
+DepartureDateTime,Date of departure from origin by the passenger and the time of departure following UTC
+ArrivalDateTime,Date of arrival at destination by the passenger and the time of departure following UTC
+OperatingCabinClass,Cabin of the passenger whether economy/premium/business in the operating carrier's aircraft
+TripOD_DepartureDate,"Date of departure from origin by the passenger, considering PAL's codeshare network"
+TripOD_Path,"Total Path traversed by passenger, considering codeshare network"
+TripOD_Coupons,"Coupon number, if applicable, from codeshare network"
+TripOD_FlightSequence,"Sequent of flights traversed by passenger, considering codeshare network"
+TripOD_CouponStatus,"Coupon status, whether ticketed or unticketed, considering codeshare network"
+TripOD_OperatingCabinClass,"Cabin of the passenger whether economy/premium/business in the operating carrier's aircraft, considering codeshare network"
+TripOD_BookingClass,"Booking class code of the PNR (economy: O,U,T,E,K,X,B,V,Q,H,M,L,S,Y; premium: N,W; Business: D,C,J)"
+OnlineOD_DepartureDate,Date of departure from origin by the passenger
+OnlineOD_Path,"Total Path traversed by passenger, on PAL's network"
+OnlineOD_Coupons,"Coupon status, whether ticketed or unticketed"
+OnlineOD_FlightSequence,Sequent of flights traversed by passenger
+OnlineOD_CouponStatus,"Coupon status, whether ticketed or unticketed"
+OnlineOD_OperatingCabinClass,"Cabin of the passenger whether economy/premium/business in the operating carrier's aircraft, on PAL's network"
+OnlineOD_BookingClass,"Booking class code of the PNR (economy: O,U,T,E,K,X,B,V,Q,H,M,L,S,Y; premium: N,W; Business: D,C,J)"
+is_nonstop,"1 for non stop flight, 0 for flight with stopovers"
+PaxCount,value should always be 1
+NetRevenue,"NetRevenue gained, including ancillary purchases"
+NetFare,NetFare of ticket
+Group/Individual,1 if part of group 0 if not
+Age,Age of the passenger from 1-100
+Gender,Male or Female
+Unique Identifier,Unique identifier for the PNR
+Channel,"Channel where ticket was sold (i.e. Website, Application, OTA, ticket office, etc)"
