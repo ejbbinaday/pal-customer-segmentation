@@ -15,6 +15,12 @@ our data, or a project decision — during any session — **append it to §15 b
 - Bump the footer `Last updated` date on every change.
 - Sections 1–14 stay deliverable-grade and stable; put evolving/working knowledge in §15.
 
+## Keep README.md current
+
+`README.md` must always reflect the current state of the project. Whenever a change affects how
+someone **sets up, runs, or navigates** the repo — new or moved files, new dependencies, new commands,
+structural changes, entrypoint changes — **update `README.md` in the same turn** as the change.
+
 ## Project orientation (see README.md for the full layout)
 
 - Approach: **anonymous trip-purpose × value segmentation** at the PNR level (Sabre's anonymous lens) —

@@ -1,0 +1,28 @@
+# Keep the build context small and the image lean.
+.git
+.gitignore
+.venv
+venv
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+.ruff_cache
+.mypy_cache
+.pytest_cache
+
+# Regenerable analysis artifacts (created inside the container at runtime)
+outputs/
+
+# Large deliverables / deck sources not needed at runtime
+reports/
+assets/
+
+# Tooling & local-only
+scratchpad/
+.claude/
+.pre-commit-config.yaml
+requirements-dev.txt
+.DS_Store
+Dockerfile
+.dockerignore

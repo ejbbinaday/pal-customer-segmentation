@@ -480,6 +480,20 @@ Dashboard Wireframe → Requirements Checklist → [Appendix] Literature
 
 ---
 
+#### 2026-07-17 — Dependency capture (3 requirements files) + optional Docker
+**Domain:** Project Decision
+`requirements.txt` was dashboard-only and **missing the entire pipeline stack**. Fixed by splitting deps:
+`requirements.txt` (lean, Streamlit Cloud) · **`requirements-pipeline.txt`** (pinned ML/EDA:
+scikit-learn 1.9.0, hdbscan 0.8.44, scipy 1.18.0, numpy 2.5.1, pandas 3.0.3, imbalanced-learn 0.14.2,
+matplotlib 3.11.0, seaborn 0.13.2) · `requirements-dev.txt` (tooling). All pinned versions install and
+import on **Python 3.14** (standalone `hdbscan` builds fine — the feared 3.14 wheel gap did not
+materialise). Added an optional **`Dockerfile`** (python:3.11-slim, dashboard as default CMD) +
+`.dockerignore`. **Recommendation stands: Docker is optional at prototyping stage** — the real
+reproducibility win was capturing/pinning deps; containerize for the eventual PAL production handoff.
+**Caveat:** Dockerfile not yet built/verified (no running Docker daemon in the dev session) — run
+`docker build -t pal-segmentation .` to confirm.
+**Source:** our setup; `README.md` §Docker / §Setup.
+
 #### 2026-07-17 — Added ruff + bandit + pre-commit tooling (first pass done, repo green)
 **Domain:** Project Decision
 Code-quality tooling added: **ruff** (lint + format) and **bandit** (security) run via **pre-commit**.

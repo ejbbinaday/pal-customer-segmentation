@@ -46,10 +46,38 @@ so they can be run from anywhere (e.g. `python src/hdbscan_final.py`).
 
 ## Setup
 
+Three dependency files, by purpose:
+
+| File | Use |
+|------|-----|
+| `requirements.txt` | Lean, dashboard-only — what **Streamlit Cloud** installs |
+| `requirements-pipeline.txt` | Full ML/EDA stack to run the `src/` scripts (pinned) |
+| `requirements-dev.txt` | ruff · bandit · pre-commit |
+
 ```bash
-pip install -r requirements.txt   # dashboard deps
-# full pipeline additionally needs: scikit-learn, seaborn, matplotlib, hdbscan, scipy
+pip install -r requirements-pipeline.txt   # run the pipeline
+pip install -r requirements-dev.txt        # + tooling (optional)
 ```
+
+Tested on Python 3.11–3.14. Clustering output is sensitive to `scikit-learn`/`hdbscan`
+versions — keep `requirements-pipeline.txt` pinned.
+
+## Docker (optional — reproducible environment)
+
+Python is pinned to 3.11 in the image, so it builds identically regardless of the host.
+
+```bash
+docker build -t pal-segmentation .
+
+# Dashboard (default CMD) → http://localhost:8501
+docker run --rm -p 8501:8501 pal-segmentation
+
+# Run a pipeline script, writing figures back to the host
+docker run --rm -v "$PWD/outputs:/app/outputs" pal-segmentation python src/hdbscan_final.py
+```
+
+Not required for day-to-day prototyping (use the venv above); most useful for guaranteed
+reproducibility or an eventual production/PAL handoff.
 
 ## Code quality (ruff · bandit · pre-commit)
 

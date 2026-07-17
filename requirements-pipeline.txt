@@ -1,0 +1,22 @@
+# Full dependencies to run the segmentation PIPELINE (the analysis scripts in src/).
+#
+# requirements.txt         → lean, dashboard-only (used by Streamlit Cloud)
+# requirements-pipeline.txt → this file: everything the ML/EDA scripts need
+# requirements-dev.txt      → ruff / bandit / pre-commit
+#
+# Install:  pip install -r requirements-pipeline.txt
+# Versions captured 2026-07-17 on Python 3.14; wheels also available for 3.11–3.13.
+# Clustering output is sensitive to scikit-learn / hdbscan versions — keep these pinned.
+
+numpy==2.5.1
+pandas==3.0.3
+scikit-learn==1.9.0
+scipy==1.18.0
+hdbscan==0.8.44
+imbalanced-learn==0.14.2
+matplotlib==3.11.0
+seaborn==0.13.2
+
+# transitive, pinned for reproducibility
+joblib==1.5.3
+threadpoolctl==3.6.0
