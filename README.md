@@ -44,6 +44,34 @@ so they can be run from anywhere (e.g. `python src/hdbscan_final.py`).
 
 > **Streamlit Cloud:** the dashboard entrypoint is now `src/dashboard.py` — update the deployment config.
 
+## v3 prototype (active track)
+
+`src/features_v3.py` implements Stages **P1–P3** of the PNR-level prototype — clean → engineer →
+proxy-label waterfall — on `data/raw/PAL_PNR_Synthetic_Data_1000-v3.csv` (see
+`docs/methodology.md` §v3 Prototype Pipeline). It exposes `build()` (enriched frame) and
+`build_matrix()` (unscaled model matrix), and profiles the features when run:
+
+```bash
+python src/features_v3.py     # P1–P3 → outputs/features_v3_output/
+python src/prototype_v3.py    # P4–P5 → outputs/prototype_v3_output/
+python src/diagnose_v3.py     # structure check (DBCV/ARI/silhouette) → outputs/diagnose_v3_output/
+```
+
+`src/prototype_v3.py` runs Stages **P4–P5** (improved): **hold-out split** → compact 24-feature matrix
+(mixed-type scaling) → **unweighted** HDBSCAN discovery → inductive nearest-centroid labelling with an
+**Unassigned bucket** → cost-matrix + DBCV validation on the **held-out** set. Penalties are used only in
+the cost metric (not the feature space); negative learning (P3b) runs in `features_v3.build()`.
+
+> **SME ground truth:** drop `data/labels/sme_sample.csv` (`Unique Identifier`,`true_segment`) and the
+> script reports a **non-circular** hold-out recall automatically — see `data/labels/README.md`.
+
+> **Known gap (v3 data):** OFW/Migrant, Pilgrimage, and Mabuhay Loyalist have no proxy seed in the
+> v3 synthetic set, so they are not assignable in this prototype (see `docs/knowledge-base.md` §15).
+>
+> **Honest verdict:** diagnostics (negative DBCV, flat KMeans silhouette) show the v3 synthetic data has
+> **no latent cluster structure** — this validates the *approach*, not a result, and the recall numbers
+> are circular. Full analysis + recommendations: **`docs/v3-prototype-findings.md`**.
+
 ## Setup
 
 Three dependency files, by purpose:

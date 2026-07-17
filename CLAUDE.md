@@ -21,6 +21,14 @@ our data, or a project decision — during any session — **append it to §15 b
 someone **sets up, runs, or navigates** the repo — new or moved files, new dependencies, new commands,
 structural changes, entrypoint changes — **update `README.md` in the same turn** as the change.
 
+## Keep docs/methodology.md current
+
+`docs/methodology.md` is the **authoritative methodology spec** and must stay in sync with the pipeline.
+Whenever the modelling approach changes — a new/removed stage, changed features, algorithm, validation,
+proxy/negative-learning rules, or defaults — **update `methodology.md` (incl. the "Current Methodology
+at a Glance" summary and the footer date) in the same turn**, and keep the other docs consistent
+(`business-requirements.md`, `knowledge-base.md`). Flag and reconcile any doc-vs-code drift.
+
 ## Project orientation (see README.md for the full layout)
 
 - Approach: **anonymous trip-purpose × value segmentation** at the PNR level (Sabre's anonymous lens) —
@@ -28,6 +36,11 @@ structural changes, entrypoint changes — **update `README.md` in the same turn
 - Code: `src/` (flat, shares `from pal_colors import`); data: `data/raw/`; artifacts: `outputs/` (git-ignored).
 - Scripts resolve paths via `ROOT = Path(__file__).resolve().parents[1]` — runnable from anywhere.
 - Active work: prototyping the clustering model on the v3 PNR dataset (`data/raw/PAL_PNR_Synthetic_Data_1000-v3.csv`).
+
+## Commits
+
+Do **not** add a `Co-Authored-By: Claude …` trailer (or any AI attribution) to commit messages.
+Write a normal message; the git author stays the user.
 
 ## Code quality
 
