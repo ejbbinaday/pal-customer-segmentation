@@ -480,6 +480,96 @@ Dashboard Wireframe → Requirements Checklist → [Appendix] Literature
 
 ---
 
+#### 2026-07-17 — Docs reconciled: at-a-glance summary + BR drift fixed + methodology-upkeep rule
+**Domain:** Project Decision
+Added a **"Current Methodology at a Glance"** summary at the top of `methodology.md` (one-line P1→P5 flow,
+current vs baseline track). **Reconciled the BR↔code drift:** `business-requirements.md` §5.4/§5.5 now carry
+a "⚠️ Superseded" note — the human annotation + label-diffusion pipeline (FR-22–26) was replaced by
+automated noise auto-assignment; Negative Learning (FR-21) retained as §P3b. New standing rule (CLAUDE.md +
+memory [[keep-methodology-current]]): keep `methodology.md` — incl. the at-a-glance + footer date — in sync
+on every methodology change, and keep BR/KB consistent. Joins the README and KB living-doc rules.
+**Source:** our doc pass.
+
+#### 2026-07-17 — Improved v3 model: hold-out + Tier-3 + negative learning + Unassigned bucket
+**Domain:** Clustering / Methodology
+While awaiting real data, applied the agreed improvements to the v3 pipeline:
+(1) **hold-out split** (train 800 / test 200, stratified) with an **inductive** scorer
+(scaler + train proxy-seed centroids + distance threshold) → out-of-sample recall;
+(2) **Tier-3 feature pruning** → compact 24-feature matrix (from 58; drops the |corr|>0.9 dups) with
+**mixed-type scaling** (scale continuous, keep binaries {0,1});
+(3) **decoupled penalties** — HDBSCAN discovery is now UNWEIGHTED; penalties enter only in the cost
+metric (was lowering DBCV before);
+(4) **negative learning P3b** in `features_v3.apply_negative_learning`;
+(5) **Unassigned bucket** — rows past the 95th-pctl train distance are left low-confidence (test 8%),
+no more forcing 42% noise into Family.
+**Results:** train discovery 2 clusters, 53.4% noise, DBCV −0.072 (structure still absent — data
+unchanged, as expected). HOLD-OUT recall vs proxy: Last-Minute/Premium Bleisure 100%, Family 67%,
+Digital Nomad/Budget 64%, Corporate 61%, Balikbayan 58% (cost 114, 1.31/record, n=87). Out-of-sample ≈
+in-sample → the labeller generalises; the ceiling is set by rules/data, not memorisation. **Recall stays
+proxy-referenced (circular) until SME labels arrive** — added an auto-detected hook at
+`data/labels/sme_sample.csv` (+ template/README) for non-circular validation.
+**Source:** `src/features_v3.py`, `src/prototype_v3.py`; outputs/prototype_v3_output/.
+
+#### 2026-07-17 — GAP: negative learning is NOT in the v3 pipeline
+**Domain:** Clustering / Methodology
+The documented framework (business-requirements, KB §9) includes **negative learning** — impossibility
+filters applied after proxy labelling to send contradictory assignments back to Unassigned. It exists in
+`poc_synthetic.py` Stage 4 but was **not carried into `features_v3.py`/`prototype_v3.py`**, and
+`methodology.md` §P3 omitted it. Reason it lapsed: the baseline NL rules key on `Loyalty status`,
+`checked bags`, `income` — none present in v3 — so they don't port 1:1. Portable v3-appropriate rules
+exist (e.g. Corporate + lead>60 + Economy → invalidate; Corporate via OTA → invalidate; Digital Nomad +
+group → invalidate; Premium Bleisure + low ancillary → invalidate). **Caveat:** NL refines proxy-seed
+purity but does not fix the no-structure finding, and under circular validation "cleaner" seeds can make
+recall look better without meaning more. Status: open — add as Stage P3b if we continue the rule track.
+**Source:** code audit (grep); [[v3-prototype-data]].
+
+#### 2026-07-17 — DIAGNOSIS: v3 synthetic data has no latent cluster structure
+**Domain:** Clustering / Methodology
+`src/diagnose_v3.py` stress-tested the data with **non-circular** metrics on a cleaned 24-feature space
+(dropped 19 |corr|>0.9 redundancies). Result is conclusive: **DBCV is NEGATIVE** across every config
+(−0.043 to −0.192, incl. PCA-90) — worse-than-random density validity, i.e. no real clusters. KMeans
+silhouette is flat ~0.10 with **no peak** (k4=0.103…k12=0.121, monotonic) → no natural k. **Bootstrap
+ARI is high (0.83–0.99) but that is a TRAP** — it means HDBSCAN is *consistent*, not that clusters are
+*real*; a stable partition of a structureless cloud is still meaningless (stability ≠ validity).
+**Implications:** (1) the shipped recall (53–100%) is circular — it measures rediscovery of the proxy
+rules on the same features, not accuracy; do NOT present it as model quality to PAL. (2) On this data,
+segments are **definitional (rule-driven), not emergent** — ML's role is label propagation/refinement/
+drift-monitoring on top of rules, not unsupervised discovery. (3) Penalty-weighting *lowered* DBCV
+(0.030→0.023) — it bends space toward the rules. **#1 recommendation: real / structure-embedding data.**
+Full write-up: `docs/v3-prototype-findings.md`.
+**Source:** `src/diagnose_v3.py`; outputs/diagnose_v3_output/diagnosis.json.
+
+#### 2026-07-17 — Built src/prototype_v3.py (Stages P4–P5); end-to-end prototype runs
+**Domain:** Clustering / Methodology
+`src/prototype_v3.py` runs P4–P5: StandardScaler → penalty-weighted HDBSCAN (min_cluster_size=30,
+min_samples=5) → nearest-centroid cluster→segment mapping + noise auto-assignment → cost-matrix +
+DBCV validation. Reuses `monitor_metrics.dbcv` and `pal_colors`. **Results on v3 (1k rows):**
+8 micro-clusters, 42.1% noise; DBCV 0.023, silhouette 0.235, Davies-Bouldin 1.465; per-segment recall
+vs proxy seeds — Balikbayan/VFR 100%, Digital Nomad 100%, Budget 87%, Last-Minute 75%, Family 63%,
+Corporate 61%, Premium Bleisure 53% (weighted cost 527, 1.15/labelled record). **Read as prototype
+validation of the *approach*, not production metrics** — 1k rows is small, noise is high, and Corporate
+(×10) at 61% is below the 91% target. 3 segments unassignable (no seed): Mabuhay Loyalist, OFW/Migrant,
+Pilgrimage. Next iterations: tune min_cluster_size/min_samples, richer or larger data, revisit the OFW
+seed (v3 `pos_mismatch`≈0). Recall here measures agreement with proxy seeds (partly circular, per the
+methodology's own note).
+**Source:** `src/prototype_v3.py` run; outputs/prototype_v3_output/prototype_v3_report.json.
+
+#### 2026-07-17 — Built src/features_v3.py (Stages P1–P3); proxy seeds thin for 3 segments
+**Domain:** Data & Features
+Implemented the v3 loader/clean/engineer/proxy-waterfall in `src/features_v3.py` → **58-feature
+matrix**, 0 NaNs, all sanity checks pass (lead_time≥0, ancillary≥0). Proxy waterfall labels **45.7%**
+of rows (vs 76.4% baseline; rest handled later by HDBSCAN + nearest-centroid). Distribution:
+Balikbayan/VFR 11.9%, Corporate 11.1%, Family 7.5%, Digital Nomad 7.2%, Budget 5.5%, Premium
+Bleisure 1.7%, Last-Minute 0.8%; Unassigned 54.3%.
+**Key finding — 3 segments get ~0 proxy seeds on the v3 synthetic data:** OFW/Migrant (its
+`pos_mismatch` signal is ~0 — `CountryCodeOfIssue` almost always equals `PointofOrigin` in v3),
+Pilgrimage (few Middle-East routes), Mabuhay Loyalist (no loyalty field, by design). A segment with
+no proxy seed has **no centroid to map clusters to**, so it can't be assigned in the prototype. This
+is a data-distribution limitation, not a bug — v3 is mostly PH-origin outbound to US/Asia, so the
+inbound-diaspora/OFW pattern is underrepresented. Options next: relax OFW/Pilgrimage rules, or accept
+the gap and document it. haul mix: LongHaul 474 / Regional 268 / Other 183 / Domestic 75.
+**Source:** `src/features_v3.py` run; outputs/features_v3_output/.
+
 #### 2026-07-17 — Dependency capture (3 requirements files) + optional Docker
 **Domain:** Project Decision
 `requirements.txt` was dashboard-only and **missing the entire pipeline stack**. Fixed by splitting deps:

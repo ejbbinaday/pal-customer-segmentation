@@ -9,6 +9,27 @@
 
 ---
 
+## Current Methodology at a Glance
+
+**Active track — the v3 Prototype Pipeline** (anonymous trip-purpose × value segmentation at the PNR level):
+
+```
+P1 clean → P2 engineer (24 compact features) → P3 proxy-label waterfall → P3b negative learning
+→ hold-out split → P4 UNWEIGHTED HDBSCAN discovery → inductive nearest-centroid labelling (+ Unassigned bucket)
+→ P5 validate on the held-out set (penalties in the cost metric only)
+```
+
+- **Model:** the 10 penalty-weighted segments (Corporate ×10 … Budget ×1).
+- **Reality check:** on the v3 synthetic data there is **no latent density structure** (DBCV ≈ 0), so segments
+  are currently **rule-seeded** — ML's role is label propagation/refinement + monitoring, not unsupervised
+  discovery. Validation is **proxy-referenced (circular)** until SME ground-truth (`data/labels/sme_sample.csv`) lands.
+- **Code:** `src/features_v3.py` (P1–P3b) · `src/prototype_v3.py` (P4–P5) · `src/diagnose_v3.py` (structure check).
+- **Baseline (Stages 1–8 below):** the earlier `sample-features.csv` pipeline — kept for reference, *not* the current track.
+
+Full detail: [v3 Prototype Pipeline](#v3-prototype-pipeline--pnr-level-anonymous-segmentation).
+
+---
+
 ## Overview
 
 This document describes the end-to-end machine learning pipeline for the PAL Customer Segmentation project. The objective is to produce a baseline segmentation model over PNR booking data, assigning each booking record to one of ten commercially meaningful customer segments. The pipeline combines rule-based proxy labelling, density-based clustering, penalty-weighted feature scaling, and direct nearest-centroid assignment for ambiguous records.
@@ -359,26 +380,44 @@ Applied low → high priority; higher overwrites lower.
 | 9 (highest) | Corporate | Business cabin **or** full-fare Y + GDS channel + short lead + weekday early-AM |
 | — | Mabuhay Loyalist | *no rule — loyalty field absent* |
 
-### Stage P4 — Penalty-Weighted HDBSCAN + Mapping
+### Stage P3b — Negative Learning (impossibility filters)
 
-Identical logic to baseline Stages 5–6, with **`min_cluster_size` scaled to the dataset**:
+Applied after the waterfall to send contradictory assignments back to `Unassigned` (baseline KB §9,
+re-mapped to v3 fields since loyalty/bags/income are absent). Implemented in `features_v3.apply_negative_learning`:
 
-| Dataset size | `min_cluster_size` |
-|--------------|--------------------|
-| 1k (v3 prototype) | **~30–50** |
-| 30k (sample-features) | 150 |
-| 6M (production) | 500–1,000 + `algorithm='prims_kdtree'` + FAISS |
+| Assigned segment | Contradiction → Unassigned |
+|---|---|
+| Corporate | `lead_time` > 60 **and** Economy cabin (booked far ahead in economy) |
+| Corporate | booked via **OTA** (corporate flows through GDS / direct) |
+| Digital Nomad | `is_group` (nomad is solo by definition) |
+| Premium Bleisure | bottom-quartile ancillary (contradicts the premium-spend signal) |
 
-Penalty-weight the scaled features (Corporate ×10 … Budget ×1) → fit HDBSCAN → map each micro-cluster
-and each noise record (`label = −1`) to its nearest proxy-segment centroid in penalty-weighted space.
+### Stage P4 — HDBSCAN Discovery + Inductive Labelling (improved)
+
+The first pass penalty-weighted the feature space before clustering; diagnostics showed this *lowered*
+DBCV (it bends space toward the proxy rules). The improved design **decouples discovery from priorities**:
+
+1. **Compact features (Tier-3):** cluster the 24-feature subspace (`build_compact_matrix`), dropping the
+   19 collinear/duplicate columns. **Mixed-type scaling:** StandardScaler on continuous columns only;
+   binary flags stay `{0,1}`.
+2. **Hold-out split:** fit everything on train; score a held-out test set inductively.
+3. **Unweighted HDBSCAN discovery** (`min_cluster_size` scaled to N — ~30–50 @1k, 150 @30k,
+   500–1,000 @6M) — used only to *assess whether density structure exists* (DBCV / silhouette).
+4. **Inductive labelling:** compute proxy-seed segment centroids on **train**; assign any row (train,
+   noise, or held-out) to its nearest centroid. **Penalties enter only in the P5 cost metric**, not the
+   distance.
+5. **Unassigned bucket:** rows past the 95th-percentile train distance are left low-confidence rather
+   than force-assigned. The deployable scorer = `(scaler + centroids + threshold)`.
 
 ### Stage P5 — Validate & Cross-Check
 
-- **Primary:** asymmetric cost matrix + **per-segment recall** (optimise Corporate ×10, OFW ×5) — as
-  baseline Stage 7.
-- **Cluster quality:** DBCV (primary for HDBSCAN), Silhouette, Davies-Bouldin, Calinski-Harabász.
-- **Cross-check:** profile resulting segments against the industry trip-purpose × value taxonomy
-  (`knowledge-base.md` §15) and flag the three structural gaps above.
+- **Primary:** asymmetric cost matrix + **per-segment recall**, reported on the **held-out** set
+  (out-of-sample), optimising Corporate ×10 / OFW ×5.
+- **Cluster quality:** DBCV (primary for HDBSCAN), Silhouette, bootstrap ARI (`diagnose_v3.py`).
+- **Ground truth:** drop `data/labels/sme_sample.csv` (`Unique Identifier`,`true_segment`) and P5 adds a
+  **non-circular** SME hold-out recall automatically. Until then, recall is proxy-referenced (circular).
+- **Cross-check:** profile segments against the industry taxonomy (`knowledge-base.md` §15) and flag the
+  structural gaps (3 unseeded segments; no latent density structure in the v3 synthetic data).
 
 ### Phase → Deliverable mapping
 

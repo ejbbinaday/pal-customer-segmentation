@@ -93,6 +93,13 @@ Six segments identified through domain knowledge and initial clustering analysis
 
 ### 5.4 Annotation Pipeline (Multi-Step)
 
+> **⚠️ Superseded (2026-07-17).** The human-annotation steps below (FR-22 Reveal Centroids,
+> FR-23/24 Annotate Tracers) and **§5.5 Label Diffusion** (FR-25/26) were **replaced by automated
+> noise auto-assignment**: HDBSCAN flags borderline records and they are assigned to their nearest
+> proxy-segment centroid — no human-annotation or graph label-spreading step. **Negative Learning
+> (FR-21) is retained** as methodology §Stage P3b. See `methodology.md` §Stage P4 and
+> `knowledge-base.md` §15 (2026-07-17). Requirements below are kept for historical context.
+
 | ID | Requirement |
 |----|-------------|
 | FR-21 | Apply **Negative Learning** first: run rule-based impossibility filters across the full dataset before human annotators see any records (e.g., "Booked 60+ days out, Economy, No Loyalty ID → Cannot be Corporate") |
