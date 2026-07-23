@@ -22,5 +22,15 @@ outputs/
 # Large client files
 assets/pal-pitch-deck.pdf
 
+# Large real PAL data (local only — never commit)
+data/PAL-data/
+data/interim/
+data/OneDrive_*.zip
+
+# Rendered status-report build artifacts (>1 MB; regenerate with
+# `python src/build_report.py` from docs/_status-report.template.html)
+docs/status-report.html
+docs/status-report.pdf
+
 # macOS
 .DS_Store

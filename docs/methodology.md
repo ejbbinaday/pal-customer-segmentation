@@ -1,9 +1,11 @@
 # PAL Customer Segmentation — ML Pipeline Methodology
 
 **Client:** Philippine Airlines (PAL)
-**Version:** v0.5 — 17 July 2026
+**Version:** v0.7 — 23 July 2026
 
 > **Changelog**
+> - **v0.7 (23 Jul 2026):** Added the [Tools & Libraries disclosure](#tools--libraries-disclosure); reconciled the header version with the footer (was drifting at v0.5 vs v0.6).
+> - **v0.6 (23 Jul 2026):** Real-data track pivot — rule-based purpose×value segmentation is primary, LCA refines/validates; HDBSCAN dropped for the real data. Added the real-data at-a-glance summary.
 > - **v0.5 (17 Jul 2026):** Added the [v3 Prototype Pipeline](#v3-prototype-pipeline--pnr-level-anonymous-segmentation) — the adapted pipeline for the new PNR-level `PAL_PNR_Synthetic_Data_1000-v3.csv` schema. Baseline (v0.4) pipeline on `sample-features.csv` retained unchanged below as the reference implementation.
 > - **v0.4 (11 May 2026):** Baseline 8-stage pipeline on `sample-features.csv`.
 
@@ -11,22 +13,71 @@
 
 ## Current Methodology at a Glance
 
-**Active track — the v3 Prototype Pipeline** (anonymous trip-purpose × value segmentation at the PNR level):
+**Active track — the Real-Data Pipeline** (real 38M-coupon extract, 2024–2027; anonymous
+trip-purpose × value segmentation at the **booking** grain, rolled up to **customer**):
 
 ```
-P1 clean → P2 engineer (24 compact features) → P3 proxy-label waterfall → P3b negative learning
-→ hold-out split → P4 UNWEIGHTED HDBSCAN discovery → inductive nearest-centroid labelling (+ Unassigned bucket)
-→ P5 validate on the held-out set (penalties in the cost metric only)
+gz → typed Parquet → Stage C clean+flag (coupon grain)
+→ Stage F features: coupon → booking (customer_id, issue_date) → customer  (+ airport→region join)
+→ RULE-BASED purpose×value proxy segmentation  ← PRIMARY deliverable (the 10 segments)
+→ LCA refinement (sub-segment oversized groups; validate axes)  ← ML's role
+→ pending SME ground-truth for non-circular validation
 ```
 
-- **Model:** the 10 penalty-weighted segments (Corporate ×10 … Budget ×1).
-- **Reality check:** on the v3 synthetic data there is **no latent density structure** (DBCV ≈ 0), so segments
-  are currently **rule-seeded** — ML's role is label propagation/refinement + monitoring, not unsupervised
-  discovery. Validation is **proxy-referenced (circular)** until SME ground-truth (`data/labels/sme_sample.csv`) lands.
-- **Code:** `src/features_v3.py` (P1–P3b) · `src/prototype_v3.py` (P4–P5) · `src/diagnose_v3.py` (structure check).
-- **Baseline (Stages 1–8 below):** the earlier `sample-features.csv` pipeline — kept for reference, *not* the current track.
+- **Approach decision (2026-07-23, evidence-based):** a mixed-type clustering diagnostic
+  (`src/cluster_diagnostic.py`: LCA + k-prototypes) showed the customer base is a **continuum**
+  (BIC has no elbow — no natural *k*) whose structure follows the rule axes (route / direction / value /
+  timing), with only moderate cluster–taxonomy agreement (ARI ≈ 0.2–0.34). **So the rule-based
+  segmentation is primary; clustering (LCA) refines and validates — it is NOT the labeler.**
+  **HDBSCAN is dropped for the real data** (categorical-heavy → not density-separable).
+- **Model:** the 10 named segments (Corporate, Mabuhay Loyalist, OFW/Migrant, Balikbayan/VFR, Pilgrimage,
+  Family, Premium Bleisure, Budget/Adventure, Last-Minute, Digital Nomad) + an Unassigned bucket.
+  Value = authoritative **farebrand tier** (V1 dictionary). Validation stays **proxy-referenced (circular)**
+  until SME labels (`data/labels/sme_sample.csv`) land.
+- **Code:** `src/build_parquet.py` · `src/clean_real.py` (C) · `src/build_airport_ref.py` ·
+  `src/features_real.py` (F) · `src/cluster_diagnostic.py` (method choice). Full plan:
+  `docs/real-data-plan.md`; data dictionary: `docs/data-dictionary.md`.
+- **Prior tracks (kept for reference, superseded for real data):** the **v3 prototype**
+  (synthetic 1k, HDBSCAN — see below) and the **Stages 1–8** `sample-features.csv` baseline. On the v3
+  synthetic data HDBSCAN also found no density structure (DBCV ≈ 0), which pre-figured this pivot.
 
-Full detail: [v3 Prototype Pipeline](#v3-prototype-pipeline--pnr-level-anonymous-segmentation).
+Full detail: [v3 Prototype Pipeline](#v3-prototype-pipeline--pnr-level-anonymous-segmentation) (prior);
+real-data methodology → `docs/real-data-plan.md`.
+
+---
+
+## Tools & Libraries (disclosure)
+
+The whole pipeline is plain **Python 3.14** and open-source end to end — there is no proprietary
+analytics platform in the loop. The guiding idea: use a heavy-data engine only where the 38M rows
+genuinely need one, and keep the modelling itself on familiar, well-audited libraries so the results
+are reproducible and easy to hand over. Read this table as *"what each tool is for and why it earns
+its place"* rather than a bare dependency list.
+
+| Layer | What we use | Version | What it does / why it's here |
+|-------|-------------|---------|------------------------------|
+| Language | **Python** | 3.14 | Every script in `src/` (wheels also fine on 3.11–3.13) |
+| Heavy data (out-of-core) | **DuckDB** | 1.5.5 | Streams the 38M-coupon gzip and does the coupon → booking → customer aggregation *without* loading it all into memory |
+| Columnar storage | **PyArrow** / Parquet | 25.0.0 | Fast typed intermediates in `data/interim/` — sub-second re-reads instead of minutes re-scanning raw gzip |
+| Dataframes & math | **pandas** · **NumPy** | 3.0.3 · 2.5.1 | Work on the *aggregated* model-grain table (millions of rows, not tens of millions) |
+| Clustering — model-based | **StepMix** (Latent Class Analysis) | 3.0.0 | The refinement layer: finds sub-types inside big segments and tests for natural structure via BIC |
+| Clustering — mixed-type | **kmodes** (k-prototypes) | 0.12.2 | Independent cross-check in the diagnostic; handles numeric + categorical features together |
+| ML utilities | **scikit-learn** · **SciPy** | 1.9.0 · 1.18.0 | Feature scaling, PCA projection, Adjusted Rand Index, cost metrics |
+| Charts | **matplotlib** · **seaborn** | 3.11.0 · 0.13.2 | Every figure; shared segment palette in `src/pal_colors.py` |
+| Report build | base64 + headless **Google Chrome** | — | Embeds figures and renders `docs/status-report.pdf` (`src/build_report.py`) |
+| Markdown tables | **tabulate** | 0.10.0 | Renders the tables in the `outputs/*/summary.md` files |
+| Code quality | **ruff** · **bandit** · **pre-commit** | — | Lint, format, and security-scan every script before it lands |
+| Reproducibility pins | joblib · threadpoolctl | 1.5.3 · 3.6.0 | Pinned so clustering output is deterministic run to run |
+
+Full pinned lists live in `requirements-pipeline.txt` (analysis) and `requirements-dev.txt` (tooling).
+
+**Retired for the real-data track (kept for the prior prototypes):** `hdbscan` 0.8.44 and
+`imbalanced-learn` 0.14.2 powered the earlier HDBSCAN clustering and resampling experiments. They are no
+longer part of the real-data method (see the 2026-07-23 decision) but stay installed so the older tracks
+still run for reference.
+
+**Authoritative reference (not a library):** `DataDictionary.v1.xlsx` — the client's V1 data dictionary —
+governs every field's meaning and the farebrand value ladder, and is mirrored to `docs/data-dictionary.md`.
 
 ---
 
@@ -432,6 +483,12 @@ DBCV (it bends space toward the proxy rules). The improved design **decouples di
 
 > **Algorithm decision is closed:** HDBSCAN is the plan of record (Stage 4). Re-running the
 > 7-algorithm leaderboard on v3 is *confirmatory only*, not a re-opening of the choice.
+>
+> **⚠️ Superseded for the real-data track (2026-07-23).** On the real 38M-coupon data, the mixed-type
+> diagnostic showed a continuum with no natural *k* and only moderate cluster–taxonomy agreement, so
+> **HDBSCAN is dropped there**: the rule-based purpose×value segmentation is primary and **LCA** refines/
+> validates (see the at-a-glance and `docs/real-data-plan.md`). This note applies to the v3/synthetic and
+> `sample-features` tracks only.
 
 ---
 
@@ -504,4 +561,4 @@ These rules are not implemented in the current pipeline because the required fie
 ---
 
 *Document prepared for Philippine Airlines internal use.*
-*v0.5 — 17 July 2026*
+*v0.7 — 23 July 2026 (added Tools & Libraries disclosure; real-data track: rule-based primary + LCA refinement; HDBSCAN superseded for real data)*

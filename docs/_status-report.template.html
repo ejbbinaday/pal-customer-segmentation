@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PAL Customer Segmentation — Approach & Status Report</title>
+<style>
+  :root {
+    --paper:#FFFFFF; --panel:#F4F4EF; --ink:#14213A; --ink-soft:#4A5468; --ink-faint:#7A8298;
+    --rule:#E1E1D8; --rule-strong:#C9C9BE; --sky:#12608F; --sky-soft:#E9F1F7; --signal:#B45309;
+    --good:#2F7A52; --good-bg:#E6F0E9; --mod:#A96A12; --mod-bg:#F5ECDC; --weak:#9B3B47; --weak-bg:#F3E4E6;
+    --serif:"Charter","Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
+    --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --mono:ui-monospace,"SF Mono","Cascadia Code",Menlo,Consolas,monospace;
+  }
+  @page { size: A4; margin: 16mm 15mm; }
+  * { box-sizing: border-box; }
+  html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body {
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:var(--sans); font-size:10.5pt; line-height:1.55;
+  }
+  .page { max-width: 190mm; margin: 0 auto; padding: 0 4mm; }
+  .measure { max-width: 74ch; }
+  p { margin: 8px 0; }
+  strong { font-weight: 660; }
+  em { font-style: italic; }
+  a { color: var(--sky); text-decoration: none; }
+  code {
+    font-family:var(--mono); font-size:.85em; background:var(--panel);
+    padding:0.5px 4px; border-radius:4px; border:1px solid var(--rule);
+  }
+
+  /* masthead */
+  header.masthead { border-bottom: 2.5px solid var(--ink); padding: 4mm 0 5mm; margin-bottom: 5mm; }
+  .eyebrow {
+    font-family:var(--mono); font-size:8pt; letter-spacing:.16em; text-transform:uppercase;
+    color:var(--sky); margin:0 0 4mm; display:flex; gap:8px; align-items:center;
+  }
+  .eyebrow .dot { width:5px; height:5px; border-radius:50%; background:var(--signal); display:inline-block; }
+  h1 {
+    font-family:var(--serif); font-weight:600; font-size:27pt; line-height:1.06;
+    letter-spacing:-.015em; margin:0 0 4mm;
+  }
+  .standfirst {
+    font-family:var(--serif); font-size:13pt; line-height:1.45; color:var(--ink-soft);
+    max-width:64ch; margin:0 0 5mm;
+  }
+  .meta { display:grid; grid-template-columns:repeat(5,1fr); gap:3mm 5mm;
+          border-top:1px solid var(--rule); padding-top:3.5mm; }
+  .meta dt { font-family:var(--mono); font-size:7pt; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-faint); margin:0 0 1px; }
+  .meta dd { margin:0; font-size:9pt; font-weight:600; }
+  .status-pill { background:var(--sky-soft); color:var(--sky); font-family:var(--mono);
+    font-size:7.5pt; font-weight:600; padding:1.5px 7px; border-radius:999px; display:inline-block; }
+
+  /* stat band */
+  .stats { display:grid; grid-template-columns:repeat(4,1fr); gap:1px; background:var(--rule);
+    border:1px solid var(--rule); border-radius:9px; overflow:hidden; margin:6mm 0; }
+  .stat { background:var(--paper); padding:3mm 4mm; }
+  .stat .n { font-family:var(--serif); font-size:19pt; font-weight:600; letter-spacing:-.02em;
+    color:var(--sky); line-height:1.05; font-variant-numeric:tabular-nums; }
+  .stat .l { font-size:8pt; color:var(--ink-soft); margin-top:2px; line-height:1.3; }
+
+  /* headings */
+  h2 { font-family:var(--serif); font-size:16pt; font-weight:600; letter-spacing:-.01em; line-height:1.15;
+    margin:8mm 0 1mm; display:flex; align-items:baseline; gap:10px; }
+  h2 .num { font-family:var(--mono); font-size:9pt; font-weight:600; color:var(--sky); letter-spacing:.06em; }
+  h3 { font-family:var(--sans); font-size:10.5pt; font-weight:700; margin:5mm 0 1mm; }
+  .subhead { font-family:var(--mono); font-size:8pt; letter-spacing:.13em; text-transform:uppercase;
+    color:var(--ink-faint); margin:5mm 0 0; }
+  ul { padding-left:1.1em; margin:8px 0; }
+  li { margin:4px 0; }
+  li::marker { color:var(--sky); }
+
+  /* callout */
+  .callout { background:var(--panel); border:1px solid var(--rule); border-left:3px solid var(--sky);
+    border-radius:0 8px 8px 0; padding:3mm 4mm; margin:4mm 0; break-inside:avoid; }
+  .callout .k { font-family:var(--mono); font-size:7.5pt; letter-spacing:.1em; text-transform:uppercase;
+    color:var(--sky); margin:0 0 3px; }
+  .callout.warn { border-left-color:var(--signal); }
+  .callout.warn .k { color:var(--signal); }
+  .callout p { margin:2px 0 0; font-size:10pt; }
+
+  /* figures */
+  figure { margin:5mm 0; break-inside:avoid; }
+  figure img { width:100%; height:auto; display:block; border:1px solid var(--rule); border-radius:8px; }
+  figcaption { font-size:8pt; color:var(--ink-faint); margin-top:2mm; font-family:var(--mono); letter-spacing:.01em; }
+  figcaption b { color:var(--ink-soft); font-weight:600; }
+
+  /* pipeline flow */
+  .flow { background:var(--panel); border:1px solid var(--rule); border-radius:9px; padding:3mm 4mm; margin:4mm 0; break-inside:avoid; }
+  .flow ol { list-style:none; margin:0; padding:0; }
+  .flow li { margin:0; display:grid; grid-template-columns:9mm 1fr; gap:3mm; padding:2mm 0; }
+  .flow li + li { border-top:1px dashed var(--rule-strong); }
+  .flow .stage { font-family:var(--mono); font-weight:700; font-size:9pt; color:var(--paper);
+    background:var(--sky); width:8mm; height:8mm; border-radius:6px; display:grid; place-items:center; }
+  .flow .stage.rule { background:var(--signal); }
+  .flow .t { font-weight:660; font-size:9.5pt; }
+  .flow .d { font-size:8.5pt; color:var(--ink-soft); margin-top:1px; }
+  .flow .tag { font-family:var(--mono); font-size:7pt; color:var(--ink-faint); margin-top:1.5px; display:inline-block; }
+
+  /* tables */
+  .tbl-wrap { margin:4mm 0; border:1px solid var(--rule); border-radius:9px; overflow:hidden; break-inside:avoid; }
+  table { border-collapse:collapse; width:100%; font-size:9pt; }
+  th,td { padding:2mm 3mm; text-align:left; border-bottom:1px solid var(--rule); }
+  thead th { font-family:var(--mono); font-size:7pt; letter-spacing:.06em; text-transform:uppercase;
+    color:var(--ink-faint); font-weight:600; background:var(--panel); }
+  tbody tr:last-child td { border-bottom:0; }
+  td.num, th.num { text-align:right; font-variant-numeric:tabular-nums; }
+  .seg-name { font-weight:600; white-space:nowrap; }
+  .swatch { display:inline-block; width:8px; height:8px; border-radius:2px; margin-right:5px; vertical-align:baseline; }
+  .chip { display:inline-block; font-family:var(--mono); font-size:7.5pt; font-weight:600;
+    padding:1px 7px; border-radius:999px; white-space:nowrap; }
+  .chip.good{background:var(--good-bg);color:var(--good);}
+  .chip.mod{background:var(--mod-bg);color:var(--mod);}
+  .chip.weak{background:var(--weak-bg);color:var(--weak);}
+
+  /* cards */
+  .cards { display:grid; grid-template-columns:1fr 1fr; gap:3mm; margin:4mm 0; break-inside:avoid; }
+  .card { background:var(--panel); border:1px solid var(--rule); border-radius:8px; padding:3mm 3.5mm; }
+  .card h4 { margin:0 0 2px; font-size:9.5pt; font-weight:700; display:flex; align-items:center; gap:6px; }
+  .card p { margin:0; font-size:8.5pt; color:var(--ink-soft); line-height:1.4; }
+  .card .flag { font-family:var(--mono); font-size:7pt; font-weight:700; padding:0.5px 6px;
+    border-radius:4px; background:var(--signal); color:var(--paper); }
+  .card .flag.info { background:var(--sky); }
+
+  section { break-inside:auto; }
+  .avoid-break { break-inside:avoid; }
+  footer { border-top:2.5px solid var(--ink); margin-top:8mm; padding:4mm 0 2mm;
+    font-size:8pt; color:var(--ink-faint); }
+  footer p { margin:2px 0; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="masthead">
+    <p class="eyebrow"><span class="dot"></span> Philippine Airlines · Customer Segmentation <span class="dot"></span> Internal Working Report</p>
+    <h1>Segmenting 38 million bookings without a name attached</h1>
+    <p class="standfirst">PAL handed us 38 million anonymous flight records and, in effect, one question: who are these travellers? This is how we've been answering it — the approach we settled on and why, what the data told us along the way, and where things stand right now.</p>
+    <dl class="meta">
+      <div><dt>Data</dt><dd>Real coupon extract, 2024–2027</dd></div>
+      <div><dt>Grain</dt><dd>Coupon → Booking → Customer</dd></div>
+      <div><dt>Stage</dt><dd>Features built · method set</dd></div>
+      <div><dt>Updated</dt><dd>23 July 2026</dd></div>
+      <div><dt>Status</dt><dd><span class="status-pill">Methodology locked</span></dd></div>
+    </dl>
+  </header>
+
+  <div class="stats">
+    <div class="stat"><div class="n">38.1M</div><div class="l">flight coupons ingested</div></div>
+    <div class="stat"><div class="n">22.9M</div><div class="l">bookings — the purpose unit</div></div>
+    <div class="stat"><div class="n">13.4M</div><div class="l">distinct customers</div></div>
+    <div class="stat"><div class="n">10</div><div class="l">named business segments</div></div>
+  </div>
+
+  <section class="measure">
+    <h2><span class="num">01</span> The short version</h2>
+    <p>The goal is to sort PAL's passengers into <strong>ten segments that actually mean something commercially</strong> — Corporate, Mabuhay Loyalist, OFW/Migrant, Balikbayan/VFR, Family, Pilgrimage, Premium Bleisure, Budget/Adventure, Last-Minute and Digital Nomad. The catch is that we have to do it blind: no names, no loyalty IDs, nothing that links a booking back to a person we already know. That isn't a corner we cut — it's a recognised approach in the industry, the <strong>“anonymous segmentation” lens</strong>, where you read a trip's <em>purpose</em> and its <em>value</em> from what the booking itself tells you.</p>
+    <p>Once we swapped the early synthetic prototype for PAL's <strong>real 38-million-coupon extract</strong>, the data pushed us into one big change of plan — and it was the evidence that made the call, not a preference of ours:</p>
+    <div class="callout">
+      <p class="k">The headline decision</p>
+      <p>PAL's customers don't fall into neat, separate clusters — they form a <strong>continuum</strong>. So the workhorse is a <strong>transparent, rule-based purpose×value classifier</strong>, and machine-learning clustering (Latent Class Analysis) plays a supporting role: it <strong>refines and validates</strong> rather than labels. Density-based clustering (HDBSCAN) was dropped for the real data.</p>
+    </div>
+    <p>Where we are today: every one of the 22.9M bookings has a segment label, and — reassuringly — average revenue climbs steadily from one segment to the next, which is exactly what we'd hope to see if the segments are real. The one thing still missing is a <strong>ground-truth check</strong>, and for that we need a small labelled sample from PAL.</p>
+  </section>
+
+  <section class="measure">
+    <h2><span class="num">02</span> What PAL actually sent us</h2>
+    <p>The extract arrives at <strong>coupon level</strong> — one row per flight leg, 38.1M of them, covering departures from May 2024 to May 2027, and stripped of anything that identifies a person. PAL's authoritative <em>V1 data dictionary</em> put right two things we'd assumed from the older sample, and each one nudged the design:</p>
+    <ul>
+      <li><code>UniqueID</code> turns out to be a <strong>customer</strong> key, not a booking reference — we confirmed it by watching the same IDs reappear over spans of up to ~3.2 years. That's a gift: it means we can actually track repeat behaviour, tenure and loyalty for the travellers who come back.</li>
+      <li>Every booking class maps onto an official <strong>farebrand value ladder</strong>, from Business Flex right down to Economy Supersaver — a clean, ordered measure of value that let us retire the fare tiers we'd been guessing at.</li>
+    </ul>
+    <div class="callout warn">
+      <p class="k">A trap that would have burned us</p>
+      <p>Booking classes <code>F</code> and <code>G</code> quietly <strong>swap meaning on 1 April 2026</strong>. Before that date <code>G</code> means an award redemption; after it, <code>F</code> means award and <code>G</code> means a group fare. Take the raw numbers at face value and you'd see a “surge in loyalty” that never happened. Applying the date-aware rule instead, we correctly pick up ~9,150 award coupons across the full span — versus roughly 1,000 the naïve reading would catch.</p>
+    </div>
+    <p>A few other quirks shape the work. <code>Age</code> is missing on 57% of rows, but not randomly — it's only captured on international operations, so we treat “do we even know the age?” as a signal in itself and never let it drive the segments. The carrier code is the same value on every row, so it's dropped. And revenue has a long tail with refunds and zeros mixed in, so we repair those rather than mistake a refund for a bargain fare.</p>
+
+    <p class="subhead">Choosing the unit of analysis</p>
+    <p>A single coupon is too fine-grained to carry a trip's purpose, and a whole customer is too coarse. The sweet spot is a <strong>booking</strong> — one purchase decision — which we rebuild as <code>(UniqueID, DateOfIssuance)</code>. The data backs this up: <strong>43% of bookings hold a full round-trip</strong>, outbound and return together. The obvious alternative, keying on individual trips, averaged just 1.13 legs each and sliced every return flight off into a phantom one-way. So we build features at booking level first, then roll them up to the customer.</p>
+    <div class="callout">
+      <p class="k">A caveat we keep in plain sight</p>
+      <p>Only <strong>about a quarter of customers ever book more than once</strong>. For them, tenure, frequency and lifetime value are genuinely informative. For the other three-quarters, the customer simply <em>is</em> their single booking — so loyalty rests on award flags and that repeat-booking minority, not on rich histories we don't have. We'd rather say so up front than pretend otherwise.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">03</span> Getting to know the data (EDA)</h2>
+    <p class="measure">Before modelling anything, we spent time simply looking at the data (all 22.9M bookings, aggregated in DuckDB). Two things stood out and steered everything after. First, PAL's network is overwhelmingly <strong>domestic</strong>, and most of that travel is cheap economy — which means value on its own can't tell the segments apart. What <em>does</em> separate them is <strong>where people are flying: domestic versus international</strong>. Second, booking timing splits into two crowds — a burst of last-minute travellers and a long tail of people who book weeks or months ahead.</p>
+    <figure>
+      <img src="__FIG_eda_02_region__" alt="Route region distribution">
+      <figcaption><b>Fig 1.</b> Route network by destination region. 58% of bookings are domestic Philippines travel.</figcaption>
+    </figure>
+    <figure>
+      <img src="__FIG_eda_03_lead_value__" alt="Lead time and value tier distributions">
+      <figcaption><b>Fig 2.</b> Booking lead time (left) and farebrand value tier (right). ~71% of bookings sit in the two cheapest economy tiers — value is non-discriminative on its own.</figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <h2><span class="num">04</span> How the pipeline works</h2>
+    <p class="measure">38 million rows is too much to hold in memory all at once, so the heavy lifting happens in <strong>DuckDB</strong>, which streams the raw files and boils them down before anything touches pandas. The intermediate results are saved as fast <strong>Parquet</strong> files, and only the aggregated, model-ready table gets handed to pandas and scikit-learn. Everything below is a single script in <code>src/</code>, run in order.</p>
+
+    <div class="flow">
+      <ol>
+        <li><span class="stage">P</span><div><div class="t">Typed Parquet build</div><div class="d">Raw gzip → typed, partitioned Parquet. Repairs timestamps, money strings and encoding.</div><div class="tag">build_parquet.py</div></div></li>
+        <li><span class="stage">C</span><div><div class="t">Clean &amp; flag — coupon grain</div><div class="d">Deduplicate; split flown vs open coupons; decode farebrand + the date-dependent award/group rule; repair refunds &amp; zero revenue; parse compound route paths; canonicalise geography.</div><div class="tag">clean_real.py · build_airport_ref.py</div></div></li>
+        <li><span class="stage">E</span><div><div class="t">Exploratory analysis</div><div class="d">Aggregate EDA on value, route, timing and customer behaviour (§3). Key finding: value alone is non-discriminative, so the route split becomes essential.</div><div class="tag">eda_real.py</div></div></li>
+        <li><span class="stage">F</span><div><div class="t">Feature engineering — coupon → booking → customer</div><div class="d">Four feature families (value, loyalty, timing, product/route) rebuilt for the real schema, plus an airport→region join and a customer rollup.</div><div class="tag">features_real.py</div></div></li>
+        <li><span class="stage rule">1°</span><div><div class="t">Rule-based purpose×value proxy — PRIMARY deliverable</div><div class="d">A priority waterfall assigns each booking to one of the 10 segments (or an explicit Unassigned bucket). This is the labeller.</div><div class="tag">the 10 named segments</div></div></li>
+        <li><span class="stage">L</span><div><div class="t">LCA refinement — the ML layer</div><div class="d">Latent Class Analysis sub-segments oversized groups into actionable sub-types and validates that the rule axes are real. It refines; it does not label.</div><div class="tag">sub_segment.py · cluster_diagnostic.py</div></div></li>
+        <li><span class="stage">V</span><div><div class="t">Validation — pending SME ground truth</div><div class="d">Asymmetric cost matrix + per-segment recall, optimising the high-stakes segments. Non-circular validation waits on a labelled sample from PAL.</div><div class="tag">data/labels/sme_sample.csv</div></div></li>
+      </ol>
+    </div>
+
+    <h3>Why the rules lead and clustering follows</h3>
+    <p class="measure">This was the big question, and we didn't want to answer it on instinct — so we tested it. We ran two different clustering methods — <strong>Latent Class Analysis and k-prototypes</strong> — on a 60,000-booking sample across 11 features, and asked them plainly: is there natural structure here? The answer came back no, twice over. The model-fit score keeps improving as you add clusters, with no natural stopping point, and whatever clusters do emerge only loosely match the business segments (agreement never tops ARI 0.34) — and when they split, they split along the exact same lines our rules were already drawing.</p>
+    <figure>
+      <img src="__FIG_clust_01_bic_ari__" alt="LCA BIC curve and ARI">
+      <figcaption><b>Fig 3.</b> Left: BIC keeps falling from k=3 to k=9 — no elbow, no natural <i>k</i>. Right: agreement with the rule segments never exceeds ARI 0.34 (shaded = weak-agreement zone).</figcaption>
+    </figure>
+    <p class="measure avoid-break">Flattening the sample onto two dimensions makes the point visible at a glance. There are <strong>no clean gaps between the clusters</strong>, and colouring the same points by our rule segments shows them bleeding into one another rather than sitting in tidy islands — the signature of a continuum. In short, clustering was just re-deriving our own rules, only less cleanly. So we let the transparent, auditable rules do the labelling, and put clustering to work where it genuinely helps: teasing out sub-types <em>within</em> the big segments. HDBSCAN, which hunts for dense pockets, was retired here — travel data this categorical simply doesn't come in dense pockets.</p>
+    <figure>
+      <img src="__FIG_clust_02_pca__" alt="PCA projection of preliminary clusters">
+      <figcaption><b>Fig 4.</b> Preliminary clusters — 60k stratified sample, PCA projection. Left: the 9 LCA latent classes. Right: identical points coloured by rule-based segment. Neither view shows separated blobs.</figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <h2><span class="num">05</span> What we built it with</h2>
+    <p class="measure">No black boxes and no proprietary analytics platform — the whole pipeline is open-source Python. We only bring in a heavy-data engine where the 38 million rows genuinely need one, and keep the modelling on well-worn, auditable libraries so anyone can reproduce the work or pick it up later. Here's what's under the hood, and why each piece is there.</p>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Tool</th><th>Version</th><th>What it does &amp; why it's here</th></tr></thead>
+        <tbody>
+          <tr><td class="seg-name">Python</td><td>3.14</td><td>Every script in <code>src/</code> — open-source end to end</td></tr>
+          <tr><td class="seg-name">DuckDB</td><td>1.5.5</td><td>Streams the 38M-coupon extract and aggregates it out-of-core, so it never all sits in memory at once</td></tr>
+          <tr><td class="seg-name">PyArrow / Parquet</td><td>25.0</td><td>Fast typed intermediates — sub-second re-reads instead of minutes re-scanning raw gzip</td></tr>
+          <tr><td class="seg-name">pandas · NumPy</td><td>3.0.3 · 2.5.1</td><td>The aggregated, model-ready table and the maths on it</td></tr>
+          <tr><td class="seg-name">StepMix</td><td>3.0</td><td>Latent Class Analysis — the refinement layer; finds sub-types and tests for natural structure</td></tr>
+          <tr><td class="seg-name">kmodes</td><td>0.12.2</td><td>k-prototypes — an independent mixed-type cross-check in the clustering diagnostic</td></tr>
+          <tr><td class="seg-name">scikit-learn · SciPy</td><td>1.9 · 1.18</td><td>Feature scaling, PCA projection, agreement (ARI) and cost metrics</td></tr>
+          <tr><td class="seg-name">matplotlib · seaborn</td><td>3.11 · 0.13.2</td><td>Every figure in this report; shared segment palette in <code>pal_colors.py</code></td></tr>
+          <tr><td class="seg-name">ruff · bandit · pre-commit</td><td>—</td><td>Lint, format and security-scan every script before it lands</td></tr>
+          <tr><td class="seg-name">Chrome (headless) · tabulate</td><td>—</td><td>Renders this PDF; tabulate builds the summary-table markdown</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="measure" style="font-size:9.5pt;color:var(--ink-soft)">Two libraries, <code>hdbscan</code> and <code>imbalanced-learn</code>, powered the earlier HDBSCAN and resampling experiments and stay installed for those prior tracks — but they're no longer part of the real-data method. Field meanings and the farebrand value ladder come from PAL's authoritative <em>V1 data dictionary</em>, not from any library. The full pinned version list lives in the methodology document and <code>requirements-pipeline.txt</code>.</p>
+  </section>
+
+  <section>
+    <h2><span class="num">06</span> What we're seeing so far</h2>
+    <p class="measure">Every one of the 22.9M bookings now carries a segment label. The check we cared about most: does value line up the way it should? It does — <strong>average spend rises steadily right up the ladder</strong>, from $74 a booking for Budget/Adventure to $1,504 for Premium Bleisure. If the segments were arbitrary, you wouldn't see that; the fact that you do is a good early sign we're capturing something real.</p>
+    <figure>
+      <img src="__FIG_eda_01_segments__" alt="Segment volume and value">
+      <figcaption><b>Fig 5.</b> Proxy segment distribution by volume (left) and average revenue per booking (right), coloured by the canonical segment palette.</figcaption>
+    </figure>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Segment</th><th class="num">Bookings</th><th class="num">Share</th><th class="num">Avg revenue</th></tr></thead>
+        <tbody>
+          <tr><td class="seg-name"><span class="swatch" style="background:#A3E635"></span>Budget/Adventure</td><td class="num">9,037,176</td><td class="num">39.4%</td><td class="num">$74</td></tr>
+          <tr><td class="seg-name"><span class="swatch" style="background:#EF4444"></span>OFW/Migrant</td><td class="num">3,919,216</td><td class="num">17.1%</td><td class="num">$312</td></tr>
+          <tr><td class="seg-name"><span class="swatch" style="background:#94A3B8"></span>Last-Minute</td><td class="num">2,945,686</td><td class="num">12.9%</td><td class="num">$137</td></tr>
+          <tr><td class="seg-name"><span class="swatch" style="background:#22C55E"></span>Balikbayan/VFR</td><td class="num">2,911,290</td><td class="num">12.7%</td><td class="num">$618</td></tr>
+          <tr><td class="seg-name"><span class="swatch" style="background:#4B5563"></span>Unassigned</td><td class="num">2,194,061</td><td class="num">9.6%</td><td class="num">$360</td></tr>
+          <tr><td class="seg-name"><span class="swatch" style="background:#38BDF8"></span>Corporate</td><td class="num">1,001,638</td><td class="num">4.4%</td><td class="num">$493</td></tr>
+          <tr><td class="seg-name"><span class="swatch" style="background:#C084FC"></span>Premium Bleisure</td><td class="num">481,666</td><td class="num">2.1%</td><td class="num">$1,504</td></tr>
+          <tr><td class="seg-name"><span class="swatch" style="background:#E879F9"></span>Family</td><td class="num">370,647</td><td class="num">1.6%</td><td class="num">$235</td></tr>
+          <tr><td class="seg-name"><span class="swatch" style="background:#F97316"></span>Pilgrimage</td><td class="num">43,617</td><td class="num">0.2%</td><td class="num">$404</td></tr>
+          <tr><td class="seg-name"><span class="swatch" style="background:#FBBF24"></span>Mabuhay Loyalist</td><td class="num">6,453</td><td class="num">0.03%</td><td class="num">$113</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Digging inside the big segments</h3>
+    <p class="measure">This is where clustering earns its keep. Some segments are large enough that “Budget/Adventure” alone doesn't tell marketing much, so LCA breaks the biggest ones into a handful of practical sub-types (we cap the number at what's actually useful, since — as everywhere in this data — there's no natural break point). <strong>Budget/Adventure</strong>, for instance, falls into four: the bargain one-way <em>supersaver</em> ($23), a one-way <em>saver</em> booked a couple of weeks out ($69), the biggest group by far — a <em>round-trip saver</em> booked in advance ($87, 38% of the segment) — and a connecting one-way ($86). <strong>OFW</strong> and <strong>Balikbayan</strong> each break into four along similar lines of timing, connections and value; <strong>Last-Minute</strong> into three. The headline ten stay exactly as they are — these sub-types just add colour underneath.</p>
+    <figure>
+      <img src="__FIG_sub_01_subtypes__" alt="Sub-segmentation of the four largest segments">
+      <figcaption><b>Fig 6.</b> LCA sub-types within the four largest segments. Each bar is a sub-type sized by its share of the parent; annotation gives median revenue and median booking lead time.</figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <h2><span class="num">07</span> Being straight about what the data can and can't do</h2>
+    <p class="measure">The ten segments come from the business, not the data — and anonymous data supports some of them far better than others. We'd much rather flag that now than let it surface later. Realistically, five or six segments come through with real confidence; the rest are either thin, overlap heavily with a neighbour, or lean on route lookups we've had to build by hand. Here's our honest read, segment by segment:</p>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Segment</th><th>Signal in this data</th><th>Confidence</th></tr></thead>
+        <tbody>
+          <tr><td class="seg-name">Last-Minute</td><td>Short booking lead time — direct measure</td><td><span class="chip good">Strong</span></td></tr>
+          <tr><td class="seg-name">Corporate</td><td>Premium cabin + corporate channel + short lead + repeat</td><td><span class="chip good">Good</span></td></tr>
+          <tr><td class="seg-name">Budget/Adventure</td><td>Economy saver fares + domestic leisure routes</td><td><span class="chip good">Good</span></td></tr>
+          <tr><td class="seg-name">Mabuhay Loyalist</td><td>Award tickets (F/G rule) + repeat + premium</td><td><span class="chip good">Good</span></td></tr>
+          <tr><td class="seg-name">OFW/Migrant</td><td>Foreign issue country + economy + long-haul</td><td><span class="chip mod">Moderate</span></td></tr>
+          <tr><td class="seg-name">Family</td><td>Group booking + leisure route</td><td><span class="chip mod">Moderate</span></td></tr>
+          <tr><td class="seg-name">Balikbayan/VFR</td><td>Diaspora issue + round-trip to PH — overlaps OFW</td><td><span class="chip weak">Weak</span></td></tr>
+          <tr><td class="seg-name">Premium Bleisure</td><td>Premium cabin + leisure route + weekend timing</td><td><span class="chip weak">Weak</span></td></tr>
+          <tr><td class="seg-name">Pilgrimage</td><td>Route to religious destinations — needs route lookup</td><td><span class="chip weak">Weak</span></td></tr>
+          <tr><td class="seg-name">Digital Nomad</td><td>Long stay + flexible + international — hard to infer anonymously</td><td><span class="chip weak">Weak</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">08</span> What's left, and what we need from PAL</h2>
+    <p class="measure">The pipeline is built and has run end to end through feature engineering, and the method is settled. What's left is mostly closing the validation gap and talking through a few taxonomy questions with PAL — several of these need input from your side, not just more analysis from ours.</p>
+    <div class="cards">
+      <div class="card"><h4><span class="flag info">PAL</span> A labelled sample</h4><p>Right now we're grading our own homework — validation compares against the same rules that made the labels. A small set of examples labelled by your experts would break that circle, and it's the single most valuable thing we could get.</p></div>
+      <div class="card"><h4><span class="flag">Discuss</span> The Unassigned 9.6%</h4><p>Mostly Philippines-issued <em>outbound</em> international economy — a genuine travel pattern that none of the ten segments quite fits. We'd like to decide together where it belongs.</p></div>
+      <div class="card"><h4><span class="flag">Enrich</span> Mabuhay Loyalist</h4><p>Very thin today (0.03%) because we can only see award redemptions. We can widen it using repeat-booking and premium-cabin behaviour once we work at customer level.</p></div>
+      <div class="card"><h4><span class="flag">Note</span> Digital Nomad has no anchor</h4><p>There's simply no reliable way to spot one in anonymous data as the segment is defined today. Worth a conversation — either we redefine it or accept it won't appear.</p></div>
+    </div>
+    <p class="measure">One framing worth stating plainly: we're treating the ten-segment list as a <strong>well-informed hypothesis to test against PAL's own knowledge</strong>, not a fixed target to hit. How many segments cleanly emerge, and exactly how each is defined, is a finding that comes <em>out</em> of the work — not a promise we made going in.</p>
+  </section>
+
+  <footer>
+    <p><strong>PAL Customer Segmentation</strong> — internal working report.</p>
+    <p>Sources: <code>docs/methodology.md</code> (v0.6), <code>docs/real-data-plan.md</code>, <code>docs/knowledge-base.md</code> §15, and pipeline outputs as of 23 July 2026. Figures generated from the real booking table by <code>src/report_figures.py</code>. Anonymous trip-purpose × value segmentation — no CRM or loyalty join.</p>
+  </footer>
+
+</div>
+</body>
+</html>

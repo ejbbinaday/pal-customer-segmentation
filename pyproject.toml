@@ -33,4 +33,6 @@ quote-style = "double"
 exclude_dirs = ["outputs", "reports", "assets", "scratchpad", ".git", "__pycache__"]
 skips = [
     "B101",  # assert_used — not security-relevant in analysis scripts
+    "B608",  # hardcoded_sql — DuckDB queries are built from internal constants and
+             # introspected column names only (never user/network input); no injection surface
 ]

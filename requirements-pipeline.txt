@@ -17,6 +17,18 @@ imbalanced-learn==0.14.2
 matplotlib==3.11.0
 seaborn==0.13.2
 
+# large-data layer — real PAL data is ~38M coupon rows / 3.6 GB gz (data/PAL-data/).
+# duckdb streams the gz and aggregates coupon→PNR out of core; pyarrow backs Parquet
+# (data/interim/pal_parquet/); tabulate renders the profiler's markdown tables.
+duckdb==1.5.5
+pyarrow==25.0.0
+tabulate==0.10.0
+
+# mixed-type clustering for the real-data segmentation diagnostic/refinement
+# (LCA = model-based; k-prototypes = hard clusters). See src/cluster_diagnostic.py.
+kmodes==0.12.2
+stepmix==3.0.0
+
 # transitive, pinned for reproducibility
 joblib==1.5.3
 threadpoolctl==3.6.0
