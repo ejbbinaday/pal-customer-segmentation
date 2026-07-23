@@ -12,6 +12,10 @@ data/raw/      Source datasets (not all tracked — see .gitignore)
                  PAL_PNR_Synthetic_Data_1000-v3.csv   NEW PNR-level prototype data (1,000 rows, 41 cols)
                  PAL_PNR_Synthetic_Data_1000-v2.csv   data dictionary for the v3 schema
                  synthetic_flight_passenger_data.csv  generic synthetic set used by the POC
+data/PAL-data/ REAL PAL coupon-level extract — 4 gzipped CSVs, ~38M rows, 40 cols, 2024–2027
+                 (git-ignored, local only). newQuery2024 / 2025 / 2026Jan_to_May / 2026Jun_to_2027May
+data/interim/  Derived Parquet built from the raw gz (git-ignored):
+                 pal_parquet/   typed, zstd, partitioned by iss_year — the fast pipeline input
 src/           All Python (analysis pipeline + report/slide generators + shared palette)
 docs/          Business + methodology + EDA + monitoring docs, onboarding guide
 reports/       Tracked deliverables: HTML EDA report, exported slide PNGs, POC figures
@@ -71,6 +75,46 @@ the cost metric (not the feature space); negative learning (P3b) runs in `featur
 > **Honest verdict:** diagnostics (negative DBCV, flat KMeans silhouette) show the v3 synthetic data has
 > **no latent cluster structure** — this validates the *approach*, not a result, and the recall numbers
 > are circular. Full analysis + recommendations: **`docs/v3-prototype-findings.md`**.
+
+## Real PAL data (38M coupon rows — active)
+
+The real extract in `data/PAL-data/` is coupon/segment-grained (avg ~2.8 coupons per passenger),
+far larger than the synthetic prototype. Processing goes through DuckDB / Parquet rather than
+in-memory pandas:
+
+```bash
+python src/build_parquet.py   # gz → data/interim/pal_parquet/ (one pass, ~90s)
+python src/profile_raw.py     # profile → outputs/profile_raw/{summary.md, column_profile.csv}
+python src/clean_real.py      # Stage C: clean+flag → data/interim/pal_clean/ + outputs/clean_report/
+python src/eda_real.py        # Stage E confirmations → outputs/eda_real/confirmations.md
+python src/build_airport_ref.py  # airport→country/region lookup → data/reference/airport_region.csv
+python src/features_real.py   # Stage F: booking + customer features + proxy labels → data/interim/pal_features_*
+python src/cluster_diagnostic.py  # mixed-type clustering diagnostic (LCA + k-prototypes) → outputs/cluster_diagnostic/
+python src/sub_segment.py     # LCA sub-types within large rule segments → outputs/sub_segments/
+python src/report_figures.py  # real-data EDA + preliminary-cluster figures → outputs/report_real/figs/
+python src/build_report.py    # embed figures + render → docs/status-report.{html,pdf}
+```
+
+`build_parquet.py` converts the four gz files to a typed, partitioned Parquet dataset (all downstream
+steps read this — sub-second queries vs multi-minute gz scans). `profile_raw.py` characterises the raw
+data (null rates, cardinality, ranges, coupon→customer grain, money/age sanity, top categories).
+`clean_real.py` (Stage C) writes a cleaned, flagged coupon Parquet (`data/interim/pal_clean/`) — farebrand
+value tier, date-aware Mabuhay award/group/non-rev flags, flown/open, money flags, parsed routes — plus a
+QA report; ~21s streaming, no dedup needed (exact duplicates verified ~0).
+`features_real.py` (Stage F) aggregates coupon→booking→customer, joins the airport-region lookup, excludes
+all-non-rev customers, engineers the four feature families + loyalty, and applies a prioritized proxy-label
+waterfall → `data/interim/pal_features_booking.parquet` (22.9M) + `pal_features_customer.parquet` (13.4M)
++ `outputs/features_real/summary.md`. Includes data guards (UniqueID persistence, currency sanity).
+`report_figures.py` draws the real-data EDA + preliminary-cluster (LCA/PCA) figures used in the
+shareable status report; `build_report.py` embeds them into a self-contained
+**`docs/status-report.html`** and renders **`docs/status-report.pdf`** (a colleague-facing summary of
+the approach, methodology, EDA and current status) from the `docs/_status-report.template.html` template.
+
+Key references:
+- **`docs/data-dictionary.md`** — authoritative field reference (mirror of the client's
+  `DataDictionary.v1.xlsx`), incl. the farebrand → value-tier ladder.
+- **`docs/real-data-plan.md`** — the cleaning → EDA → feature-engineering plan (grain, decisions).
+- **`docs/knowledge-base.md`** §15 — profile findings + dictionary-reconciliation notes.
 
 ## Setup
 

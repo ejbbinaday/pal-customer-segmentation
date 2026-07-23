@@ -480,6 +480,256 @@ Dashboard Wireframe → Requirements Checklist → [Appendix] Literature
 
 ---
 
+#### 2026-07-23 — methodology.md v0.7: Tools & Libraries disclosure + version-drift fix; report humanized
+**Domain:** Project Decision
+Added a **Tools & Libraries (disclosure)** section to `docs/methodology.md` (bumped v0.6→**v0.7**) —
+an intuitive "what each tool is for and why" table covering the real stack: Python 3.14, DuckDB 1.5.5
+(out-of-core), PyArrow/Parquet 25.0, pandas 3.0.3 / NumPy 2.5.1, StepMix 3.0 (LCA), kmodes 0.12.2
+(k-prototypes), scikit-learn 1.9 / SciPy 1.18, matplotlib 3.11 / seaborn 0.13.2, tabulate, ruff/bandit/
+pre-commit, and headless Chrome for PDF; notes `hdbscan`/`imbalanced-learn` as retired-but-installed for
+prior tracks, and `DataDictionary.v1.xlsx` as the authoritative reference. Also **reconciled a version
+drift** (header said v0.5 while footer said v0.6; changelog was missing v0.6) — added v0.6 + v0.7 entries.
+Separately **humanized** `docs/status-report.{html,pdf}` prose (warmer, less robotic; same figures/facts)
+and added the same **Tools & Libraries disclosure as a new report section (§05 "What we built it with")** —
+so the disclosure lives in both the methodology doc and the shareable report. **Source:**
+`requirements-pipeline.txt` + our edits.
+
+#### 2026-07-23 — Colleague-facing status report built (real-data figures generated for the first time)
+**Domain:** Project Decision
+Produced a shareable status report — **`docs/status-report.pdf`** (7pp, A4) + self-contained
+`docs/status-report.html` — covering approach, methodology, EDA and current status for colleagues.
+Key point: the real-data track had **only text summaries, no figures** (all PNGs in `outputs/` were from
+the old `sample-features` baseline and the v3 *synthetic* prototype — misleading to reuse). So
+`src/report_figures.py` now generates genuine real-data figures from `pal_features_booking.parquet`:
+3 EDA charts (segment volume×value, route region, lead-time×value-tier) + 2 preliminary-cluster panels
+(LCA BIC/ARI curve; PCA projection coloured by LCA class vs. rule segment — visually confirms the
+continuum). `src/build_report.py` base64-embeds them into the print template
+(`docs/_status-report.template.html`) and renders the PDF via headless Chrome. **Source:** our build.
+
+#### 2026-07-23 — Hybrid adopted; methodology.md pivoted; LCA sub-segmentation of big segments
+**Domain:** Project Decision
+Decisions signed off: **(1) Hybrid approach** — rule-based purpose×value segmentation is PRIMARY, LCA is the
+refinement/validation layer (HDBSCAN dropped for real data). Updated `docs/methodology.md` to **v0.6** (new
+at-a-glance real-data track; "HDBSCAN plan of record" flagged ⚠️ superseded for real data) and
+`docs/real-data-plan.md` §4. **(2) Sub-segment the big rule segments** (`src/sub_segment.py`, LCA within each
+parent) → `outputs/sub_segments/summary.md`. BIC is monotone *within* segments too (continuum all the way
+down), so sub-count is **capped at a business-actionable 4** (deliberate cut, not natural k). Interpretable
+sub-types emerged, split by direction × timing × value tier × connecting: e.g. **Budget/Adventure** → 4
+(one-way advance supersaver $23 / one-way short-lead saver $69 / round-trip advance saver $87 [largest, 38%]
+/ one-way connecting $86); **OFW** → 4; **Balikbayan** → 4 ($317–$987 by lead/connecting/value); **Last-Minute**
+→ 3. Top-level 10 segments unchanged. Note: auto sub-names can collide (cosmetic; clusters distinct). Taxonomy
+stays a data-driven hypothesis to reconcile with PAL (outbound-leisure gap, Digital Nomad). **Source:** our runs.
+
+#### 2026-07-23 — Mixed-type clustering diagnostic: data is a continuum → rules primary, clustering refines
+**Domain:** Clustering / Methodology
+Per the decision to use a data-driven mixed-type method (HDBSCAN rejected — categorical-heavy data isn't
+dense blobs), ran `src/cluster_diagnostic.py` (LCA via `stepmix` + k-prototypes via `kmodes`) on a 60k
+stratified booking sample (4 numeric + 6 binary + 1 nominal features). **Findings:** (1) **No natural k** —
+LCA BIC decreases monotonically 3→9 (1.016M→932k) with no elbow, picking the range boundary → the customer
+base is a **continuum** along the feature axes, not discrete islands. (2) **Only moderate agreement with the
+rule-based proxy segments** — ARI 0.20–0.34 (peak at k=5), for both LCA and k-prototypes. (3) But the emergent
+clusters split along **exactly the rule axes** (domestic/intl, one-way/round-trip, value, lead) and mainly
+sub-divide the big domestic-economy mass (4 of 9 clusters are Budget-dominant sub-types) and cleanly separate
+intl-round-trip $724 (Balikbayan) from intl-one-way $260 (OFW). **Conclusion (recommended pivot):** unsupervised
+clustering is **not** the right primary labeler here (no natural k; only re-slices our axes); make the
+**rule-based purpose×value segmentation primary**, and use LCA/clustering as a **refinement + validation layer**
+(sub-segment oversized groups, validate axes, inform taxonomy). Supersedes the v3 "HDBSCAN → 10 segments,
+recall-vs-proxy" plan for the real data. Deps added: `kmodes`, `stepmix`. **Source:** `src/cluster_diagnostic.py`.
+
+#### 2026-07-23 — Stage F proxy rules refined + mode()→max() perf fix
+**Domain:** Clustering / Methodology
+Reviewed the Stage F feature tables + proxy rules and refined (see also `docs/real-data-plan.md` §4):
+(1) **`corp_channel`** narrowed to **TMC + Corporate Web Portal** (dropped **NDC** — a distribution tech
+standard, not a corporate signal). (2) **Corporate** broadened to `corp_channel OR (business AND lead≤7)`
+→ **0.07% → 4.4%** of bookings (captures economy corporate via TMC; avg rev correctly drops $1,245→$493).
+(3) **Budget/Adventure** broadened from `tier≤2` to **domestic AND NOT premium** → 29.8% → 39.4%, cutting
+**Unassigned 20.9% → 9.6%** (residual is mostly the flagged #4 gap: PH-issued *outbound* international
+economy — no home segment in the 10; left Unassigned, to raise with PAL). Value axis still monotonic
+($74 Budget → $1,504 Premium Bleisure). **Perf:** the dominant channel/region/country aggregates used
+`mode()`, which spilled catastrophically (**34 GB**, killed at 14 min); a booking averages 1.66 coupons so
+`max()` is equivalent and cheap → clean 7.5-min run, ~0 spill. Digital Nomad still unseeded (expected).
+Refined outputs written to `data/interim/pal_features_{booking,customer}.parquet`. **Source:** review +
+`src/features_real.py`.
+
+#### 2026-07-23 — Stage F built & run: booking + customer features + proxy labels
+**Domain:** Data & Features
+`src/features_real.py` (DuckDB, ~8.5 min) → `data/interim/pal_features_booking.parquet` (**22,911,450**
+bookings) + `pal_features_customer.parquet` (**13,435,365** customers) + `outputs/features_real/summary.md`.
+Excluded 12,306 all-non-rev customers. **Both data guards passed:** UniqueID appears in >1 source file for
+19.73% of customers (cross-file customer key is valid → rollup OK); median-revenue spread across 26 issue
+countries = 7.3× (< 20× → plausibly single-currency, likely USD). Coupon→booking aggregation joins the
+airport-region ref; booking features cover value (farebrand tier), timing (lead_days, peak_month, round_trip),
+route (is_domestic/international, dest_region, pilgrimage), party/channel (group, corp_channel, sea_crew),
+loyalty (is_award). **Prioritized proxy-label waterfall** (seeds, not final) → booking mix: Budget/Adventure
+29.8%, Unassigned 20.9%, OFW/Migrant 18.0%, Last-Minute 13.7%, Balikbayan/VFR 13.2%, Premium Bleisure 2.6%,
+Family 1.6%, Pilgrimage 0.19% (44k to JED/MED), Corporate 0.07%, Mabuhay Loyalist 0.03%; **Digital Nomad
+unseeded (0)**. Strong validation: **avg revenue is monotonic across segments** ($53 Budget → $140 Last-Minute
+→ $317 OFW → $408 Pilgrimage → $622 Balikbayan → $1,245 Corporate → $1,468 Premium Bleisure), which also
+corroborates single-currency. Route mix: 57.7% domestic, 16% East Asia, 10.6% SE Asia, 8.5% North America,
+4% Middle East, 3.3% Oceania. Notes: Corporate proxy is thin (restrictive rule); Mabuhay Loyalist seeded by
+award only — repeat+premium enrichment deferred to clustering/customer stage. **Source:** `src/features_real.py`.
+
+#### 2026-07-23 — Pre-Stage-F decisions settled + airport→region reference built
+**Domain:** Project Decision
+After the EDA confirmations, settled three pre-Stage-F decisions (recorded in `docs/real-data-plan.md`
+Decisions §): **(1) Population** = exclude only the 12,306 all-non-revenue customers (0.09%); keep the
+heterogeneous heavy tail (crew/agency/corporate are signals). **(2) Deliverable unit** = booking-primary
+labels + a customer-level dominant-segment rollup. **(3) Route lookup** = we build it. Built
+`src/build_airport_ref.py` → `data/reference/airport_region.csv` (tracked): all **97 airport codes** in the
+data mapped to country + region (39 PH-domestic, 58 international across North America / Oceania / East Asia
+/ Southeast Asia / South Asia / Middle East / Europe), 100% coverage. Low-volume PH strips (BPA/BSI/KTI)
+pair only with PH hubs → treated as domestic (provisional). Still open (asks to PAL, non-blocking): SME
+label sample; `E`/`Z` coupon-status path codes. **Source:** our EDA + curation.
+
+#### 2026-07-23 — Stage E confirmation pass: value is non-discriminative; route split now essential
+**Domain:** Clustering / Methodology
+Ran `src/eda_real.py` on `pal_clean` → `outputs/eda_real/confirmations.md`. Findings: **A1** booking grain
+`(customer_id, issue_date)` = **22.9M bookings**, avg 1.66 coupons, **42.7% round-trip / 55.3% one-direction**
+→ grain is sound (one-way is itself a signal). **A2/A3** heavy tail is **heterogeneous** — 100+-coupon
+customers (4,896) are 22% Sea Crew but mostly WEB/APP + agency + corporate portal, and only **12,306
+customers (0.09%) are entirely non-revenue** → exclude non-rev cleanly, **do NOT blanket-exclude the tail**
+(crew/agency are signals). **A4** lead time median 25 / mean 53 days, negatives just 1,728 (0.005%, reissues)
+→ clamp. **A5** loyalty leans on **repeat customers (26.1%, 3.5M)** + premium (6.9%), not the tiny award flag
+(6,259 customers, 0.05%). **A6 — key insight:** rough proxy seeds are either tiny (award 0.03%, corporate
+~1%) or huge/overlapping (**economy tier≤2 = 70.6%**, foreign-issued econ 33%, last-minute 19%). So **value
+is NOT discriminative** (most bookings are cheap economy) — purpose/route/timing must drive segmentation, and
+the **airport→region / domestic-vs-international lookup is now essential** (not optional) to split the 70%
+economy bulk into domestic-budget vs international-OFW. Confirms §5: expect a few strong segments + heavy
+overlap + an Unassigned bucket. **Source:** `src/eda_real.py` run.
+
+#### 2026-07-22 — Stage C built & run: cleaned coupon Parquet (`src/clean_real.py`)
+**Domain:** Data & Features
+Implemented Stage C (`src/clean_real.py`, DuckDB streaming COPY) → `data/interim/pal_clean/` (1.6 GB,
+partitioned by iss_year) + `outputs/clean_report/summary.md`. 38,116,260 → **38,116,259 rows** (dropped 1
+junk `SoldOperatingCabinClass='K'`). **No dedup applied** — exact duplicates on the natural coupon key
+verified ~0 via a streaming approx-distinct check (the first attempt used a `row_number()` window that
+spilled and hit a DuckDB temp-file IO error; removing it made the pass a clean 21s stream). Adds snake_case
+columns + flags: `farebrand`/`value_tier` (7 Business Flex…1 Supersaver, date-aware F/G), `is_award`/
+`is_group_fare`/`is_nonrev`, `flown`, `lead_time_days`, `is_connecting`/`n_legs`, `trip_origin`/`trip_dest`/
+`sector_origin`/`sector_dest`, `revenue`/`net_fare`/`rev_missing`/`is_refund`, `age`/`age_known`,
+`is_group_booking`, `foreign_issue`; dropped `OperatingCarrierCode` + `DaysBeforeMonthEnd`; winsorization
+deferred to FE. QA results all reconcile with prior verification: flown 93.42%, Mabuhay award 9,152 coupons
+(0.024%), Groups 49,821, non-rev 31,249, NULL value_tier 90,222 (=award+groups+nonrev, exact), age-known
+43%, foreign-issued 38.4%, connecting 27.6%, avg lead 53.2 days. **Source:** `src/clean_real.py` run.
+
+#### 2026-07-22 — Plan sanity-check: booking grain > directional trip; segment feasibility tempered
+**Domain:** Clustering / Methodology
+Stress-tested `docs/real-data-plan.md` against the data and made three refinements: (1) **Grain = booking
+(`UniqueID`,`DateOfIssuance`), not the directional `TripOD` key.** The `TripOD` key averages only **1.13
+coupons** (splits out/return into two journeys), whereas a booking groups round-trips — **43% of bookings
+have 2 `TripOD` directions** (out+return), 55% one → ~23M bookings is the purpose unit. (2) **Customer
+rollup is a minority signal:** only **26% of customers book >1×** (6.6% have 4+), so tenure/frequency/LTV
+inform that minority; for 74%, customer ≡ their one booking — loyalty leans on award flags + that 26%.
+(3) **Segment feasibility is uneven:** of the 10 target segments, ~5–6 have decent signal (Last-Minute,
+Mabuhay Loyalist, Corporate, Budget/Adventure, OFW; Family moderate) and 3–4 are weak/overlapping
+(Balikbayan-vs-OFW, Premium Bleisure, Pilgrimage [needs route lookup], Digital Nomad). Expect an
+Unassigned bucket; validation stays proxy-circular until SME labels arrive. Also noted per-km/yield needs
+an external airport-coords table (not in data); non-revenue is only 31,249 coupons (clean exclusion).
+Verdict: pipeline skeleton (DuckDB→Parquet→clean→EDA→features→sample-cluster→inductive-label) is sound;
+these are refinements, not a redesign. **Source:** our DuckDB verification + plan audit.
+
+#### 2026-07-22 — V1 dictionary (authoritative) overturns two v2-based corrections + adds farebrand ladder
+**Domain:** Data & Features
+Client supplied the authoritative **`data/PAL-data/DataDictionary.v1.xlsx`** (sheets `Dictionary` +
+`Farebrand_relationship`) for the real data. It **supersedes the two corrections in the earlier
+"Dictionary reconciliation" and "SME rule" entries below**, which were based on the stale synthetic-set
+`...v2.csv`. Corrections, all **verified against the Parquet**:
+- **`UniqueID` = "Unique customer identifier"**, NOT a PNR. Verified: single IDs span up to **1,162 days
+  (~3.2 yr)** and 26% make >1 booking → it tracks a person across bookings. **Customer-level features
+  (repeat frequency, tenure, lifetime value, loyalty) are back on** — reinstates the "trip + customer
+  rollup" grain. (There is no explicit PNR id; a trip = `UniqueID`×`TripOD_DepartureDate`×`TripOD_Path`.)
+- **`CurrentCouponStatus` F = flown, O = open** (not "ticketed/unticketed"). Verified: every future
+  departure is `O`, every past is `F`, 0 future-flown. Realised travel = flown coupons.
+- **Farebrand ladder** (`Farebrand_relationship`) maps all 26 RBD letters to 8 farebrands →
+  authoritative ordinal value tier, **replaces the ad-hoc `FARE_TIER`**: Business Flex (J,C,D) >
+  Business Value (I,Z) > Premium Economy (W,N) > Economy Flex (Y,S,L,M,H) > Economy Value (Q,V,B,X) >
+  Economy Saver (K,E,T) > Economy Supersaver (U,O); plus **Non-revenue** A,R (biz), P (econ) = staff/comp
+  (clean exclusion lever for non-customers); **Groups** G; **Award** F.
+- **Mabuhay award coding flips at 2026-04-01**: award = (≥Apr-2026 & `F`) OR (<Apr-2026 & `G`) ≈ **9,152
+  coupons** (1,031 + 8,121) — far more than the F-only ~1,038; post-Apr `G` = Groups (49,821). So the
+  earlier "F post-Apr only" award rule was correct but incomplete.
+- **`Age` structurally missing** (V1: DOB vs issuance, **international ops only**) → not missing-at-random;
+  `age_known` is itself a signal. **`Pax Count`** is sectoral by design (1 sector = 1 pax), so ~always 1 —
+  group signal comes from `BookingType`/Groups. **`DaysBeforeMonthEnd`** is a revenue-accounting snapshot
+  (days before end of travel month, for YoY same-point comparison; >month-length = accounting overrides)
+  → **drop from segmentation**. **`TripOD`** includes codeshare (OAL) sectors; **`OnlineOD`** is PR-only.
+**Source:** `DataDictionary.v1.xlsx` + our DuckDB verification. Plan fully rewritten in
+`docs/real-data-plan.md` (§0/§0a farebrand table/§1 grain/§4/decisions).
+
+#### 2026-07-22 — SME rule: BookingClass 'F' = Mabuhay Miles award ticket (issued ≥ Apr 2026)
+**Domain:** Airline Industry
+SME (client) rule: an `F` in **`BookingClass` or `SoldBookingClass`** means the ticket was bought with
+**Mabuhay Miles (loyalty points)** — an award redemption — **only for tickets issued 2026-04-01 onwards**;
+earlier `F` entries mean something else and must not be treated as award. `F` is not a normal fare RBD
+(absent from the dictionary's economy/premium/business lists). *Verified on the Parquet:* only 1,132 `F`
+booking-class coupons exist in all 38.1M, clustered in 2026 and ramping after April; applying the cutoff
+gives **1,038 award coupons (all economy cabin)**, with `BookingClass`/`SoldBookingClass` agreeing ~1,064×.
+Impact: this is a **direct, high-precision but very low-coverage Mabuhay Loyalist signal** — it partly
+offsets the "no repeat-loyalty possible" limitation from the PNR-grain finding, but only seeds the segment
+(absence of `F` ≠ non-member; signal exists only from Apr-2026 on, so don't read the 2026 rise as loyalty
+growth — it's when the coding began). Feature: `award_ticket` = (`BookingClass='F'` OR `SoldBookingClass=
+'F'`) AND `DateOfIssuance >= '2026-04-01'`; exclude `F` from `FARE_TIER` value mapping. Captured in
+`docs/real-data-plan.md` §0a/§1/§4. **Source:** client SME rule + our verification (`src/` DuckDB query).
+
+#### 2026-07-22 — Dictionary reconciliation corrects key assumptions (UniqueID = PNR, not passenger)
+**Domain:** Data & Features
+Reconciled the real extract against the data dictionary (`data/raw/PAL_PNR_Synthetic_Data_1000-v2.csv`)
+and found the profiling made wrong inferences — **corrected in `docs/real-data-plan.md`**:
+(1) **`UniqueID` = the PNR (booking), NOT a passenger** (dictionary: "Unique identifier for the PNR").
+The 13.45M distinct IDs are **bookings, not people**; the anonymous data has **no persistent passenger
+key**, so there is **no passenger-level rollup / lifetime value / repeat-loyalty** possible — the model
+grain is **PNR** (matches the project's stated PNR-level anonymous framing). This limits **Mabuhay
+Loyalist** detection to within-booking signals. Verified in-data (avg 2.5 directional legs/PNR = round
+trips; 99% single BookingType). (2) **`CurrentCouponStatus` F/O = ticketed / open(unticketed), NOT
+flown / future** — departures run to 2027, so `F` can't mean flown; realised travel must be derived
+from `DepartureDate`. (3) **`Pax Count` is ~always 1** (dict: "always 1"; only 1,596/38.1M are 2–5) →
+party size unusable; group signal comes only from `BookingType`. (4) **`POO` = origin airport**, not the
+country the dict's "PointofOrigin" implies (separate `CountryCodeOfIssue` exists). (5) **`Gender` is in
+the dictionary but absent from the real data**; `Revenues w YQ`=dict `NetRevenue` (incl. ancillaries),
+`Net Fare`=`NetFare`, `BookingType`=`Group/Individual`, `Channel Category`=`Channel`. (6) The heavy
+100+-coupon tail is ~all Pax Count=1 and non-Group → likely agency/technical PNRs. (7) `DaysBeforeMonthEnd`
+range (−7…315) conflicts with the dict definition — meaning unclear, confirm with PAL. **Source:** our
+reconciliation (dictionary + DuckDB checks on the Parquet).
+
+#### 2026-07-22 — Real data profiled (DuckDB/Parquet) + cleaning/EDA/feature plan
+**Domain:** Data & Features
+Profiled all 38.1M coupon rows via `src/build_parquet.py` (gz → `data/interim/pal_parquet/`, typed +
+zstd + partitioned by iss_year, ~90s one pass) and `src/profile_raw.py` (→ `outputs/profile_raw/`).
+Key findings: **13.45M distinct `UniqueID`** (0 null) at **mean 2.83 coupons / 2.51 trips per passenger**
+(median 2, p95 8, max 771 — a long agency/crew tail); `OperatingCarrierCode` is **constant (PR)** →
+drop; `CurrentCouponStatus` F(lown) 93.4% / O(pen) 6.6%; **`Age` is 57% null** (can't be a primary
+feature); `Revenues w YQ` heavy right-skew (median 82.6, p99 1,150, max 290k) with 7,385 negative /
+92,867 zero / 1,771 null, and `Net Fare` 38,442 negative (refunds/ADMs); cabin economy-dominated
+(Y 94% / J 3% / W 3%); Non-Group 97.4%; nonstop 72%; **channels include "Sea Crew"** (maritime-crew
+signal), NDC, TMC, OTA; geography MNL 38% / PH-issued 62% / US 10%; compound route cols
+(`TripOD_Path`, `TripOD_Coupons`, `*_CouponStatus`) are space/hyphen-delimited and need parsing;
+booking **lead time = departure − issuance** is available. Wrote the full plan to
+**`docs/real-data-plan.md`** (grain decision → cleaning → EDA → feature engineering). **Decisions
+signed off 2026-07-22:** model grain = **trip + passenger rollup**; **flown** coupons drive behaviour
+with **open kept flagged**; **investigate the 100+-coupon crew/agency tail in EDA before** any
+exclusion; use the **full 2024–2027 span** (account for uneven coverage vs truncating).
+Toolchain decision: DuckDB out-of-core + Parquet for the 38M rows; pandas/sklearn only on the
+aggregated model-grain table; clustering fits on a stratified sample + inductive labelling.
+Added `duckdb`/`pyarrow`/`tabulate` to `requirements-pipeline.txt` and bandit skip `B608`
+(DuckDB SQL built from internal constants only). **Source:** our analysis (`src/profile_raw.py`).
+
+#### 2026-07-22 — Real PAL coupon-level data received (~38M rows, 2024–2027)
+**Domain:** Data & Features
+Received the first tranche of **real PAL data** in `data/PAL-data/` — four gzipped CSVs
+(`newQuery2024`, `newQuery2025`, `newQuery2026Jan_to_May`, `newQuery2026Jun_to_2027May`),
+~3.6 GB compressed, **38,116,260 data rows** total (10.4M / 16.2M / 7.07M / 4.35M respectively).
+All four share an **identical 40-column header** (md5 `53318f34…`) and pass `gzip -t`. Grain is
+**coupon/segment level** (one row per flown/booked coupon), not PNR level — must aggregate to
+`UniqueID` (hashed pax) / PNR for segmentation. Columns include `DateOfIssuance`, `POO`,
+`CountryCodeOfIssue`, coupon status, sold+operating booking/cabin classes, OD paths
+(`TripOD`/`OnlineOD`/`Sector`), flight/carrier details, `is_nonstop`, `Channel Category`,
+`BookingType`, hashed `UniqueID`, `Age`, `Revenues w YQ`, `Net Fare`, `Pax Count`. Format quirks:
+UTF-8 BOM on header, double-quoted text fields, SQL-style `.0000000` timestamps. This is far
+richer than the 1,000-row v3 synthetic prototype and should become the real modelling input.
+The original `data/OneDrive_1_7-22-2026.zip` was a **truncated/incomplete download** (single stored
+entry, no central directory — `unzip`/`bsdtar`/`ditto` all rejected it); the user re-extracted the
+`.gz` files directly into `PAL-data/`. **Source:** our analysis of `data/PAL-data/`.
+
 #### 2026-07-17 — Docs reconciled: at-a-glance summary + BR drift fixed + methodology-upkeep rule
 **Domain:** Project Decision
 Added a **"Current Methodology at a Glance"** summary at the top of `methodology.md` (one-line P1→P5 flow,
@@ -724,4 +974,4 @@ is now `src/dashboard.py`. See `README.md`.
 ---
 
 *Knowledge base maintained by CPT 3 — PAL Customer Segmentation*
-*Last updated: 17 July 2026*
+*Last updated: 23 July 2026*
