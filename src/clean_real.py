@@ -12,8 +12,11 @@ Applies the plan in `docs/real-data-plan.md` §2, grounded in the authoritative 
   • farebrand       — booking class → farebrand + ordinal `value_tier` (V1 Farebrand_relationship)
   • Mabuhay rule    — date-dependent F/G: `is_award`, `is_group_fare`, `is_nonrev` (flip at 2026-04-01)
   • money           — `rev_missing` (null/zero), `is_refund` (negative) flags; raw kept (winsorize in FE)
-  • drops           — `OperatingCarrierCode` (constant), `DaysBeforeMonthEnd` (accounting snapshot);
-                      quarantine junk `SoldOperatingCabinClass`
+  • drops           — quarantine junk `SoldOperatingCabinClass`
+  • leg identity    — `CouponNumber` carried through so legs can be ordered/deduped within a booking
+  • BI passthrough  — `OperatingCarrierCode` (constant 'PR') and `DaysBeforeMonthEnd` (accounting
+                      snapshot) are **excluded from modelling** but carried through for the Power BI
+                      export (`src/export_powerbi.py`): the carrier filter and the LY-vs-CY pickup anchor
   • missingness     — `age_known` flag; cabin/channel nulls → 'Unknown'
   • parse routes    — `n_legs`, trip/sector origin+dest from the compound path fields
   • derive          — `lead_time_days` (departure − issuance), `foreign_issue`
@@ -95,6 +98,7 @@ def build_sql() -> str:
                                                          AS lead_time_days,
             "CurrentCouponStatus"                        AS coupon_status,
             ("CurrentCouponStatus" = 'F')                AS flown,
+            "CouponNumber"                               AS coupon_number,
             "BookingClass"                               AS booking_class,
             "SoldBookingClass"                           AS sold_booking_class,
             -- farebrand resolved with the date-dependent F/G rule
@@ -142,6 +146,9 @@ def build_sql() -> str:
             "CountryCodeOfIssue"                          AS issue_country,
             ("CountryCodeOfIssue" <> 'PH')               AS foreign_issue,
             "OperatingFlightNumber"                       AS flight_number,
+            -- BI passthrough only (never features): constant carrier + accounting snapshot anchor
+            "OperatingCarrierCode"                        AS carrier_code,
+            "DaysBeforeMonthEnd"                          AS days_before_month_end,
             src_file,
             iss_year
         FROM src
