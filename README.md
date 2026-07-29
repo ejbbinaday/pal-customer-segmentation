@@ -102,6 +102,8 @@ python src/model_stress_test.py  # 10-method / 8-axis benchmark + stress battery
 python src/model_stress_test.py --quick   # same, ~8 min, directional only
 python src/validate_construct.py  # NON-CIRCULAR: are the segments distinguishable? (~15 min) → outputs/validate_construct/
 python src/validate_criterion.py  # NON-CIRCULAR: do segments predict held-out outcomes? (~10 min) → outputs/validate_criterion/
+python src/detection_power.py  # could we have found a segment if one existed? (~25 min) → outputs/detection_power/
+python src/detection_power.py --quick    # same, ~1 min, coarse grid, directional only
 python src/build_pbip.py      # Power BI project reproducing the revenue/PAX mock-up → outputs/pbip/
 python src/sub_segment.py     # LCA sub-types within large rule segments → outputs/sub_segments/
 python src/export_powerbi.py  # Power BI fact table (coupon + agg grain, ~2 min) → outputs/powerbi_export/
@@ -155,6 +157,22 @@ outcomes no rule consumes (`flown_any`, `refund_any`, `rebook_180d`), reporting 
 *incremental value* — because a segmentation is a compression and can never beat the features it came from.
 Rare-event outcomes are **reported as infeasible rather than fitted**, and `rebook_180d` excludes
 right-censored bookings near the extract boundary.
+`detection_power.py` answers the one challenge the continuum finding could not: **"or are your methods
+blind?"** It **appends** synthetic segments of known prevalence (0.5–10%) and known distinctness to the real
+population — each planted row moved a fraction `w` toward a business-plausible archetype, plus a
+**random-direction control** so the result can't be an artefact of a lucky guess — then re-fits the
+deployable panel (GMM(full) · LCA · KMeans · SVD+KMeans) at k=10 and measures whether the group comes back
+out. Detection is best-F1 of any fitted cluster against the planted membership, against a **pre-registered
+threshold** set from `w=0` negative controls rather than a round number.
+**Verdict:** a **majority of the panel** recovers a planted segment at **≥2% of bookings** (distinctness
+≈0.34), ≥5% (≈0.23) and ≥10% (≈0.13) — so the earlier nulls are evidence about PAL's data, not about our
+instruments. **But below ~1% prevalence nothing is detected at any distinctness** (~229k bookings), and that
+bound must be quoted alongside the continuum finding. Two rules this run establishes: **floors are
+majority-rule** — the luckiest of the 12 method × archetype cells would have claimed 0.5% / 0.059 while
+groups at 0.555 distinctness were missed elsewhere — and the **H0 significant-component count is retired as a
+detector** (1 → 120 across 100 draws of *unchanged* data; median 1, so the continuum reading holds as the
+centre of a noisy distribution). `--report-only` rebuilds the summary from saved CSVs without refitting. See
+`outputs/detection_power/summary.md`.
 `build_pbip.py` generates a **Power BI project** (`outputs/pbip/`) reproducing the "Passenger Revenue & PAX
 Performance" mock-up: `model.bim` (TMSL — 6 tables, 15 measures, data embedded as inline-CSV Power Query so
 the file is self-contained) + `report.json` (60 visual containers) + a PAL theme + CSV fallbacks.

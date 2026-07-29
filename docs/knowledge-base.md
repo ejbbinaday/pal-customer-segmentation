@@ -480,6 +480,72 @@ Dashboard Wireframe → Requirements Checklist → [Appendix] Literature
 
 ---
 
+#### 2026-07-29 — Detection power: the null is now *bounded*, we are blind below ~1% prevalence, and the H0 component count is not a usable statistic
+**Domain:** Clustering / Methodology
+`src/detection_power.py` closes the largest hole in the project's story. Every prior diagnostic returned
+"no natural clusters", and none of them could answer **"or are your methods blind?"** This plants segments
+of known prevalence and known distinctness — **appended** to the real 20k base, never edited in place, so
+the counterfactual is *"if PAL's book also contained this group"* — and re-fits the deployable panel
+(GMM(full) · LCA · KMeans · SVD+KMeans) at k=10. Distinctness is one knob `w`: each planted row moves a
+fraction `w` toward an archetype, so `w=0` is an unmodified random subset and `w=1` a point mass.
+
+**The floors (majority of the 12 method × archetype combinations — see the methodology note below):**
+
+| prevalence | majority detects from | distinctness there | unanimous from |
+|---|---|---|---|
+| 0.5% | **never** | — | never |
+| 1% | **never** | — | never |
+| 2% | `w` ≥ 0.75 | ≈0.337 | never |
+| 5% | `w` ≥ 0.50 | ≈0.227 | `w` ≥ 0.75 (≈0.40) |
+| 10% | `w` ≥ 0.35 | ≈0.128 | `w` ≥ 0.75 (≈0.43) |
+
+**Five things learned:**
+
+1. **The null is now bounded and falsifiable, which is a much stronger deliverable than a bare null.**
+   The claim becomes: *no segment exists in these features at or above **2% of bookings** with distinctness
+   at or above **≈0.34**, because a planted one at that size and distinctness is recovered by a majority of
+   the panel.* The earlier "no clusters" findings are therefore evidence about **PAL's data**, not about our
+   instruments.
+2. **But we are effectively blind below ~1% prevalence, at *any* distinctness — state this, don't bury it.**
+   Not one prevalence at or below 1% reached majority detection even at `w=1` (a literal point mass). 1% of
+   22.9M bookings is **~229k bookings** — a commercially meaningful group PAL could still be missing. This
+   limitation must travel in the same breath as the continuum finding.
+3. **Methodological rule established: never quote the single most sensitive cell.** With 12 combinations per
+   cell, one clearing threshold is what the luckiest alignment of an archetype direction and a method's
+   inductive bias produces anyway. The naive read of this grid would have claimed detection at **0.502%
+   prevalence and 0.059 distinctness** — while groups as distinct as **0.555** were *missed* elsewhere in the
+   same grid. Those two numbers cannot both be a floor. All floors are majority-rule.
+4. **The floors are direction-independent, and the random control is what proves it.** Detection rate by
+   archetype: `late_yield` 22% (27/120) · `planned_group` 28% · **`random_dir` 29%** — spread 7pp. The
+   direction with no business story at all sits inside the range set by the two plausible ones, so the
+   floors are a property of the method panel, not of directions we guessed well. Per-method: **LCA is the
+   most sensitive detector, SVD+KMeans the weakest** (needs 5% prevalence before it finds anything).
+5. **Failure mode is *smearing*, not missing.** Averaged at `w=1`, recall hits **1.00** for every method
+   while precision lags (LCA 0.77, GMM 0.73, KMeans 0.58, **SVD+KMeans 0.39**). A faint planted group is
+   found *and then absorbed into a much larger cluster* — so it would be present in the labels but useless
+   for targeting. Recall alone would have badly overstated detection.
+
+**⚠️ A defect in one of our own instruments — this one qualifies an earlier entry.** The `w=0` controls
+re-ran H0 persistent homology on unchanged data 100 times, where the answer should be identical every time.
+`n_significant_H0` returned **median 1, 75th percentile 3, maximum 120** across 100 draws of 1,200 rows
+(60% of draws gave 1). A statistic ranging 1→120 on unchanged data **cannot screen for anything**, so this
+grid draws no detection conclusion from it. The instability is the **gap heuristic** (`argmax` over
+differences in sorted bar lengths, which jumps whenever two adjacent bars are close), *not* the homology.
+Consequence for the 2026-07-28 entry below: its "**1 significant H0 component**" was **one draw** of this
+noisy statistic. **1 is the modal and median value, so the continuum reading still holds** — but it should be
+reported as the centre of a noisy distribution, never as a clean measurement. The **H1 loop-noise ratio and
+the barcode's shape are the robust parts** of that analysis; the integer component count is not.
+
+**Also:** the floors are **optimistic bounds, not guarantees** — a planted group is internally coherent in a
+way a real segment may not be, so a messier real segment of the same size and distinctness would be *harder*
+to find. And `planted_sil` is **not** comparable to the stress test's 0.381 ceiling: it is measured on a
+stratified sample (planted rows over-represented) for one group against the rest, where 0.381 is a
+full-partition silhouette on a uniform sample. Do not put them in the same sentence.
+**Source:** our analysis — `outputs/detection_power/summary.md`, `src/detection_power.py`; plan in
+`docs/recommendations-plan.md` §Plan B item B5.
+
+---
+
 #### 2026-07-28 — Plan B delivered: the segments *are* non-circularly validated, and OFW/Balikbayan is the weakest boundary in the taxonomy (not a spurious one)
 **Domain:** Clustering / Methodology
 `src/validate_construct.py` + `src/validate_criterion.py` (library: `src/validation_anchors.py`) ran the first
@@ -589,6 +655,11 @@ ten one-page segment profiles reviewed in ~1 hour by one person, roughly two ord
 ---
 
 #### 2026-07-28 — Ten-method stress test: GMM overtakes LCA, but the continuum finding survives four *new* independent tests
+> **Qualified 2026-07-29** by the detection-power entry above: the "**1 significant H0 component**" cited in
+> learning #2(a) is **one draw of a statistic that ranges 1→120 on unchanged data** (median 1, p75 3, over 100
+> draws). The conclusion stands — 1 is the modal value — but quote it as the centre of a noisy distribution,
+> not as a measurement. The H1 loop-noise ratio and barcode shape are the robust parts. Learnings #1 and
+> #3–#6 are unaffected.
 **Domain:** Clustering / Methodology
 `src/model_stress_test.py` + `src/model_zoo.py` widened the 2026-07-27 three-way test (k-prototypes /
 k-modes / LCA) into **ten methods across six families** — adding **GMM** (full + diag), **SVD+KMeans**,
@@ -1254,4 +1325,4 @@ is now `src/dashboard.py`. See `README.md`.
 ---
 
 *Knowledge base maintained by CPT 3 — PAL Customer Segmentation*
-*Last updated: 28 July 2026*
+*Last updated: 29 July 2026*

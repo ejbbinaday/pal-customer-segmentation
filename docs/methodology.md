@@ -1,9 +1,23 @@
 # PAL Customer Segmentation — ML Pipeline Methodology
 
 **Client:** Philippine Airlines (PAL)
-**Version:** v1.1 — 28 July 2026
+**Version:** v1.2 — 29 July 2026
 
 > **Changelog**
+> - **v1.2 (29 Jul 2026):** **The null result is now falsifiable.** Added
+>   [Stage V3 — detection power](#stage-v3--detection-power-srcdetection_powerpy)
+>   (`src/detection_power.py`): synthetic segments of known prevalence and distinctness are *appended* to the
+>   real population and the deployable panel is re-fitted at k=10 to see whether they come back out. Every
+>   prior diagnostic returned "no natural clusters"; that finding could not answer **"or are your methods
+>   blind?"** until now. Detection thresholds are **pre-registered and derived from `w=0` negative controls**.
+>   **Result:** a majority of the panel recovers a planted segment at **≥2% of bookings** (distinctness
+>   ≈0.34), **≥5%** (≈0.23) and **≥10%** (≈0.13) — but **never below ~1% prevalence at any distinctness
+>   tested**, so that blind spot (~229k bookings) is now a stated limitation of the deliverable rather than an
+>   unknown. Floors are **majority-rule**: the single most sensitive cell of 12 method × archetype
+>   combinations is a cherry-pick and must not be quoted. Also **retires the H0 significant-component count
+>   as a detector** — it returned **1 → 120 components across 100 draws of unchanged data** (median 1, p75 3),
+>   which qualifies how the v1.0 H0 result should be quoted without overturning it. Full detail:
+>   `outputs/detection_power/summary.md`.
 > - **v1.1 (28 Jul 2026):** **Validation is no longer blocked on SME labels.** Added the
 >   [Non-Circular Validation](#non-circular-validation-plan-b) stage — `src/validation_anchors.py` (the
 >   circularity contract), `src/validate_construct.py` (segment-distinguishability matrix with negative and
@@ -101,6 +115,21 @@ gz → typed Parquet → Stage C clean+flag (coupon grain)
   **(c)** **every method is fragile to feature dropout** (leave-one-out ARI minima 0.15–0.49; best
   SVD+KMeans 0.487, LCA 0.480, GMM(full) 0.409) — a production risk worth stating given the extract's
   known field gaps. Full detail: `outputs/model_stress_test/summary.md`.
+- **Detection power (2026-07-29) — the null is now bounded, and so is our sensitivity.**
+  `src/detection_power.py` plants segments of known prevalence and distinctness into the real population and
+  checks whether the deployable panel recovers them, which is the only way the repeated "no clusters" result
+  becomes falsifiable rather than merely negative. **A majority of the panel recovers a planted segment at
+  ≥2% of bookings** (distinctness ≈0.34), ≥5% (≈0.23) and ≥10% (≈0.13) — direction-independent, confirmed by
+  a **random-direction control** that detects at the same rate (29%) as the two business-plausible
+  archetypes. **The bound matters as much as the finding: below ~1% prevalence nothing is detected at any
+  distinctness tested** — ~229k bookings — so *"a segment smaller than ~1% could exist and we would not have
+  found it"* now travels with the continuum claim. Two cautions established: **never quote the single most
+  sensitive cell** (of 12 combinations, the luckiest would have claimed 0.5% / 0.059 while groups at 0.555
+  distinctness were missed elsewhere — all floors are majority-rule), and **the H0 significant-component
+  count is retired as a detector** (1 → 120 across 100 draws of unchanged data; median 1, so the v1.0
+  continuum reading holds, but as the centre of a noisy distribution, not a measurement). Failure mode is
+  **smearing**: at `w=1` recall is 1.00 for every method while precision lags (SVD+KMeans 0.39), so a faint
+  group is found and then absorbed into a larger cluster. Full detail: `outputs/detection_power/summary.md`.
 - **Model:** the 10 named segments (Corporate, Mabuhay Loyalist, OFW/Migrant, Balikbayan/VFR, Pilgrimage,
   Family, Premium Bleisure, Budget/Adventure, Last-Minute, Digital Nomad) + an Unassigned bucket.
   Value = authoritative **farebrand tier** (V1 dictionary). Validation stays **proxy-referenced (circular)**
@@ -209,6 +238,62 @@ frame. Two numbers are reported instead: **signal retained** = `(AUC_segment −
 and **incremental value** = `AUC(features + segment) − AUC(features)`. Near-zero incremental value means the
 segmentation is a lossy re-encoding — valuable for communication and targeting, but not a source of new
 signal, and it must not be sold as one.
+
+### Stage V3 — detection power (`src/detection_power.py`)
+
+Stages V1/V2 ask whether the segments we *have* are real. V3 asks the complementary question, and the only
+one that makes the project's repeated null result falsifiable: **if a segment existed that we are missing,
+would this pipeline see it?** Ten methods agreeing on "no clusters" is only evidence if the methods can
+detect a cluster when one is present.
+
+Synthetic segments of known prevalence (0.5 · 1 · 2 · 5 · 10%) and known distinctness are **appended** to
+the real population — never substituted in, so the counterfactual is *"if PAL's book also contained this
+group"* rather than *"if part of the book were replaced"*. Distinctness is one knob, `w`: each planted row
+starts as a real booking and moves a fraction `w` toward a fixed archetype (numerics interpolate; binary
+flags and `dest_region` flip toward it with probability `w`). `w=0` is an unmodified random subset, `w=1`
+collapses the group onto a single point.
+
+Three archetypes, and the third matters as much as the first two: `late_yield` (last-minute high-yield
+corporate one-way) and `planned_group` (far-ahead low-fare multi-sector group travel) are directions a real
+missed segment could plausibly point in; **`random_dir` has no business story at all**, so a floor that holds
+there is a property of the method panel rather than of two well-chosen guesses.
+
+The panel is the **deployable** one — GMM(full) · LCA · KMeans · SVD+KMeans — fitted at **k=10**, the
+taxonomy size the pipeline actually uses. The O(n²) methods are excluded on purpose: a method capped at 3k
+rows is not the pipeline whose blindness is in question. Recovery is the **best F1 any single fitted cluster
+achieves against the planted membership**, reported with its precision and recall because the failure mode is
+informative — high recall with low precision means the group was found but smeared into a much larger cluster
+and would never be actionable.
+
+**The detection threshold is pre-registered and control-derived:** best-F1 ≥ 0.50 *and* ≥ the 95th percentile
+of that method's own `w=0` runs, whichever is higher — so a method with a noisy control faces a *higher* bar,
+not a lower one.
+
+**Floors are majority-rule, and this is the load-bearing methodological decision in the stage.** With one row
+per method × archetype there are 12 chances per cell for *something* to clear the threshold, so the single
+most sensitive combination reports the luckiest alignment between an archetype's direction and a method's
+inductive bias — which is what that many draws produce even without real sensitivity. Quoting it would have
+claimed detection at **0.5% prevalence and 0.059 distinctness** while groups at **0.555** distinctness were
+missed elsewhere in the same grid; those cannot both be a floor. Every published floor is therefore the cell
+where **>50% of the panel agrees**, with the unanimous floor reported beside it.
+
+**The `w=0` controls retired one of our own instruments.** Re-running H0 persistent homology 100 times on
+unchanged data — where the answer must be identical every time — returned **median 1, p75 3, maximum 120**
+significant components. A statistic with that range on unchanged data cannot screen for anything, so this
+stage draws **no detection conclusion from H0 at all**. The instability is the *gap heuristic* (`argmax` over
+differences in sorted bar lengths, which jumps whenever two adjacent bars are close), not the homology. This
+qualifies rather than overturns the v1.0 continuum result: 1 is the modal and median value, so the reading
+holds — but report it as the centre of a noisy distribution, and lean on the H1 loop-noise ratio and the
+barcode's shape, which are the robust parts.
+
+Three limits to carry into any deliverable. **The floors are optimistic**, because a planted group is
+internally coherent in a way a real segment may not be — a messier real segment of the same size and
+distinctness would be harder to find. **The blind spot is real and must be stated**: below ~1% prevalence
+(~229k bookings) nothing was detected at any distinctness tested, so *"a segment smaller than that could
+exist and we would not have found it"* belongs beside the continuum finding, not in a footnote. And
+`planted_sil` is **not** the stress test's 0.381 ceiling: it is measured on a stratified sample and describes
+one group against the rest, where 0.381 is a full-partition silhouette on a uniform sample. Related
+quantities, not interchangeable.
 
 ### What this stage cannot do
 
@@ -739,4 +824,4 @@ These rules are not implemented in the current pipeline because the required fie
 ---
 
 *Document prepared for Philippine Airlines internal use.*
-*v1.0 — 28 July 2026 (ten-method / eight-axis stress test: GMM(full) overtakes LCA on the composite — refinement layer under review, pipeline unchanged; continuum reconfirmed by persistent homology, SVC, Mapper and cross-method disagreement; separation ceilings at 0.381)*
+*v1.2 — 29 July 2026 (detection power: the null is now bounded — a planted segment is recovered by a majority of the panel at ≥2% of bookings with distinctness ≈0.34, and the pipeline is effectively blind below ~1% prevalence at any distinctness; H0 significant-component count found unusable as a detector — 1→120 across draws of unchanged data)*

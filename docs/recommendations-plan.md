@@ -274,16 +274,22 @@ highest-value single question, and it needs no SME.
 | B2 | **Construct validity** on the surviving anchors, with an explicit missingness model for age | `src/validate_construct.py` | ✅ **done 2026-07-28** |
 | B3 | **Seasonality vs the known calendar** — pre-register predictions (Balikbayan→Dec, Pilgrimage→Hajj/Umrah window, OFW→deployment rhythm), then test, base-rate normalised | part of B2 | ✅ **done 2026-07-28** |
 | B4 | **Out-of-time stability** — fit on 2024–25, apply to 2026–27; do sizes, profiles and revenue mix hold? | `src/validate_temporal.py` |
-| B5 | **Detection power by injection** — plant synthetic segments of known prevalence and separation, find the detection floor | `src/detection_power.py` |
+| B5 | **Detection power by injection** — plant synthetic segments of known prevalence and separation, find the detection floor | `src/detection_power.py` | ✅ **done 2026-07-29** |
 | B6 | **Weak supervision** — 3+ *independent* labelling functions per segment from disjoint feature families, combined with a Dawid–Skene label model → accuracy estimate with no gold labels. Also: characterise the **2.19M Unassigned** — one coherent missing segment, or a grab bag? | `src/weak_labels.py` |
 
 **B1's framing matters.** A segmentation is a *compression*, so it will never beat the raw features. The
 honest question is how much actionable signal it retains while staying interpretable — report the ratio, not
 a win/loss.
 
-**B5 is now the highest-value *remaining* item in Tier 1.** It converts *"we found no clusters"* into *"no
-clusters exist above X% prevalence and Y separation, and here is the proof we could have found them"* — which
-closes the largest remaining hole in the current story, with no external dependency whatsoever.
+**B5 was the highest-value remaining Tier-1 item and is now done (2026-07-29).** It converted *"we found no
+clusters"* into *"no clusters exist above 2% prevalence with distinctness ≈0.34, and here is the proof we
+could have found them"* — and, just as usefully, established that **below ~1% prevalence the pipeline detects
+nothing at any distinctness**, which is a bound the deliverable must state rather than a gap it can leave
+implicit. It also retired the H0 significant-component count as a detector (1 → 120 across draws of unchanged
+data). Full results: `outputs/detection_power/summary.md`; KB §15 (2026-07-29).
+
+**B4 is now the highest-value remaining Tier-1 item** — out-of-time stability is the one axis still untested,
+and "the segments still exist a year later" is the claim most exposed to a sceptical question.
 
 ### B1–B3 results (run 2026-07-28)
 
