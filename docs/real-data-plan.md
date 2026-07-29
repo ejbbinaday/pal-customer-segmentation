@@ -186,6 +186,14 @@ segmentation** (the 10 named segments), and **LCA is the refinement/validation l
 **sub-segment oversized groups** (esp. Budget/Adventure) into actionable sub-types and to validate the
 axes. HDBSCAN is dropped for the real data (categorical-heavy, not density-separable).
 
+> **Re-tested 2026-07-27 and confirmed** (`src/kproto_compare.py`, 20k sample, k = 3–12): a full head-to-head
+> of **k-prototypes · k-modes · LCA** on the same rows. LCA wins taxonomy agreement (ARI **0.336** vs 0.216 /
+> 0.212) *and* mixed-type separation (Gower silhouette **0.30** vs 0.09 / 0.15), in the parent segments too;
+> neither distance method finds an elbow. k-prototypes is markedly more **reproducible** (split-half ARI
+> 0.97–0.98 vs LCA 0.67–0.86) but with the worst separation — reproducible partitioning *of a continuum*, not
+> evidence of clusters. **No pipeline change**; k-prototypes stays a diagnostic cross-check. Side-finding: the
+> **Balikbayan/VFR** LCA sub-types are the least stable (split-half ARI 0.495) — treat as provisional.
+
 Output: `data/interim/pal_features_booking.parquet` (+ customer variant) and a feature-profile summary.
 
 > **Built & run 2026-07-23** (`src/features_real.py`): 22.9M bookings / 13.4M customers; guards passed
@@ -244,4 +252,4 @@ recovered segments is an output, not a guarantee. A small SME-labelled sample wo
 6. **Time window → full 2024–2027 span.** Use all data; account for uneven coverage (2024 starts May,
    2027 partial) and the **Apr-2026 F/G coding change** when reading trends.
 
-*Last updated: 22 July 2026*
+*Last updated: 27 July 2026*

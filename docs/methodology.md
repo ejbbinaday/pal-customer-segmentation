@@ -1,9 +1,40 @@
 # PAL Customer Segmentation — ML Pipeline Methodology
 
 **Client:** Philippine Airlines (PAL)
-**Version:** v0.7 — 23 July 2026
+**Version:** v1.1 — 28 July 2026
 
 > **Changelog**
+> - **v1.1 (28 Jul 2026):** **Validation is no longer blocked on SME labels.** Added the
+>   [Non-Circular Validation](#non-circular-validation-plan-b) stage — `src/validation_anchors.py` (the
+>   circularity contract), `src/validate_construct.py` (segment-distinguishability matrix with negative and
+>   positive controls) and `src/validate_criterion.py` (outcome-prediction ladder). Records the
+>   **circularity audit** of the proxy waterfall, including the *semantic* leaks a name-based check misses
+>   (`dest_region`→`is_domestic`, `issue_country`→`foreign_issue`, `channel`→`corp_channel`), and flags
+>   **OFW/Migrant vs Balikbayan/VFR** — 6.8M bookings split on the single bit `round_trip` — as the weakest
+>   boundary in the taxonomy, pending the full run. Proxy-referenced validation is now *one* leg of the story
+>   rather than the only one; SME labels (Plan A) remain the strongest evidence but are no longer a blocker.
+> - **v1.0 (28 Jul 2026):** **Ten-method stress test** (`src/model_stress_test.py` + `src/model_zoo.py`)
+>   widened the algorithm field to six families — added **GMM** (full + diag), **SVD+KMeans**,
+>   **Spectral(Gower)**, **Support Vector Clustering**, **TDA-Mapper** and **persistent homology**, plus a
+>   KMeans floor — scored on **eight axes** (agreement · separation · natural-k · split-half · bootstrap ·
+>   perturbation · feature-dropout · SVM-separability). **`GMM(full)` now leads the composite (0.849) ahead of
+>   LCA (0.763), and still leads with the circular agreement axis zeroed (0.798 vs 0.762)** — so the
+>   refinement layer is **under review, not yet switched**: the benchmark tests *top-level* segmentation while
+>   LCA's pipeline job is *sub-segmentation*, so a stage-matched head-to-head is required first. The
+>   **continuum finding is reconfirmed by four independent new tests**, separation ceilings at **0.381**
+>   across all ten methods, and a new caveat is recorded: **every method is fragile to leave-one-feature-out**
+>   (min ARI 0.15–0.49). No pipeline stage changed in this version.
+> - **v0.9 (27 Jul 2026):** Added **Stage X — Power BI export** (`src/export_powerbi.py`): the rule-based
+>   segment joined back to coupon grain as a preliminary BI **star schema** (coupon + flight-level agg +
+>   dashboard-grain agg + date dimension), with booking identity (`BookingID`, `IsPrimaryCoupon`) and
+>   exclusion flags so measures filter rather than guess. `CouponNumber` added to Stage C. Surfaced two
+>   blocking BI data gaps — the **forward-book boundary** (travel months after 2026-07-21 are still filling;
+>   guarded by `IsCompleteTravelMonth`/`IsCompleteTravelYear`) and `DaysBeforeMonthEnd` being
+>   departure-month metadata rather than a booking snapshot, so it cannot drive LY-vs-CY pickup
+>   (use `LeadTimeDays`, or request repeated dated extracts).
+> - **v0.8 (27 Jul 2026):** Algorithm choice **re-tested and unchanged** — full k-prototypes / k-modes / LCA
+>   head-to-head (`src/kproto_compare.py`) confirms LCA as the refinement layer; k-prototypes demoted to a
+>   diagnostic cross-check. Balikbayan/VFR sub-types flagged provisional (low stability).
 > - **v0.7 (23 Jul 2026):** Added the [Tools & Libraries disclosure](#tools--libraries-disclosure); reconciled the header version with the footer (was drifting at v0.5 vs v0.6).
 > - **v0.6 (23 Jul 2026):** Real-data track pivot — rule-based purpose×value segmentation is primary, LCA refines/validates; HDBSCAN dropped for the real data. Added the real-data at-a-glance summary.
 > - **v0.5 (17 Jul 2026):** Added the [v3 Prototype Pipeline](#v3-prototype-pipeline--pnr-level-anonymous-segmentation) — the adapted pipeline for the new PNR-level `PAL_PNR_Synthetic_Data_1000-v3.csv` schema. Baseline (v0.4) pipeline on `sample-features.csv` retained unchanged below as the reference implementation.
@@ -21,6 +52,7 @@ gz → typed Parquet → Stage C clean+flag (coupon grain)
 → Stage F features: coupon → booking (customer_id, issue_date) → customer  (+ airport→region join)
 → RULE-BASED purpose×value proxy segmentation  ← PRIMARY deliverable (the 10 segments)
 → LCA refinement (sub-segment oversized groups; validate axes)  ← ML's role
+→ Stage X export: segment joined back down to coupon grain  → Power BI fact table
 → pending SME ground-truth for non-circular validation
 ```
 
@@ -30,12 +62,75 @@ gz → typed Parquet → Stage C clean+flag (coupon grain)
   timing), with only moderate cluster–taxonomy agreement (ARI ≈ 0.2–0.34). **So the rule-based
   segmentation is primary; clustering (LCA) refines and validates — it is NOT the labeler.**
   **HDBSCAN is dropped for the real data** (categorical-heavy → not density-separable).
+- **Algorithm re-test (2026-07-27) — decision unchanged.** `src/kproto_compare.py` ran the full
+  **k-prototypes vs k-modes vs LCA** head-to-head on the same 20k booking sample (k = 3–12) across four
+  axes. **LCA wins as the refinement layer:** taxonomy agreement ARI **0.336** (k=4) vs k-prototypes 0.216 /
+  k-modes 0.212, and Gower silhouette (mixed-type separation) **0.30** vs 0.09 / 0.15 — including inside all
+  three big parent segments. Neither distance method finds an elbow (their cost falls monotonically by
+  construction), and the three methods agree with each other only weakly (pairwise ARI 0.12–0.43) —
+  the continuum finding, reconfirmed by a second model family. **k-prototypes' one advantage is
+  reproducibility** (split-half ARI 0.97–0.98 vs LCA's 0.67–0.86) but paired with the *worst* separation:
+  a hard-centroid method partitions a smooth density stably without the partition being meaningful. So it
+  stays a **diagnostic cross-check, not a pipeline stage**. Side-finding: the **Balikbayan/VFR** LCA
+  sub-types are the least reproducible (split-half ARI **0.495**) → treat as **provisional**.
+- **Ten-method stress test (2026-07-28) — the continuum finding hardens; the refinement layer goes under
+  review.** `src/model_stress_test.py` (library: `src/model_zoo.py`) benchmarked **ten methods across six
+  families** on the same 20k booking sample and feature set, over **eight axes**. Two results matter:
+  1. **`GMM(full)` overtakes LCA** — composite **0.849 vs 0.763**, and **0.798 vs 0.762** when taxonomy
+     agreement (the one *circular* axis) is weighted to zero, so the win is not borrowed from the proxy
+     rules. It leads on agreement (ARI **0.409** @k=6 vs 0.337), split-half+bootstrap stability (0.812 vs
+     0.680) and noise/dropout robustness (0.757 vs 0.645); **LCA retains the better separation** (Gower
+     silhouette 0.298 vs 0.262). **The pipeline is unchanged pending a stage-matched re-test:** this
+     benchmark scores *top-level* segmentation, whereas LCA's actual job (Stage: LCA refinement) is
+     *sub-segmenting inside big parent segments*. Re-run the head-to-head there — as
+     `kproto_compare.py` §5 does — before swapping the layer.
+  2. **The continuum is confirmed by four independent new tests**, none of which existed in the earlier
+     decisions: **H0 persistent homology** (no labels, no k, no centroid, no distributional assumption) finds
+     **1 significant component**, gap ratio 1.195; **SVC's emergent k = 1** for all γ ≤ 0.8, fragmenting to
+     27–39 shards only by ejecting 43–62% of rows; **TDA-Mapper finds nothing** (separation ≈ 0, negative at
+     k ≥ 5); and **median cross-method ARI is 0.41**. **Separation ceilings at 0.381** across the whole field
+     — the honest upper bound on any clustering claim on this data.
+
+  Three methodological cautions this run establishes, all quotable:
+  **(a)** the **SVM separability probe** scores 0.85–0.99 for nearly every method *including* those with
+  silhouette ≈ 0.1 — a geometric cut of a continuum is perfectly learnable while being wholly arbitrary, so
+  **never quote an accuracy/separability figure without the silhouette beside it**;
+  **(b)** **KMeans is the most stable and robust method in the field** (0.970 / 0.802) with nearly the
+  *least* separation — the third method after k-prototypes to show that **stability without separation is not
+  structure**;
+  **(c)** **every method is fragile to feature dropout** (leave-one-out ARI minima 0.15–0.49; best
+  SVD+KMeans 0.487, LCA 0.480, GMM(full) 0.409) — a production risk worth stating given the extract's
+  known field gaps. Full detail: `outputs/model_stress_test/summary.md`.
 - **Model:** the 10 named segments (Corporate, Mabuhay Loyalist, OFW/Migrant, Balikbayan/VFR, Pilgrimage,
   Family, Premium Bleisure, Budget/Adventure, Last-Minute, Digital Nomad) + an Unassigned bucket.
   Value = authoritative **farebrand tier** (V1 dictionary). Validation stays **proxy-referenced (circular)**
   until SME labels (`data/labels/sme_sample.csv`) land.
+- **Delivery (Stage X, 2026-07-27):** `src/export_powerbi.py` joins the booking-grain `proxy_segment` back
+  down onto the cleaned coupons and emits a Power BI **star schema** → `outputs/powerbi_export/`: `coupons/`
+  (38.1M, drill-through), `agg/` (flight-level detail), `agg_dashboard.parquet` (~1.7M, headline visuals),
+  `dim_date.csv` (time intelligence) + QA sample + `summary.md`. Row-preserving (38,116,259 in = out); 99.95%
+  segment match, the remainder being the all-non-revenue customers Stage F excludes, labelled
+  `Excluded (non-revenue)` so BI totals still tie. **`CustomerSegment` ships as the rule-based proxy label** —
+  preliminary, and explicitly flagged as such in the export summary until SME ground truth lands.
+  Grain safety: `BookingID` + `IsPrimaryCoupon` (exactly one TRUE per booking) make booking-level measures a
+  filter rather than a non-re-aggregatable DISTINCTCOUNT; aggregate `Bookings` is `sum(IsPrimaryCoupon)` for
+  the same reason. Exclusion flags (`IsRefund`, `RevMissing`, `IsAward`, `IsNonRev`, `IsGroupFare`, `AgeKnown`,
+  `IsReissue`) ship so commercial measures filter rather than guess.
+  **Two blocking gaps surfaced by this stage:**
+  1. **Forward-book boundary.** The extract stops at a single as-of date (last flown departure **2026-07-21**).
+     Travel months past it are still filling — Sep-2026 holds ~22% of a mature month — so an unfiltered trend
+     or YoY visual draws a *fake cliff*; 2024 also starts in May, so full-year YoY compares 12 months to 8.
+     Mitigated in-band by `DataAsOfDate` / `IsCompleteTravelMonth` / `IsCompleteTravelYear` (TRUE for **2025
+     only**), which every trend visual must filter on.
+  2. **`DaysBeforeMonthEnd` cannot support the requested LY-vs-CY pickup measure** — it holds exactly one value
+     per departure month across all 37 months (8 distinct values in the whole extract, 99.7% of them `-7`),
+     i.e. departure-month metadata against a single extract date, not a booking snapshot. Pickup requires
+     either `LeadTimeDays` (exported) or **repeated dated extracts of the same departure months** — a new data
+     request to PAL.
 - **Code:** `src/build_parquet.py` · `src/clean_real.py` (C) · `src/build_airport_ref.py` ·
-  `src/features_real.py` (F) · `src/cluster_diagnostic.py` (method choice). Full plan:
+  `src/features_real.py` (F) · `src/cluster_diagnostic.py` (method choice) ·
+  `src/kproto_compare.py` (method re-test) · `src/model_zoo.py` + `src/model_stress_test.py`
+  (ten-method / eight-axis benchmark) · `src/export_powerbi.py` (X, BI delivery). Full plan:
   `docs/real-data-plan.md`; data dictionary: `docs/data-dictionary.md`.
 - **Prior tracks (kept for reference, superseded for real data):** the **v3 prototype**
   (synthetic 1k, HDBSCAN — see below) and the **Stages 1–8** `sample-features.csv` baseline. On the v3
@@ -43,6 +138,87 @@ gz → typed Parquet → Stage C clean+flag (coupon grain)
 
 Full detail: [v3 Prototype Pipeline](#v3-prototype-pipeline--pnr-level-anonymous-segmentation) (prior);
 real-data methodology → `docs/real-data-plan.md`.
+
+---
+
+## Non-Circular Validation (Plan B)
+
+**Added v1.1 (28 Jul 2026).** Every validation number produced before this was **circular**: agreement was
+measured against `proxy_segment`, which is the rule waterfall's own output. Plan A closes that with SME
+ground truth (`data/labels/sme_sample.csv`). Because internal SME labelling may not be available, this stage
+answers a different question that needs no labels at all — and therefore is not blocked:
+
+> **Do the segments differ on evidence the rules never saw, and do they predict outcomes they were not
+> built to predict?**
+
+### The circularity audit — and the leak a name check cannot catch
+
+The waterfall (`src/features_real.py`) consumes: `is_award`, `corp_channel`, `any_business`, `lead_days`,
+`pilgrimage`, `sea_crew`, `foreign_issue`, `is_international`, `max_tier`, `round_trip`, `any_premium`,
+`is_group`, `is_domestic`. **Anything on that list validates nothing.** Three fields that look like ideal
+independent markers are disqualified outright: `sea_crew` *is* the OFW rule, `is_award` *is* the Mabuhay
+rule, `pilgrimage` *is* the Pilgrimage rule.
+
+Subtler, and the reason `src/validation_anchors.py` exists: three admissible-looking anchors are **finer-
+grained versions of rule fields**, so coarsening them recovers a rule bit exactly —
+`dest_region == 'Domestic'` **is** `is_domestic`; `issue_country != 'PH'` **is** `foreign_issue`;
+`channel IN ('TMC','Corporate Web Portal')` **is** `corp_channel`. A name-based guard passes them, and the
+result is AUC ≈ 1.0 that proves only that the rules were applied consistently. Admissibility is therefore
+decided **per comparison**: such an anchor is used only where the bit it encodes is not the boundary under
+test. `assert_admissible()` raises rather than warns; `admissible_for_groups()` does the per-pair check.
+
+Sea-crew bookings are excluded throughout — `channel` is an anchor whose level is literally `Sea Crew`, so
+keeping them leaks the OFW rule through an anchor. That reduces OFW/Migrant from 3.92M to 2.82M by design:
+a booking whose channel says Sea Crew is identified *by definition*.
+
+| Tier | Fields | Status |
+|---|---|---|
+| Rule inputs | the 13 above | circular — never usable |
+| Trip-type proxies | `rev_pos`, `n_coupons`, `connecting`, `n_directions`, `min_tier` | leak `round_trip` — excluded |
+| **Tier-A anchors** | `age`, `age_known`, `dep_month`, `n_bookings` | independent of every rule field — always usable |
+| Conditional anchors | `issue_country`, `channel`, `dest_region` | usable only where their encoded bit is constant across the pair |
+
+### Stage V1 — construct validity (`src/validate_construct.py`)
+
+A **segment-distinguishability matrix**: for each of the 45 segment pairs, held-out ROC-AUC from a
+`HistGradientBoostingClassifier` given only admissible anchors (NaN and categoricals handled natively, so
+age's missing-not-at-random pattern is modelled rather than imputed away). Bands: **<0.60 not
+distinguishable · 0.60–0.75 weakly · >0.75 clearly distinct.**
+
+Controls are what make the AUCs interpretable, and are deliberately asymmetric: the **negative control**
+(each segment split randomly in half) gets *all* anchors, because more features mean more chance to fit
+noise — it must land ≈0.50 or the harness leaks and the run is void. The **positive controls** get strict
+anchors only, so they calibrate the same scale as the matrix.
+
+Includes a dedicated test of **OFW/Migrant vs Balikbayan/VFR** on the isolated population where every
+higher-priority branch is excluded and `round_trip` is the *only* difference, plus two robustness checks
+(matched within `issue_country`; base-rate-normalised `dep_month`, since most segments peak in May
+regardless). Also profiles the 2.19M `Unassigned`: coherent missing segment, or residue?
+
+### Stage V2 — criterion validity (`src/validate_criterion.py`)
+
+A four-rung ladder — **null → segment-only → the 11 clustering features → features + segment** — against
+outcomes no rule consumes: `flown_any` (primary), `refund_any` (rare; **reported as infeasible rather than
+fitted** where minority events < 200 — Family has 3 in 22.9M), and `rebook_180d` (forward-looking;
+right-censored bookings near the extract boundary are **excluded**, since counting them as "did not rebook"
+would manufacture a fake collapse in loyalty — the same boundary that makes unfiltered trend visuals draw a
+cliff).
+
+A segmentation is a **compression** and cannot beat the features it was built from, so win/loss is the wrong
+frame. Two numbers are reported instead: **signal retained** = `(AUC_segment − 0.5) / (AUC_features − 0.5)`,
+and **incremental value** = `AUC(features + segment) − AUC(features)`. Near-zero incremental value means the
+segmentation is a lossy re-encoding — valuable for communication and targeting, but not a source of new
+signal, and it must not be sold as one.
+
+### What this stage cannot do
+
+It **cannot confirm the segment names.** It shows that groups differ and that they carry outcome signal; it
+cannot show the group labelled `Corporate` is what PAL's commercial team means by Corporate. Every
+deliverable must therefore say **"behaviourally validated; segment names not externally confirmed."** A low
+AUC is evidence about a *boundary*, not proof of identity — two segments indistinguishable on these anchors
+could still differ on evidence we do not hold (loyalty tier, length of stay, ancillary spend — all known
+gaps). And no taxonomy change follows automatically: an unsupported split becomes a **proposal to PAL with
+the evidence attached**, never a unilateral merge.
 
 ---
 
@@ -61,7 +237,9 @@ its place"* rather than a bare dependency list.
 | Columnar storage | **PyArrow** / Parquet | 25.0.0 | Fast typed intermediates in `data/interim/` — sub-second re-reads instead of minutes re-scanning raw gzip |
 | Dataframes & math | **pandas** · **NumPy** | 3.0.3 · 2.5.1 | Work on the *aggregated* model-grain table (millions of rows, not tens of millions) |
 | Clustering — model-based | **StepMix** (Latent Class Analysis) | 3.0.0 | The refinement layer: finds sub-types inside big segments and tests for natural structure via BIC |
-| Clustering — mixed-type | **kmodes** (k-prototypes) | 0.12.2 | Independent cross-check in the diagnostic; handles numeric + categorical features together |
+| Clustering — mixed-type | **kmodes** (k-prototypes, k-modes) | 0.12.2 | Independent cross-check only — handles numeric + categorical together, but lost the 2026-07-27 head-to-head to LCA on agreement and separation |
+| Clustering — benchmark field | **scikit-learn** (GMM, spectral, one-class SVM, Ward) | 1.9.0 | The other five families in the 2026-07-28 ten-method benchmark: Gaussian mixtures (full + diag), SVD/spectral, Support Vector Clustering, KMeans floor |
+| Topology (TDA) | **kmapper** · **ripser** | 2.1.0 · 0.6.15 | Mapper graph (lens → cover → per-patch clustering → graph) and H0/H1 **persistent homology** — a label-free, algorithm-free read on whether the data is separated blobs, one continuum, or a cycle. `giotto-tda` was tried first: no Python 3.14 wheel, fails to build |
 | ML utilities | **scikit-learn** · **SciPy** | 1.9.0 · 1.18.0 | Feature scaling, PCA projection, Adjusted Rand Index, cost metrics |
 | Charts | **matplotlib** · **seaborn** | 3.11.0 · 0.13.2 | Every figure; shared segment palette in `src/pal_colors.py` |
 | Report build | base64 + headless **Google Chrome** | — | Embeds figures and renders `docs/status-report.pdf` (`src/build_report.py`) |
@@ -561,4 +739,4 @@ These rules are not implemented in the current pipeline because the required fie
 ---
 
 *Document prepared for Philippine Airlines internal use.*
-*v0.7 — 23 July 2026 (added Tools & Libraries disclosure; real-data track: rule-based primary + LCA refinement; HDBSCAN superseded for real data)*
+*v1.0 — 28 July 2026 (ten-method / eight-axis stress test: GMM(full) overtakes LCA on the composite — refinement layer under review, pipeline unchanged; continuum reconfirmed by persistent homology, SVC, Mapper and cross-method disagreement; separation ceilings at 0.381)*

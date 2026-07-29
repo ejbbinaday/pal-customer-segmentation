@@ -1,8 +1,15 @@
 # PAL Customer Segmentation
 
-ML framework to auto-classify Philippine Airlines PNRs into actionable revenue segments.
-Winning approach: **HDBSCAN** on penalty-weighted features → mapped to **10 named segments**
-(see `docs/methodology.md` and `docs/knowledge-base.md`).
+ML framework to auto-classify Philippine Airlines PNRs into actionable revenue segments —
+**10 named segments** (see `docs/methodology.md` and `docs/knowledge-base.md`).
+
+Two tracks, two winning approaches:
+- **Real 38M-coupon data (active):** the customer base is a **continuum**, not natural clusters — so the
+  **rule-based purpose×value segmentation is primary** and model-based clustering *refines and validates* it.
+  HDBSCAN is dropped here (categorical-heavy, not density-separable). Confirmed by a ten-method benchmark
+  (2026-07-28); the refinement layer (LCA vs GMM) is under review.
+- **Prototype tracks (`sample-features.csv`, v3 synthetic):** **HDBSCAN** on penalty-weighted features →
+  nearest-centroid mapping to the 10 segments. Retained as the reference implementation.
 
 ## Repository layout
 
@@ -90,7 +97,14 @@ python src/eda_real.py        # Stage E confirmations → outputs/eda_real/confi
 python src/build_airport_ref.py  # airport→country/region lookup → data/reference/airport_region.csv
 python src/features_real.py   # Stage F: booking + customer features + proxy labels → data/interim/pal_features_*
 python src/cluster_diagnostic.py  # mixed-type clustering diagnostic (LCA + k-prototypes) → outputs/cluster_diagnostic/
+python src/kproto_compare.py  # k-prototypes vs k-modes vs LCA head-to-head (~4 min) → outputs/kproto_compare/
+python src/model_stress_test.py  # 10-method / 8-axis benchmark + stress battery (~40 min) → outputs/model_stress_test/
+python src/model_stress_test.py --quick   # same, ~8 min, directional only
+python src/validate_construct.py  # NON-CIRCULAR: are the segments distinguishable? (~15 min) → outputs/validate_construct/
+python src/validate_criterion.py  # NON-CIRCULAR: do segments predict held-out outcomes? (~10 min) → outputs/validate_criterion/
+python src/build_pbip.py      # Power BI project reproducing the revenue/PAX mock-up → outputs/pbip/
 python src/sub_segment.py     # LCA sub-types within large rule segments → outputs/sub_segments/
+python src/export_powerbi.py  # Power BI fact table (coupon + agg grain, ~2 min) → outputs/powerbi_export/
 python src/report_figures.py  # real-data EDA + preliminary-cluster figures → outputs/report_real/figs/
 python src/build_report.py    # embed figures + render → docs/status-report.{html,pdf}
 ```
@@ -105,12 +119,91 @@ QA report; ~21s streaming, no dedup needed (exact duplicates verified ~0).
 all-non-rev customers, engineers the four feature families + loyalty, and applies a prioritized proxy-label
 waterfall → `data/interim/pal_features_booking.parquet` (22.9M) + `pal_features_customer.parquet` (13.4M)
 + `outputs/features_real/summary.md`. Includes data guards (UniqueID persistence, currency sanity).
+`kproto_compare.py` answers "would k-prototypes/k-modes improve the model?" — a head-to-head against LCA on
+the same sample (elbow, ARI vs the rule segments, Gower silhouette, split-half stability, and
+sub-segmentation inside the big parents). **Verdict: no** — LCA stays the refinement layer; see
+`outputs/kproto_compare/summary.md` and `docs/methodology.md` v0.8.
+`model_stress_test.py` + `model_zoo.py` widen that three-way test into a **ten-method, six-family,
+eight-axis benchmark**: LCA · GMM (full + diag) · k-prototypes · k-modes · KMeans · SVD+KMeans ·
+Spectral(Gower) · Support Vector Clustering · TDA-Mapper, scored on taxonomy agreement, Gower-silhouette
+separation, natural-*k* (own criterion + **H0/H1 persistent homology**), split-half and bootstrap
+stability, perturbation and leave-one-feature-out robustness, an **SVM separability probe**, and cost.
+`model_zoo.py` is the library — one `fit(train, k, test, spec) -> Fit` contract per family, plus the
+shared Gower/probe/persistence instruments — and is the file to edit to add a method.
+**Verdict:** `GMM(full)` leads the composite (**0.849** vs LCA's 0.763) and still leads with the circular
+agreement axis zeroed, so the **refinement layer is under review — but the pipeline is unchanged**, because
+this benchmark scores *top-level* segmentation while LCA's job is *sub-segmentation* (needs a stage-matched
+re-test first). The **continuum finding is reconfirmed by four independent new tests** and separation
+**ceilings at 0.381** across all ten methods. See `outputs/model_stress_test/summary.md` and
+`docs/methodology.md` v1.0.
+**Plan B — non-circular validation** (`docs/recommendations-plan.md` §Plan B). Every earlier validation number
+is measured against `proxy_segment`, which the rules themselves produced. These two scripts need **no ground
+truth**, so they work whether or not SME labelling happens.
+`validation_anchors.py` is the **circularity contract** and the single source of truth: which fields the rule
+waterfall consumes (so they validate nothing), which are *mechanically* tied to trip type (they leak
+`round_trip`), and which remain admissible. It raises `CircularityError` rather than warning. Note the subtle
+class of leak it handles: `dest_region == 'Domestic'` **is** `is_domestic`, `issue_country != 'PH'` **is**
+`foreign_issue`, `channel IN ('TMC','Corporate Web Portal')` **is** `corp_channel` — so those anchors are
+admitted **per comparison**, only where the rule bit they encode isn't the boundary under test.
+`validate_construct.py` builds a **segment-distinguishability matrix**: for all 45 segment pairs, held-out AUC
+from a classifier given only admissible anchors, with a **negative control** (random half-splits, must be
+≈0.50 — read it first, it's the harness self-test) and **positive controls** to calibrate the scale. Includes a
+dedicated section on **OFW/Migrant vs Balikbayan/VFR** (6.8M bookings, split on the single bit `round_trip`)
+and a profile of the 2.19M `Unassigned`.
+`validate_criterion.py` runs a **null → segment-only → 11-features → features+segment** ladder against
+outcomes no rule consumes (`flown_any`, `refund_any`, `rebook_180d`), reporting *signal retained* and
+*incremental value* — because a segmentation is a compression and can never beat the features it came from.
+Rare-event outcomes are **reported as infeasible rather than fitted**, and `rebook_180d` excludes
+right-censored bookings near the extract boundary.
+`build_pbip.py` generates a **Power BI project** (`outputs/pbip/`) reproducing the "Passenger Revenue & PAX
+Performance" mock-up: `model.bim` (TMSL — 6 tables, 15 measures, data embedded as inline-CSV Power Query so
+the file is self-contained) + `report.json` (60 visual containers) + a PAL theme + CSV fallbacks.
+**A `.pbix` cannot be generated programmatically** — its `DataModel` part is a proprietary binary
+Analysis Services database, and Power BI Desktop (the only writer) is Windows-only. So the flow is
+**File → Open → the `.pbip`**, then **File → Save As → `.pbix`**. Figures are the mock-up's *illustrative*
+ones; `outputs/pbip/README.md` records where they diverge from the real extract (real data shows flat revenue
+and −1.1% PAX, not +6.2%/+6.5%) and flags that real `NetRevenue` implies **₱163 per passenger**, which is not
+a credible fare — units need confirming with PAL before any revenue figure ships.
+`export_powerbi.py` joins the booking-grain `proxy_segment` back down onto the cleaned coupons and writes
+the **preliminary Power BI star schema** into `outputs/powerbi_export/` — row-preserving (coupons in =
+coupons out):
+
+The folder is laid out as a **self-contained handoff** — zip it and send it:
+
+```
+outputs/powerbi_export/
+├── START-HERE.md                 5-min starter guide (copy of docs/powerbi-guide.md)
+├── summary.md                    field dictionary, reconciliation, caveats
+├── model/                        ← the three things Power BI actually loads
+│   ├── dim_date.csv                 1.8k rows — mark as the Date table
+│   ├── fact_flight/                20.6M rows — full dashboard (flight no., O&D, lead time)
+│   └── fact_dashboard.parquet       2.1M rows — fast summary-only alternative
+├── qa/sample_100k.csv             100k rows — build + validate DAX before moving GBs
+└── detail/fact_coupons/           38.1M rows — only for Age / UniqueID
+```
+
+Read `outputs/powerbi_export/summary.md` before building measures. The load-bearing caveats:
+**default trend visuals to `IsCompleteTravelMonth = TRUE`** — travel months after the extract boundary are
+still-filling forward book and will draw a fake cliff; use `IsPrimaryCoupon = TRUE` (one row per booking)
+for booking-level measures and `BookingID` to dedupe the per-leg `Route` repetition; `CustomerSegment` is
+the **rule-based proxy** label; `PaxCount` is sectoral (≈always 1, *not* party size); `Age` is 57% NULL by
+design (filter `AgeKnown`); and **`DaysBeforeMonthEnd` cannot drive LY-vs-CY pickup** (one value per
+departure month — use `LeadTimeDays`).
 `report_figures.py` draws the real-data EDA + preliminary-cluster (LCA/PCA) figures used in the
 shareable status report; `build_report.py` embeds them into a self-contained
 **`docs/status-report.html`** and renders **`docs/status-report.pdf`** (a colleague-facing summary of
 the approach, methodology, EDA and current status) from the `docs/_status-report.template.html` template.
 
 Key references:
+- **`docs/recommendations-plan.md`** — the sequenced plan acting on the 2026-07-28 stress-test findings
+  (SME ground truth first, feature-contract gate, GMM confidence layer, pre-registered decision rules,
+  and the one gated customer-grain experiment).
+- **`docs/mentor-presentation-guide.md`** — talk track for presenting initial findings + next steps
+  (TL;DR, 6-beat arc, per-beat script, term explainers, analogy cheat sheet, anticipated Q&A,
+  what not to claim).
+- **`docs/powerbi-guide.md`** — the colleague-facing Power BI starter guide (star schema, load steps,
+  starter DAX, the four gotchas). **Canonical copy** — `export_powerbi.py` copies it into the export
+  folder as `START-HERE.md` on every build, since `outputs/` is git-ignored. Edit it here, not there.
 - **`docs/data-dictionary.md`** — authoritative field reference (mirror of the client's
   `DataDictionary.v1.xlsx`), incl. the farebrand → value-tier ladder.
 - **`docs/real-data-plan.md`** — the cleaning → EDA → feature-engineering plan (grain, decisions).

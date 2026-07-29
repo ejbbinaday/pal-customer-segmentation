@@ -480,6 +480,286 @@ Dashboard Wireframe → Requirements Checklist → [Appendix] Literature
 
 ---
 
+#### 2026-07-28 — Plan B delivered: the segments *are* non-circularly validated, and OFW/Balikbayan is the weakest boundary in the taxonomy (not a spurious one)
+**Domain:** Clustering / Methodology
+`src/validate_construct.py` + `src/validate_criterion.py` (library: `src/validation_anchors.py`) ran the first
+**non-circular** validation this project has: classifiers given *only* fields the proxy waterfall never
+consumes. Validation is therefore **no longer blocked on SME labels**.
+
+**The harness validated itself first.** Negative controls — each segment split randomly in half, so there is
+nothing to find — landed at **0.494–0.506** across six segments. Positive controls (strict anchors) landed at
+**0.770–0.945**. That calibrates the scale: on this data a *real* difference reads 0.77–0.95, and 0.50 is the
+floor.
+
+**Segment-distinguishability matrix (45 pairs, held-out AUC, Tier-A anchors):**
+
+| Boundary | strict | adaptive | reading |
+|---|---|---|---|
+| **Balikbayan/VFR vs OFW/Migrant** | **0.608** | 0.714 | **weakest of all 45** |
+| Last-Minute vs Budget/Adventure | 0.645 | 0.685 | 2nd weakest |
+| Premium Bleisure vs Balikbayan/VFR | 0.678 | 0.754 | weak |
+| … | | | |
+| Balikbayan/VFR vs Budget/Adventure | 0.965 | 0.976 | strongest |
+
+**The OFW/Balikbayan verdict is more interesting than the hypothesis it replaced.** The preliminary probe
+suggested "one population, split by trip type". The controlled test says **two populations with a genuine but
+weak difference** — not spurious, not strong:
+- Matched **within** `issue_country` (holding origin market constant, `issue_country` withheld) the split
+  survives in *every* country tested: **AUC 0.622–0.721** across CN/US/CA/JP/QA/NZ/AE/HK/KR/SG. So the
+  difference is not geographic — the earlier country-mix reading was too coarse.
+- **Seasonality carries most of it.** Base-rate-normalised departure-month index (1.0 = base rate):
+  December is **1.174 for Balikbayan vs 0.826 for OFW** — a sharp, opposite-direction signal from rules that
+  read no month at all. August reverses it (0.923 vs 1.077). Every other month sits at ≈1.0.
+- **Recommendation: keep them separate but treat the boundary as soft** — and consider reporting an
+  "Overseas Filipino" super-segment with trip type as a sub-dimension. **Do not merge** on this evidence.
+
+**`Unassigned` (2.19M) is a coherent missing population, not a residue.** It is clearly distinct from 8 of 9
+named segments (AUC 0.821–0.986) and only weakly separable from Corporate (0.682) — corroborating the
+documented taxonomy gap #4 (outbound PH-issued international economy, intentionally left unassigned). Worth a
+named segment rather than a bucket.
+
+**Criterion validity — the segmentation is a lossy re-encoding for the outcomes that matter.** Against
+outcomes no rule consumes: `flown_any` **signal retained 0.324**, incremental value **+0.002**;
+`rebook_180d` **0.555**, **+0.002**. It carries a third to a half of the achievable signal and adds
+essentially **nothing** beyond the 11 raw features. Valuable for communication and targeting; **not** a source
+of new predictive signal, and must not be sold as one.
+
+**Two methodological findings worth keeping:**
+1. **`signal_retained` can exceed 1.0 legitimately** — `refund_any` hit **2.944** (segment-only AUC 0.822 vs
+   features-only 0.609). The segment label is *not* a compression of the 11 clustering features: the waterfall
+   also reads `sea_crew`, `is_award`, `pilgrimage`, `any_premium`, `any_business`, `is_domestic`,
+   `is_international`, **none of which the clustering ever saw**. Those rule inputs carry real outcome signal.
+   *But that row is flagged `unstable`* — features+segment (0.541) scored *below* segment alone, which is
+   impossible with real signal, so with 347 events in 300k it is rare-event overfitting. Indicative only.
+2. **Semantic circularity defeats a name-based guard.** Three anchors that pass any field-name check are
+   finer-grained versions of rule fields: `dest_region == 'Domestic'` **is** `is_domestic`,
+   `issue_country != 'PH'` **is** `foreign_issue`, `channel IN ('TMC','Corporate Web Portal')` **is**
+   `corp_channel`. Admitting them produced **AUC ≈ 1.0 for nearly every pair** on the first run — a result
+   that proves only that the rules were applied consistently. Fixed by deciding admissibility **per
+   comparison**: an anchor is used only where the rule bit it encodes is not the boundary under test.
+   Anyone extending this must keep that discipline.
+
+**Source:** our analysis — `outputs/validate_construct/summary.md`, `outputs/validate_criterion/summary.md`,
+`src/validation_anchors.py`; plan in `docs/recommendations-plan.md` §Plan B.
+
+---
+
+#### 2026-07-28 — Non-circular validation *is* possible without SME labels — and the first probe questions the OFW / Balikbayan split
+> **Partly superseded the same day** by the controlled test above: the country-mix reading here was too
+> coarse. Holding `issue_country` constant, the OFW/Balikbayan split *does* survive (AUC 0.62–0.72 in every
+> country) — weakly, but it is not spurious. The audit and MNAR findings below stand.
+**Domain:** Data & Features
+With internal SME labelling possibly unavailable, we audited which fields the proxy waterfall
+(`src/features_real.py`) actually consumes, to find anchors that can validate it non-circularly.
+
+**The circularity audit changed the design.** The rules consume `is_award`, `corp_channel`, `any_business`,
+`lead_days`, `pilgrimage`, `sea_crew`, `foreign_issue`, `is_international`, `max_tier`, `round_trip`,
+`any_premium`, `is_group`, `is_domestic`. So three fields that *look* like independent markers are
+**circular and unusable**: **`sea_crew`** (it *is* the OFW rule), **`is_award`** (the Mabuhay rule),
+**`pilgrimage`** (the Pilgrimage rule). Genuinely independent anchors that survive: `refund_any`,
+`flown_any`, `age`/`age_known`, `issue_country` *identity*, `channel` *identity*, `min_tier`,
+`n_directions`, route identity, and — importantly — **`dep_month`, since the rules use no month at all.**
+
+**Probe results (unconditioned marginals, 22.9M bookings):**
+- **Outcomes carry signal:** refund rate spans 0.00% (Family) → **0.45%** (Balikbayan); flown 91.7% →
+  99.9% (Last-Minute). Neither field is used by the rules.
+- **Seasonality is a working external anchor:** **Balikbayan/VFR peaks in December** — the Philippine
+  Christmas homecoming — predicted from domain knowledge and recovered from rules that see no month.
+  Pilgrimage is the most seasonal segment (peak/trough **5.39**).
+- **⚠️ The OFW vs Balikbayan split is not corroborated by geography.** Those two segments (**6.8M
+  bookings, 30% of the base**) are separated by a *single bit* — `round_trip` (one-way → OFW, round-trip →
+  Balikbayan). But their `issue_country` mixes are near-identical, both dominated by US/SG/JP/HK, with
+  **no Gulf concentration in OFW**. Seasonality partly disagrees (Balikbayan Dec vs OFW May). **Live
+  hypothesis: one population — overseas Filipinos — segmented by trip type, not two customer types.**
+  Merging them would consolidate two of the four largest segments. Needs a controlled test before acting.
+
+**Two methodological traps found:** (a) **`age` is missing-not-at-random** — `age_known` runs from **0.8%**
+(Budget/Adventure) to **89.2%** (Balikbayan), so raw median-age comparisons are across different
+subpopulations (Budget/Adventure's "39" rests on 0.8% of 9M rows); model the missingness or don't use it.
+(b) **Most segments peak in May**, which is a base rate, so monthly peaks must be base-rate normalised —
+Balikbayan's December peak is meaningful *because* it deviates from that base rate.
+
+**Also learned:** the strongest available substitute for row-level labels is **profile-level face validity** —
+ten one-page segment profiles reviewed in ~1 hour by one person, roughly two orders of magnitude cheaper than
+1,000 row labels. And **detection-power testing by structure injection** converts "we found no clusters" into
+"no clusters exist above X% prevalence and Y separation", which needs no external input at all.
+**Source:** our analysis — probe queries against `pal_features_booking.parquet`; plan in
+`docs/recommendations-plan.md` §Plan B. Results are unconditioned marginals — controlled tests are B1/B2.
+
+---
+
+#### 2026-07-28 — Ten-method stress test: GMM overtakes LCA, but the continuum finding survives four *new* independent tests
+**Domain:** Clustering / Methodology
+`src/model_stress_test.py` + `src/model_zoo.py` widened the 2026-07-27 three-way test (k-prototypes /
+k-modes / LCA) into **ten methods across six families** — adding **GMM** (full + diag), **SVD+KMeans**,
+**Spectral(Gower)**, **Support Vector Clustering**, **TDA-Mapper** and **H0/H1 persistent homology**, plus a
+KMeans floor — scored on **eight axes** on the same 20k booking sample and feature set (so it extends, not
+replaces, the earlier decisions). Weighted leaderboard:
+
+| method | agreement (ARI) | separation (Gower sil) | stability | robustness | score | score w/o agreement |
+|---|---|---|---|---|---|---|
+| **GMM(full)** | **0.409** @k=6 | 0.262 | 0.812 | 0.757 | **0.849** | **0.798** |
+| GMM(diag) | 0.396 @k=4 | 0.269 | 0.706 | 0.724 | 0.828 | 0.785 |
+| Spectral(Gower) | 0.372 @k=3 | **0.381** | 0.582 | 0.431 | 0.785 | 0.754 |
+| LCA (incumbent) | 0.337 @k=4 | 0.298 | 0.680 | 0.645 | 0.763 | 0.762 |
+| KMeans | 0.226 | 0.136 | **0.970** | **0.802** | 0.673 | 0.762 |
+| SVD+KMeans | 0.184 | 0.087 | 0.851 | 0.812 | 0.583 | 0.686 |
+| k-prototypes | 0.207 | 0.106 | 0.810 | 0.646 | 0.530 | 0.592 |
+| SVC | 0.132 | 0.363* | 0.135 | 0.010 | 0.364 | 0.451 |
+| k-modes | 0.228 | 0.144 | 0.471 | 0.247 | 0.363 | 0.346 |
+| TDA-Mapper | 0.100 | −0.007 | 0.451 | 0.545 | 0.280 | 0.373 |
+
+**Six things learned:**
+
+1. **GMM(full) beats LCA on the composite, and beats it on the non-circular axes too** (0.798 vs 0.762 with
+   taxonomy agreement weighted to zero) — so the win is not borrowed from the rules it is scored against.
+   Higher agreement (0.409 vs 0.337), stability (0.812 vs 0.680) and robustness (0.757 vs 0.645); LCA keeps
+   the better **separation** (0.298 vs 0.262). **Scope caveat:** this benchmark tests *top-level* segmentation,
+   whereas LCA's actual pipeline job is **sub-segmenting inside big parent segments**. Swapping the pipeline
+   layer needs a GMM-vs-LCA head-to-head *at that stage* first (as `kproto_compare.py` §5 did).
+2. **The continuum finding (2026-07-23) is confirmed by four brand-new, independent lines of evidence** —
+   this is the strongest result. (a) **Persistent homology**, which sees no labels, no k, no centroid and
+   assumes no distribution: **1 significant H0 component**, gap ratio 1.195 → one connected mass.
+   (b) **SVC's emergent k = 1** for every γ ≤ 0.8 — the kernel contour finds *one* blob until γ is large
+   enough to shatter it into 27–39 shards while ejecting 43–62% of rows. (c) **TDA-Mapper finds nothing**:
+   separation ≈ 0 and *negative* at k ≥ 5. (d) **Median cross-method ARI 0.41** — six families cut the data
+   six different ways.
+3. **Separation ceilings at 0.381** across all ten methods (weak-but-real band, 0.25–0.5). That is the honest
+   upper bound on what *any* clustering can claim here — a number to quote when asked "how good are the
+   clusters?"
+4. **The SVM separability probe earned its place.** Held-out balanced accuracy on a solution's own labels
+   runs **0.85–0.99 for nearly every method**, including ones with silhouette ≈ 0.1. A geometric partition of
+   a continuum is perfectly *learnable* while being entirely *arbitrary* — so **a separability/accuracy number
+   is not evidence of real segments** and must never be quoted without the silhouette beside it. (Only k-modes
+   scored low, 0.69–0.90, and it is the worst method overall.)
+5. **KMeans is the most stable and robust method in the field** (0.970 / 0.802) with almost the *least*
+   separation — the textbook signature of stably partitioning a smooth density. Same trap
+   k-prototypes fell into on 2026-07-27 (split-half 0.97, worst separation), reproduced by a third method.
+   **Stability without separation is not evidence of structure.**
+6. **New caveat — every method is fragile to losing one feature.** Leave-one-feature-out ARI *minimums* land
+   at 0.15–0.49 for all ten (best: SVD+KMeans 0.487, LCA 0.480; GMM(full) 0.409). No method's segmentation is
+   robust to a single column going missing, which is a real production risk given the extract's known gaps.
+
+*SVC's 0.363 separation is measured on the 77% of rows still inside a contour at γ=1.6 — a high silhouette
+paired with a large outlier share is **selection, not structure**. Its stability is −0.05 (worse than random)
+because emergent k jumps discontinuously with γ.
+
+**Also:** `giotto-tda` has no Python 3.14 wheel and fails to build; `kmapper` + `ripser` cover Mapper and
+persistent homology and are now pinned in `requirements-pipeline.txt`.
+**Source:** our analysis — `outputs/model_stress_test/summary.md`, `src/model_stress_test.py`,
+`src/model_zoo.py`; Ben-Hur et al. (2001) "Support Vector Clustering" for the SVC construction.
+
+---
+
+#### 2026-07-27 — The extract has a hard forward-book boundary: any unfiltered trend visual draws a fake cliff
+**Domain:** Data & Features
+The real extract stops at a **single as-of date** — the last flown departure is **2026-07-21**. Travel months
+past that are *forward bookings still filling*, not demand, and the drop-off is severe: Jun-2026 has 1,094,151
+coupons (100% flown), Jul-2026 has 1,088,618 (68.9% flown), **Aug-2026 has 627,859 (0% flown)** and Sep-2026
+only **316,703 — about 22% of a mature month**. Plotted unfiltered, a 12-month trend or YoY visual shows a
+catastrophic decline that is purely an artefact of the extract boundary.
+Second, related trap: **travel year 2024 only starts in May** (first departure 2024-05-01), so a full-year
+2025-vs-2024 YoY silently compares 12 months against 8.
+**Fix shipped:** `src/export_powerbi.py` now derives the boundary from the data (`max(departure_date) where
+flown`) and stamps three guards on every row — `DataAsOfDate`, `IsCompleteTravelMonth` (TRUE only through the
+last fully-settled month) and `IsCompleteTravelYear` (TRUE for **2025 only** on this extract). Every trend and
+YoY visual must default to `IsCompleteTravelMonth = TRUE`. The same flag is repeated on the generated
+`dim_date.csv` so the filter works from either side of the model.
+**Source:** our analysis — `outputs/powerbi_export/summary.md`; travel-month completeness query.
+
+#### 2026-07-27 — BI fact table hardened: booking key, primary-coupon flag, exclusion flags, dashboard grain
+**Domain:** Data & Features
+Review of the first export surfaced structural gaps that would have produced wrong Power BI measures. All fixed
+in `src/export_powerbi.py` (+ one upstream change to `src/clean_real.py`):
+1. **No booking key existed.** Segment is a *booking* attribute on a *coupon* table, and the booking was only
+   implicitly the composite (`UniqueID`, `DateOfIssuance`). Added **`BookingID`** (hashed surrogate) and
+   **`IsPrimaryCoupon`** — exactly one TRUE per booking, so booking-level measures become a filter instead of a
+   DISTINCTCOUNT over a composite. This also fixes the per-leg `Route` repetition that double-counts
+   connecting journeys.
+2. **`CouponNumber` was dropped in Stage C** — without it legs cannot be ordered or deduped within a booking.
+   Now carried through (`pal_clean` 43 → 44 columns).
+3. **No Date dimension**, despite YoY and 12-month-trend being explicit requirements. DAX time intelligence
+   needs a marked Date table; there are also **two date roles** (`DepartureDate`, `DateOfIssuance`) needing
+   `USERELATIONSHIP`. Now generated as `dim_date.csv`.
+4. **Exclusion flags were computed upstream but never exported.** `IsAward`, `IsNonRev`, `IsGroupFare`,
+   `RevMissing`, `AgeKnown`, `IsReissue` now ship, so a clean revenue measure is a filter rather than a guess.
+   Same for the already-computed `DestRegion`, `RoundTrip`, `IsInternational`, `BookingCoupons`, `NLegs`.
+5. **The `agg/` rollup barely rolled up** (20.1M rows = 52.8% of coupon rows) because it kept
+   `OperatingFlightNumber` (1,213 values) and **day-level** dates (1,126 / 1,173). Added a separate
+   **`agg_dashboard/`** at true headline grain (~1.7M rows, ~23× smaller than the coupon table); `agg/` stays
+   for flight-level detail pages.
+6. **Dropped two dead columns:** `RouteBasis` (100% one value — it was a diagnostic, since served) and
+   `CouponStatusLabel` (duplicate of `CurrentCouponStatus`; replaced by the boolean `IsFlown`).
+Deliberately **not** renamed despite being misleading: `PaxCount` (sectoral, ≈always 1, not party size),
+`DaysBeforeMonthEnd`, `OperatingCarrierCode` (constant `PR`) and the snake_case `is_nonstop` — all four were
+requested by name, so they keep their names and carry ⚠️ warnings in the field dictionary instead.
+Still open: **currency is undocumented** — Stage F only established revenue is *plausibly* single-currency
+(7.3× median spread across 26 issue countries). Confirm with PAL before summing revenue across countries.
+**Source:** our analysis — `src/export_powerbi.py`, `outputs/powerbi_export/summary.md`.
+
+#### 2026-07-27 — `DaysBeforeMonthEnd` is departure-month metadata, not a booking snapshot — it cannot anchor LY-vs-CY pickup
+**Domain:** Data & Features
+The BI field list asked for `DaysBeforeMonthEnd` as the "same-window snapshot anchor for LY vs CY pickup."
+It cannot serve that purpose. Verified on all 38.1M raw coupons: **every one of the 37 departure months
+carries exactly one distinct value**, even though each month is sold across **13–15 different issue
+months**. So the field is a deterministic function of the *departure month* alone, measured against a
+single extract date (~2026-07-20): it is a constant **`-7`** for every departure month through Jun-2026,
+then steps by month length (11, 42, 72, 103, 133, 164, 195, 223, 254, 284, 315) for future months. Only
+**8 distinct values exist across the whole extract**, 99.7% of them `-7`. It therefore carries **zero
+booking-timing information** and cannot distinguish "booked 60 days out" from "booked 3 days out".
+**Implication:** pickup/booking-curve analysis needs either (a) `LeadTimeDays` (departure − issuance,
+genuine per-coupon, already exported), or (b) **repeated dated extracts of the same departure months** —
+a data request to PAL, since this is a single snapshot. This supersedes the earlier note that the field was
+"fine as the LY-vs-CY pickup anchor."
+**Source:** our analysis — DuckDB probe over `data/interim/pal_parquet/`; `outputs/powerbi_export/summary.md`.
+
+#### 2026-07-27 — Power BI export built: `OnlineOD` alone resolves Route; `PaxCount` is sectoral, not party size
+**Domain:** Data & Features
+`src/export_powerbi.py` joins the booking-grain `proxy_segment` onto the 38.1M cleaned coupons (row-preserving:
+38,116,259 in = out; 99.95% segment match, the 0.05% gap being the all-non-revenue customers Stage F excludes).
+Three findings that change how the report must be built:
+1. **Route needs no three-way waterfall.** `OnlineOD` is populated on 99.999% of coupons. On **nonstop**
+   coupons (27.6M, 72.4%) `OnlineOD` **is identical to `Sector`** (99.998%), so the "Sector for nonstop"
+   rule is satisfied automatically. On **connecting** coupons (10.5M, 27.6%) `Sector` matches only 16.3% —
+   correctly so, since a sector is one leg of many. The genuine interline case is the **22.6% of connecting
+   coupons where `OnlineOD` ≠ `TripOD`**. Caveat: `Route` repeats per leg, so counting coupons by Route
+   double-counts connecting journeys.
+2. **`PaxCount` is a *sectoral* count** (1 sector = 1 pax) — it is 1 on 38,114,663 of 38,116,259 coupons and
+   is **not party size**. Segment pax = coupon count; party size must come from `BookingType = 'Group'`.
+3. **`OperatingCarrierCode` is constant `PR`** across the entire extract, so the "isolate PR-operated" filter
+   is a no-op; interline surfaces as `TripOD` ≠ `OnlineOD` instead.
+Also confirmed the fare basis: `NetRevenue ≥ NetFare` on **100.0%** of coupons (median gap 7.11 = the YQ
+surcharge), so `NetFare` = base fare excl. YQ → use it for **Avg Fare**; `NetRevenue` = fare + YQ → use it
+for revenue share / YoY.
+**Source:** our analysis — `src/export_powerbi.py`, `outputs/powerbi_export/summary.md`.
+
+#### 2026-07-27 — k-prototypes / k-modes head-to-head: no improvement as labeler; but they *are* more reproducible
+**Domain:** Clustering / Methodology
+Tested whether swapping in **k-prototypes** or **k-modes** would improve the model. The 2026-07-23
+diagnostic had only run k-prototypes **once** at k*, so `src/kproto_compare.py` re-ran all three methods
+(k-prototypes · k-modes · LCA) on the **same** 20k booking sample, k = 3–12, on four axes: cost/BIC elbow,
+ARI vs the proxy taxonomy, **Gower** silhouette (mixed-type-correct separation) and **split-half stability**
+(fit on half A → predict B vs fit on B). **Findings:** (1) **Still no natural k** — k-prototypes/k-modes cost
+falls monotonically with per-step gains staying 3–8% (cost *always* falls with k, so there is no elbow to
+find); LCA BIC flattens to ≤0.6%/step from k=7 and finally turns up at k=12 (min k=11) — a boundary, not an
+elbow. Continuum finding **reconfirmed by a second method family**. (2) **Neither improves labelling** —
+best ARI vs proxy: **LCA 0.336** (k=4) vs k-prototypes 0.216 (k=8) vs k-modes 0.212 (k=6); LCA also wins
+separation (Gower sil **0.30** vs 0.09 / 0.15). Note k-modes gets *identical* binned input to LCA and still
+loses, and k-prototypes gets the *advantage* of raw un-binned numerics and still loses → LCA's win is the
+model class, not the encoding. (3) **Methods disagree with each other** (pairwise ARI 0.12–0.43) → no single
+reproducible partition exists, exactly as a continuum predicts. (4) **The one real k-prototypes win —
+stability:** split-half ARI **0.97–0.98** (k=5/9/10) vs LCA 0.67–0.86 and k-modes 0.37–0.65. **Interpretation
+matters:** a hard-centroid method partitions a smooth density very reproducibly *without* the partition being
+meaningful (worst silhouette of the three) — high stability here is **not** evidence of clusters. (5)
+**Sub-segmentation head-to-head** (inside Budget/Adventure · OFW/Migrant · Balikbayan/VFR at k=4): LCA wins
+Gower silhouette in **all three** (0.264/0.215/0.204 vs 0.241/0.151/0.193) and gives more balanced sub-types
+(k-prototypes produced a degenerate **2%** sub-segment in OFW); k-prototypes wins stability in all three.
+**Decision: keep the pipeline as-is** — rules primary, **LCA** the refinement layer; k-prototypes stays a
+diagnostic cross-check only. **Actionable side-finding:** the **Balikbayan/VFR** LCA sub-types are the least
+reproducible (split-half ARI **0.495**) — consistent with the earlier colliding auto-names there — so those
+sub-types must not be presented as firm; re-derive or reduce the sub-count for that parent.
+**Source:** `src/kproto_compare.py` → `outputs/kproto_compare/summary.md`.
+
 #### 2026-07-23 — methodology.md v0.7: Tools & Libraries disclosure + version-drift fix; report humanized
 **Domain:** Project Decision
 Added a **Tools & Libraries (disclosure)** section to `docs/methodology.md` (bumped v0.6→**v0.7**) —
@@ -974,4 +1254,4 @@ is now `src/dashboard.py`. See `README.md`.
 ---
 
 *Knowledge base maintained by CPT 3 — PAL Customer Segmentation*
-*Last updated: 23 July 2026*
+*Last updated: 28 July 2026*
