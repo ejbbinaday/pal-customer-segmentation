@@ -273,7 +273,7 @@ highest-value single question, and it needs no SME.
 | B1 | **Criterion validity** — do segments predict `refund_any`, `flown_any`, reissue, and next-trip behaviour? Report **segment-only vs full-feature vs null** model, i.e. *what fraction of achievable signal survives the compression* | `src/validate_criterion.py` | ✅ **done 2026-07-28** |
 | B2 | **Construct validity** on the surviving anchors, with an explicit missingness model for age | `src/validate_construct.py` | ✅ **done 2026-07-28** |
 | B3 | **Seasonality vs the known calendar** — pre-register predictions (Balikbayan→Dec, Pilgrimage→Hajj/Umrah window, OFW→deployment rhythm), then test, base-rate normalised | part of B2 | ✅ **done 2026-07-28** |
-| B4 | **Out-of-time stability** — fit on 2024–25, apply to 2026–27; do sizes, profiles and revenue mix hold? | `src/validate_temporal.py` |
+| B4 | **Out-of-time stability** — two adjacent 12-month *issuance* windows (the extract is departure-filtered, so calendar-year splits are invalid); do sizes, profiles and revenue mix hold? | `src/validate_temporal.py` | ✅ **done 2026-07-29** |
 | B5 | **Detection power by injection** — plant synthetic segments of known prevalence and separation, find the detection floor | `src/detection_power.py` | ✅ **done 2026-07-29** |
 | B6 | **Weak supervision** — 3+ *independent* labelling functions per segment from disjoint feature families, combined with a Dawid–Skene label model → accuracy estimate with no gold labels. Also: characterise the **2.19M Unassigned** — one coherent missing segment, or a grab bag? | `src/weak_labels.py` |
 
@@ -288,8 +288,12 @@ nothing at any distinctness**, which is a bound the deliverable must state rathe
 implicit. It also retired the H0 significant-component count as a detector (1 → 120 across draws of unchanged
 data). Full results: `outputs/detection_power/summary.md`; KB §15 (2026-07-29).
 
-**B4 is now the highest-value remaining Tier-1 item** — out-of-time stability is the one axis still untested,
-and "the segments still exist a year later" is the claim most exposed to a sceptical question.
+**B4 is done (2026-07-29).** Shares hold across a 12-month step (TVD 1.93 pp, full population) and a model
+fitted a year earlier transfers for free (ratio 1.02 against a within-window ceiling). Two caveats it
+surfaced: **revenue mix is less stable than headcount** (TVD 3.21 pp; Balikbayan/VFR 29.35%→26.64% of
+revenue on a flat share), and the extract is **departure-filtered**, which invalidates calendar-year windows
+for any future temporal work. **B6 is now the highest-value remaining Tier-1 item** — weak supervision would
+put an accuracy estimate on the labels with no gold data, and it is the last Tier-1 axis untouched.
 
 ### B1–B3 results (run 2026-07-28)
 

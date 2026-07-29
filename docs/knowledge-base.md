@@ -480,6 +480,69 @@ Dashboard Wireframe → Requirements Checklist → [Appendix] Literature
 
 ---
 
+#### 2026-07-29 — Out-of-time stability: the segmentation survives a 12-month step, and the extract is **departure-filtered** (which dictates every temporal design)
+**Domain:** Clustering / Methodology
+`src/validate_temporal.py` (Plan B item B4) splits the extract in time and re-asks every stability
+question. Everything validated before this was a **photograph** — one pooled snapshot — so a segment that
+existed only because of one period's booking conditions would have passed every earlier test.
+
+**First, a data-structure finding that governs any future temporal work.** The extract is filtered on
+**departure date (2024-05-01 → 2027-05-31), not on issuance.** That truncates the issuance axis at *both*
+ends, and ignoring it would manufacture findings rather than reveal them:
+- **Left:** a booking issued before the travel window opens appears **only if its lead time was long
+  enough to reach it**. Issuance before 2024-05 is a long-lead-only sample — mean lead **105 days** in the
+  excluded region vs **38** inside it (2023Q3 issuance: 277 days). Included, it would show a spectacular
+  "collapse in lead time" that is **pure selection**.
+- **Right:** for issue date `d` the longest observable lead is `2027-05-31 − d`. That ceiling drops below
+  the modelled 365-day clip after ~2026-06, so the last ~3 months of issuance are missing their long-lead
+  tail (min ceiling **315 days**).
+- **Therefore the windows are `2024-05-01→2025-04-30` vs `2025-05-01→2026-04-30`** — two adjacent
+  12-month windows (9.77M vs 10.08M bookings, 86% of the extract), each covering all twelve calendar
+  months so seasonality cannot masquerade as drift. **Not** "2024–25 vs 2026–27": issuance never reaches
+  2027 at all.
+
+**Five findings:**
+
+1. **Segment sizes hold.** Share TVD **1.93 pp** across all ten segments on *full-population* counts —
+   you would have to move 1.93% of bookings to turn one year's mix into the other's. Largest single move
+   `Budget/Adventure` −1.49 pp; `OFW/Migrant` +1.40 pp (+8.7% relative).
+2. **Revenue mix is the weaker leg — TVD 3.21 pp, materially worse than share's 1.93.** `Balikbayan/VFR`
+   revenue share fell **29.35% → 26.64%** while its *headcount* share barely moved (−0.19 pp). Revenue is
+   what the commercial team acts on, so **a segment holding its size is not evidence its value held**.
+   Quote both or neither.
+3. **The populations are *mildly* distinguishable — adversarial AUC 0.61**, against a negative control at
+   **0.492/0.497** (random halves of one window) and a positive control at **0.994** (domestic vs
+   international, region withheld). So there is real population shift that the segment sizes absorbed.
+   The two control rails are what make 0.61 readable at all.
+4. **Composition is stable where the volume is.** 7 of 10 segments show negligible-or-small profile drift
+   and carry **98.2% of bookings**. All three moderate-or-larger drifters are the *smallest* segments —
+   `Mabuhay Loyalist` (0.03%, SMD 2.448), `Pilgrimage` (0.20%, 0.458), `Family` (1.57%, 0.283) — totalling
+   1.8%. **Reported as unresolved, not as behaviour change.** This only became visible because profile
+   drift uses a **per-segment stratified draw**: a uniform 30k sample gives Mabuhay ~9 rows, so the
+   segments whose stability is least known would have come back `n/a`.
+5. **A model fitted a year earlier transfers essentially for free.** GMM(full) transfer ARI **0.763**
+   against a **within-window control of 0.746** — ratio **1.02**; LCA 0.729 vs 0.761 (0.96). The control
+   is the **ceiling, not a baseline**: the same method fitted on two halves of the *earlier* window, both
+   scoring the later one, with no time involved. The shortfall below it — not the raw ARI — is what a year
+   costs, and here it is ~zero. Raw ARIs sit well below 1.0 for both, which is the continuum again: these
+   methods do not reproduce themselves exactly on *any* split, which is precisely why the ratio is the
+   readable number.
+
+**The F/G coding change did not break anything.** `is_award` **is** the Mabuhay rule and its source coding
+flipped at 2026-04-01, inside the later window. Monthly award rate runs 0.0036–0.0798% with **no step at
+the boundary**, and the highest month in the series is *pre*-change — so `clean_real.py`'s date-aware rule
+is preserving semantics. But month-to-month swing exceeds the pre/post difference on ~200 bookings a
+month, which is the direct reason Mabuhay's large SMD is reported as noise rather than drift.
+
+**Method note worth reusing:** `flown_any` and `refund_any` are **excluded from every comparison** here.
+They run ~100% for early issuance and **30.7%** for 2026Q3 — right-censoring (bookings that have not flown
+yet), not a behaviour change. Comparing them across windows would produce a large, wholly artefactual
+difference. Same forward-book boundary as the 2026-07-27 fake-cliff finding.
+**Source:** our analysis — `outputs/validate_temporal/summary.md`, `src/validate_temporal.py`; plan in
+`docs/recommendations-plan.md` §Plan B item B4.
+
+---
+
 #### 2026-07-29 — Detection power: the null is now *bounded*, we are blind below ~1% prevalence, and the H0 component count is not a usable statistic
 **Domain:** Clustering / Methodology
 `src/detection_power.py` closes the largest hole in the project's story. Every prior diagnostic returned

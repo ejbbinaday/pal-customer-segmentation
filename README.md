@@ -104,6 +104,8 @@ python src/validate_construct.py  # NON-CIRCULAR: are the segments distinguishab
 python src/validate_criterion.py  # NON-CIRCULAR: do segments predict held-out outcomes? (~10 min) → outputs/validate_criterion/
 python src/detection_power.py  # could we have found a segment if one existed? (~25 min) → outputs/detection_power/
 python src/detection_power.py --quick    # same, ~1 min, coarse grid, directional only
+python src/validate_temporal.py  # out-of-time stability: do the segments hold a year later? (~5 min) → outputs/validate_temporal/
+python src/validate_temporal.py --quick  # same, ~1 min, directional only
 python src/build_pbip.py      # Power BI project reproducing the revenue/PAX mock-up → outputs/pbip/
 python src/sub_segment.py     # LCA sub-types within large rule segments → outputs/sub_segments/
 python src/export_powerbi.py  # Power BI fact table (coupon + agg grain, ~2 min) → outputs/powerbi_export/
@@ -173,6 +175,21 @@ groups at 0.555 distinctness were missed elsewhere — and the **H0 significant-
 detector** (1 → 120 across 100 draws of *unchanged* data; median 1, so the continuum reading holds as the
 centre of a noisy distribution). `--report-only` rebuilds the summary from saved CSVs without refitting. See
 `outputs/detection_power/summary.md`.
+`validate_temporal.py` asks whether the segments are still there a year later — everything before it read a
+single pooled snapshot. **Read its §0 before doing any temporal analysis on this extract:** the data is
+filtered on **departure** date (2024-05-01 → 2027-05-31), *not* issuance, so issuance is truncated at both
+ends and naive calendar-year windows report a **fake collapse in lead time** that is pure selection
+(excluded early region: mean lead 105 days vs 38 inside the windows). The windows used are two adjacent
+12-month issuance spans, 2024-05→2025-04 vs 2025-05→2026-04. Measures share and revenue-mix TVD on the
+**full population**, per-segment profile drift on a **stratified** draw (a uniform sample gives
+`Mabuhay Loyalist` ~9 rows), an **adversarial drift AUC** with negative *and* positive control rails, and
+**model transfer** against a within-window ceiling. `flown_any`/`refund_any` are excluded as right-censored,
+with the censoring curve published so the exclusion is visible.
+**Verdict:** shares hold (TVD **1.93 pp**), a model fitted a year earlier transfers for free (GMM(full)
+**0.763** vs a 0.746 ceiling), composition is stable across the **98.2%** of bookings that carry the volume
+— but **revenue mix is the weaker leg** (TVD 3.21 pp; `Balikbayan/VFR` 29.35%→26.64% of revenue on a flat
+headcount share) and the populations are mildly distinguishable (AUC 0.61 vs 0.49/0.99 controls). See
+`outputs/validate_temporal/summary.md`.
 `build_pbip.py` generates a **Power BI project** (`outputs/pbip/`) reproducing the "Passenger Revenue & PAX
 Performance" mock-up: `model.bim` (TMSL — 6 tables, 15 measures, data embedded as inline-CSV Power Query so
 the file is self-contained) + `report.json` (60 visual containers) + a PAL theme + CSV fallbacks.

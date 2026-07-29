@@ -1,9 +1,23 @@
 # PAL Customer Segmentation — ML Pipeline Methodology
 
 **Client:** Philippine Airlines (PAL)
-**Version:** v1.2 — 29 July 2026
+**Version:** v1.3 — 29 July 2026
 
 > **Changelog**
+> - **v1.3 (29 Jul 2026):** **Out-of-time stability tested.** Added
+>   [Stage V4 — out-of-time stability](#stage-v4--out-of-time-stability-srcvalidate_temporalpy)
+>   (`src/validate_temporal.py`): two adjacent 12-month issuance windows, and every stability question
+>   re-asked across the step. **Records a data-structure fact that governs all future temporal work — the
+>   extract is filtered on *departure* date (2024-05-01 → 2027-05-31), not issuance**, so issuance is
+>   left-truncated (pre-window bookings survive only if their lead time was long) and right-truncated (the
+>   observable-lead ceiling falls below the 365-day clip after ~2026-06). Naive "2024–25 vs 2026–27"
+>   windows would have shown a fake lead-time collapse; issuance never reaches 2027 at all. **Results:**
+>   segment shares hold (TVD 1.93 pp on full-population counts), revenue mix is the weaker leg
+>   (3.21 pp — `Balikbayan/VFR` 29.35%→26.64% of revenue on a flat headcount share), populations are
+>   *mildly* distinguishable (adversarial AUC 0.61 against controls at 0.49 and 0.99), composition is
+>   stable across the 98.2% of bookings that carry the volume, and **a model fitted a year earlier
+>   transfers for free** (GMM(full) 0.763 vs a within-window ceiling of 0.746). `flown_any`/`refund_any`
+>   are excluded throughout as right-censored. Full detail: `outputs/validate_temporal/summary.md`.
 > - **v1.2 (29 Jul 2026):** **The null result is now falsifiable.** Added
 >   [Stage V3 — detection power](#stage-v3--detection-power-srcdetection_powerpy)
 >   (`src/detection_power.py`): synthetic segments of known prevalence and distinctness are *appended* to the
@@ -130,6 +144,21 @@ gz → typed Parquet → Stage C clean+flag (coupon grain)
   continuum reading holds, but as the centre of a noisy distribution, not a measurement). Failure mode is
   **smearing**: at `w=1` recall is 1.00 for every method while precision lags (SVD+KMeans 0.39), so a faint
   group is found and then absorbed into a larger cluster. Full detail: `outputs/detection_power/summary.md`.
+- **Out-of-time stability (2026-07-29) — the segmentation is not a one-period artefact.**
+  `src/validate_temporal.py` splits the extract into two adjacent 12-month **issuance** windows
+  (2024-05→2025-04 vs 2025-05→2026-04; 9.77M vs 10.08M bookings) and re-asks every stability question.
+  **Segment shares hold** — TVD **1.93 pp** on full-population counts, largest single move
+  `Budget/Adventure` −1.49 pp. **A model fitted a year earlier transfers for free** — GMM(full) transfer ARI
+  **0.763** against a within-window *ceiling* of 0.746 (ratio 1.02). **Composition is stable where the
+  volume is**: 7 of 10 segments show negligible-or-small drift and carry **98.2%** of bookings; the three
+  moderate-or-larger drifters are the three smallest segments (1.8% combined) and are reported as
+  **unresolved, not as behaviour change**. Two cautions: **revenue mix is the weaker leg** (TVD 3.21 pp —
+  `Balikbayan/VFR` fell 29.35%→26.64% of revenue on a flat headcount share, so *a segment holding its size
+  is not evidence its value held*), and the populations are **mildly distinguishable** (adversarial AUC 0.61
+  against controls at 0.49 / 0.99), i.e. real shift that the segment sizes absorbed. **Critical data fact
+  recorded here: the extract is filtered on *departure* date, not issuance**, so naive calendar-year windows
+  would report a fake lead-time collapse — see Stage V4 before any future temporal analysis. Full detail:
+  `outputs/validate_temporal/summary.md`.
 - **Model:** the 10 named segments (Corporate, Mabuhay Loyalist, OFW/Migrant, Balikbayan/VFR, Pilgrimage,
   Family, Premium Bleisure, Budget/Adventure, Last-Minute, Digital Nomad) + an Unassigned bucket.
   Value = authoritative **farebrand tier** (V1 dictionary). Validation stays **proxy-referenced (circular)**
@@ -294,6 +323,53 @@ exist and we would not have found it"* belongs beside the continuum finding, not
 `planted_sil` is **not** the stress test's 0.381 ceiling: it is measured on a stratified sample and describes
 one group against the rest, where 0.381 is a full-partition silhouette on a uniform sample. Related
 quantities, not interchangeable.
+
+### Stage V4 — out-of-time stability (`src/validate_temporal.py`)
+
+Stages V1–V3 all read a single pooled snapshot. This one splits it in time, because a segment that exists
+only because of one period's booking conditions would pass every earlier test and still be worthless to act
+on.
+
+**The extract's shape dictates the design, and this is the part to get right.** The data is filtered on
+**departure date (2024-05-01 → 2027-05-31), not issuance**, which truncates the issuance axis at both ends:
+a booking issued before the travel window opens appears only if its lead time was long enough to reach it
+(mean lead **105 days** in the excluded early region vs **38** inside the windows), and for issue date `d`
+the longest observable lead is `2027-05-31 − d`, a ceiling that drops below the modelled 365-day clip after
+~2026-06. The windows are therefore **2024-05-01 → 2025-04-30** and **2025-05-01 → 2026-04-30** — adjacent,
+12 months each so seasonality cannot masquerade as drift, and both strictly inside the complete region. A
+naive "2024–25 vs 2026–27" split would have reported a spectacular collapse in lead time that is **pure
+selection**; issuance never reaches 2027 at all.
+
+Five measurements, each against controls: **share stability** and **revenue-mix stability** (total-variation
+distance, on the **full population** rather than a sample); **profile drift** (per-segment, per-feature
+standardised mean difference — a segment can hold its share while its members change underneath, which is
+the more dangerous failure because a size report shows nothing); **adversarial drift** (held-out AUC at
+telling which window a booking came from using only the 11 features — one number for "has the population
+changed?"); and **model transfer** (fit on the earlier window, score the later one, against a model fitted
+on the later window directly — what production actually does).
+
+Three design points that carry the stage:
+
+- **Profile drift is stratified, and must be.** A uniform 30k draw gives `Mabuhay Loyalist` (0.03% of
+  bookings) ~9 rows, so exactly the segments whose stability is least known would return `n/a`. A
+  per-segment floor tests all ten. Those rows are **not** a population sample and are used only for
+  within-segment before/after comparison — shares come from the full population.
+- **Drift is read weighted by volume.** "Three segments drifted" hides whether they carry 2% or 60% of
+  bookings, and the answer changes the conclusion entirely.
+- **The transfer control is a ceiling, not a baseline.** It fits the same method on two random halves of the
+  *earlier* window, both scoring the later one — the method disagreeing with itself, no time involved.
+  Transfer cannot meaningfully exceed it, so the **shortfall below it** is what a year costs, not the raw
+  ARI. Raw ARIs sit well under 1.0 for every method here, which is the continuum again.
+
+**Outcome fields are excluded throughout.** `flown_any` runs ~100% for early issuance and **30.7%** for
+2026Q3 — right-censoring, not a collapse in travel. Comparing it across windows would produce a large,
+wholly artefactual difference. The censoring curve is published instead, so the exclusion is visible rather
+than silent. Same forward-book boundary that makes unfiltered trend visuals draw a false cliff.
+
+What the stage does **not** establish: it tests **one** 12-month step inside a single extract. Stability
+across 2024–26 is not evidence of stability through a demand shock, a network change or a fare-structure
+revision — the mechanism that would break it is not in this data. Issuance after 2026-04-30 is untested
+here, so a refresh should re-run it once that travel completes.
 
 ### What this stage cannot do
 
@@ -824,4 +900,4 @@ These rules are not implemented in the current pipeline because the required fie
 ---
 
 *Document prepared for Philippine Airlines internal use.*
-*v1.2 — 29 July 2026 (detection power: the null is now bounded — a planted segment is recovered by a majority of the panel at ≥2% of bookings with distinctness ≈0.34, and the pipeline is effectively blind below ~1% prevalence at any distinctness; H0 significant-component count found unusable as a detector — 1→120 across draws of unchanged data)*
+*v1.3 — 29 July 2026 (out-of-time stability: segment shares hold across a 12-month issuance step (TVD 1.93 pp, full population) and a model fitted a year earlier transfers for free (ratio 1.02 vs a within-window ceiling); revenue mix is the weaker leg (TVD 3.21 pp); the extract is departure-filtered, so calendar-year windows are invalid — plus v1.2 detection power: the null is bounded at ≥2% prevalence and we are blind below ~1%)*
