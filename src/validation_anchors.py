@@ -74,8 +74,8 @@ TRIP_MECHANICAL = frozenset({"rev_pos", "n_coupons", "connecting", "n_directions
 
 # ── tier 3: admissible anchors, with the reason each one is independent ──────────
 ANCHORS: dict[str, str] = {
-    "age": "passenger demographics — never referenced by any rule",
-    "age_known": "whether age was captured; its own signal, and makes MNAR visible in importances",
+    "age": "passenger demographics — no rule reads it, but its *missingness* tracks is_international",
+    "age_known": "age capture — NOT independent: 0.86% domestic vs 87.62% intl, i.e. is_international",
     "issue_country": "country *identity* — the rules use only the foreign/domestic bit",
     "channel": "channel *identity* — the rules use only corp_channel and sea_crew",
     "dep_month": "departure timing — the rules use no month at all",
@@ -87,7 +87,7 @@ CATEGORICAL = ("issue_country", "channel", "dep_month", "dest_region")
 NUMERIC = ("age", "age_known", "n_bookings")
 
 # ── the subtle leak: *semantic* overlap that a name-based guard cannot see ────────
-# Three anchors are finer-grained versions of fields the rules DO use, so coarsening them recovers a
+# Some anchors are finer-grained versions of fields the rules DO use, so coarsening them recovers a
 # rule bit exactly. `dest_region == 'Domestic'` **is** `is_domestic`; `issue_country != 'PH'` **is**
 # `foreign_issue`; `channel IN ('TMC','Corporate Web Portal')` **is** `corp_channel`. Handing these to
 # a classifier comparing two segments that the rules split on that very bit yields AUC ≈ 1.0 and
@@ -98,17 +98,51 @@ NUMERIC = ("age", "age_known", "n_bookings")
 #               comparable across all pairs.
 #   • the rest — usable only when the rule bit they encode is (near-)constant across both groups
 #               being compared, i.e. it is not what separates them.
-TIER_A = ("age", "age_known", "dep_month", "n_bookings")
+#
+# ── 2026-07-30 correction: `age_known` (and therefore `age`) leaks `is_international` ──
+# `age_known` was in TIER_A, i.e. asserted independent of every rule field. Measured on the full
+# non-sea-crew population it is very nearly a *copy* of `is_international`, which IS a rule field
+# (it gates the OFW/Migrant, Balikbayan/VFR and Premium Bleisure branches):
+#
+#       domestic       12,830,158 bookings →  0.86% age_known
+#       international   8,969,039 bookings → 87.62% age_known
+#
+# Mechanism: international travel captures passport data, domestic travel does not — so age capture
+# is a near-deterministic function of a rule bit. `age` inherits it, because a tree model reads
+# "value present vs NaN" directly and that pattern *is* `is_international`.
+#
+# Consequence: both leave TIER_A and join ANCHOR_LEAKS, so `admissible_for_groups` withholds them
+# from any comparison whose two sides differ on international-vs-domestic. Pairs that do NOT differ
+# on that bit keep them — e.g. OFW/Migrant vs Balikbayan/VFR sit at 87.05% vs 87.10% age_known, a gap
+# of 0.05pp, so the headline OFW question is unaffected and still uses both.
+#
+# This leaves only two *unconditionally* admissible anchors, which is the honest post-audit position
+# rather than a loss of capability: the strict matrix is thin, and the per-pair adaptive matrix is
+# where the power now lives. Reports must say which they are quoting.
+#
+# A less conservative alternative was considered and rejected: restrict to `age_known == 1` rows so
+# missingness no longer varies, then use `age` normally. On domestic-vs-international pairs that
+# retains 0.86% of the domestic side — too few rows to fit, so dropping is both simpler and safer.
+TIER_A = ("dep_month", "n_bookings")
 
 ANCHOR_LEAKS: dict[str, tuple[str, ...]] = {
     "channel": ("corp_channel",),
-    "dest_region": ("is_domestic", "is_international"),
+    # `pilgrimage` fires on trip_dest IN ('JED','MED') — both Middle East — so the region *is* a
+    # coarsening of the field that rule reads: 76.4% of Pilgrimage bookings are Middle East against
+    # 3.7% elsewhere. Found 2026-07-30, same bug class as the age_known leak below.
+    "dest_region": ("is_domestic", "is_international", "pilgrimage"),
     "issue_country": ("foreign_issue",),
+    # see the 2026-07-30 correction above — age capture is a proxy for international travel
+    "age_known": ("is_international",),
+    "age": ("is_international",),
 }
 
 # Loaded as *metadata* so leak checks can be measured. Never passed to a model — they are in
 # RULE_FIELDS, so `assert_admissible` rejects them if anyone tries.
-AUDIT_BITS = ("corp_channel", "is_domestic", "is_international", "foreign_issue")
+#
+# Every bit named anywhere in ANCHOR_LEAKS must appear here, or `admissible_for_groups` silently skips
+# the check for it (missing column → `continue`) and the leak ships. `src/audit_leaks.py` asserts this.
+AUDIT_BITS = ("corp_channel", "is_domestic", "is_international", "foreign_issue", "pilgrimage")
 
 LEAK_TOLERANCE = 0.20  # max allowed gap in a rule bit's rate between two groups
 
@@ -174,6 +208,9 @@ def load_anchors(
         quoted = ", ".join("'" + s.replace("'", "") + "'" for s in segments)
         seg_filter = f" AND proxy_segment IN ({quoted})"
     extra_cols = "".join(f", {c}" for c in extra)
+    # generated from AUDIT_BITS rather than hardcoded, so adding a bit to the contract cannot leave
+    # `admissible_for_groups` checking a column that was never loaded
+    audit_cols = ", ".join(f"{b}::INT AS {b}" for b in AUDIT_BITS)
     con = _connect()
     df = con.execute(f"""
         WITH b AS (
@@ -183,9 +220,7 @@ def load_anchors(
                    coalesce(channel, 'Unknown')       AS channel,
                    dep_month::VARCHAR                 AS dep_month,
                    coalesce(dest_region, 'Domestic')  AS dest_region,
-                   corp_channel::INT AS corp_channel, is_domestic::INT AS is_domestic,
-                   is_international::INT AS is_international,
-                   foreign_issue::INT AS foreign_issue
+                   {audit_cols}
                    {extra_cols}
             FROM read_parquet('{BOOKING}')
             WHERE {where}{seg_filter}

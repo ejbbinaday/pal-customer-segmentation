@@ -25,6 +25,20 @@ base, separated by a single bit (`round_trip`).** It gets a dedicated section on
 population where that bit is the only difference, plus two robustness checks (matched within-country,
 and base-rate-normalised seasonality). Also profiles the 2.19M `Unassigned` on the same anchors.
 
+**Re-run 2026-07-30 after the `age_known` correction.** `age_known` was in Tier A — asserted
+independent of every rule field — but it is very nearly a copy of `is_international`, which *is* a
+rule field: 0.86% of domestic bookings capture age against 87.62% of international ones, because
+international travel collects passport data. `age` inherits the leak through its missingness pattern,
+since a tree model reads present-vs-NaN directly. Both now sit in `ANCHOR_LEAKS`, so the per-pair
+guard withholds them wherever international-vs-domestic is the boundary under test.
+
+That correction is large: the strict `Premium Bleisure vs Budget/Adventure` positive control falls
+from **0.948 to 0.553**. Two consequences are baked into the report rather than left to the reader —
+positive controls are now reported on *both* feature sets (one ceiling cannot calibrate both), and the
+ranked pair table is explicitly **not** a league table, because cells with different withheld-anchor
+sets are not on a common scale. Pairs inside the international world (OFW vs Balikbayan differ by
+0.05pp on `age_known`) keep the age anchors and are unaffected.
+
 Read-only on `data/interim/pal_features_*.parquet`. Writes `outputs/validate_construct/`.
 
 Run:  python src/validate_construct.py            # ~10-20 min
@@ -178,9 +192,13 @@ def controls(df: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
     """Negative (random half-splits, must be ≈0.50) and positive (expected-different) controls.
 
     Deliberately asymmetric. The **negative** control gets *all* anchors — the more features, the more
-    chance of spuriously fitting noise, so that is the stronger self-test. The **positive** controls
-    get the *strict* anchors only, so they calibrate the same scale the headline matrix is on;
-    on all anchors they would be inflated by exactly the leaks §2 describes.
+    chance of spuriously fitting noise, so that is the stronger self-test.
+
+    The **positive** controls are reported on *both* feature sets, because after the 2026-07-30
+    `age_known` correction the two matrices no longer share a ceiling. Withholding the age anchors
+    drops `Premium Bleisure vs Budget/Adventure` from 0.948 to 0.553 — so a single positive-control
+    range cannot calibrate both. Each matrix must be read against the control computed on its own
+    feature set, or a strict AUC gets judged against an adaptive ceiling and looks like a failure.
     """
     strict_cols = [c for c in cols if c in TIER_A]
     rows = []
@@ -205,17 +223,25 @@ def controls(df: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
         sub, y = pair_frame(df, a, b)
         if not len(sub):
             continue
-        r = fit_pair(sub, y, strict_cols)
+        ma, mb = sub["proxy_segment"] == a, sub["proxy_segment"] == b
+        usable, dropped = admissible_for_groups(sub, ma, mb, cols)
+        strict = fit_pair(sub, y, strict_cols)
+        adaptive = fit_pair(sub, y, usable) if set(usable) != set(strict_cols) else strict
         rows.append(
             {
-                "control": "positive (expected different, strict anchors)",
+                "control": "positive (expected different)",
                 "pair": f"{a} vs {b}",
-                "n": r["n"],
-                "auc": r["auc"],
-                "expected": "well above 0.60",
+                "n": strict["n"],
+                "auc": strict["auc"],
+                "auc_adaptive": adaptive["auc"],
+                "anchors_withheld": "; ".join(dropped) or "none",
+                "expected": "above the negative control, on its own feature set",
             }
         )
-        print(f"  positive  {a[:12]} vs {b[:12]:14s} AUC={r['auc']} (strict)")
+        print(
+            f"  positive  {a[:12]} vs {b[:12]:14s} strict={strict['auc']} "
+            f"adaptive={adaptive['auc']}  withheld: {'; '.join(dropped) or 'none'}"
+        )
     return pd.DataFrame(rows)
 
 
@@ -300,7 +326,11 @@ def write_report(mat, pairs, ctl, head, matched, season, unass, pops, cols, cfg)
     OUT.mkdir(parents=True, exist_ok=True)
     neg = ctl[ctl["control"].str.startswith("negative")]["auc"]
     neg_ok = bool(len(neg)) and neg.between(0.45, 0.55).all()
-    pos = ctl[ctl["control"].str.startswith("positive")]["auc"]
+    pos_rows = ctl[ctl["control"].str.startswith("positive")]
+    pos = pos_rows["auc"]
+    pos_ad = (
+        pos_rows["auc_adaptive"].dropna() if "auc_adaptive" in pos_rows else pd.Series(dtype=float)
+    )
     q_auc = head["auc"]
 
     anchor_tbl = pd.DataFrame(
@@ -325,8 +355,21 @@ def write_report(mat, pairs, ctl, head, matched, season, unass, pops, cols, cfg)
         f"\n**Negative control {'PASSED' if neg_ok else 'FAILED'}** "
         f"(range {neg.min():.3f}–{neg.max():.3f}, expected 0.45–0.55). "
         + (
-            f"Positive controls land at {pos.min():.3f}–{pos.max():.3f}, so the scale is calibrated: "
-            "the gap between those two rows is the range in which a real difference shows up.\n"
+            f"Positive controls land at **{pos.min():.3f}–{pos.max():.3f} on strict anchors** and "
+            + (
+                f"**{pos_ad.min():.3f}–{pos_ad.max():.3f} on per-pair adaptive anchors**"
+                if len(pos_ad)
+                else "n/a on adaptive anchors"
+            )
+            + ". Read each matrix against the control computed on **its own** feature set.\n\n"
+            "**The two ceilings differ enormously, and that is the point.** Before the 2026-07-30 "
+            "`age_known` correction the strict positive controls read 0.770–0.945; almost all of that "
+            "was `age_known` standing in for `is_international`, a rule field (see §1). With the age "
+            "anchors correctly withheld, a pair we are confident genuinely differs — Premium Bleisure "
+            "vs Budget/Adventure — scores barely above the negative control. **So the strict matrix "
+            "has very little power left**, and a low strict AUC now means *"
+            "we withheld the evidence that would have separated them*, not *these segments are the "
+            "same*. The adaptive matrix is the one to interpret.\n"
             if neg_ok
             else "**Do not interpret anything below** — fix the leak first.\n"
         ),
@@ -344,16 +387,29 @@ def write_report(mat, pairs, ctl, head, matched, season, unass, pops, cols, cfg)
         "### Populations analysed\n",
         pops.to_markdown(index=False),
         "\n## 2. Segment-distinguishability matrix (held-out AUC, strict anchors)\n",
-        "**<0.60 not distinguishable · 0.60–0.75 weakly · >0.75 clearly distinct.**\n",
-        "The matrix uses **strict (Tier-A) anchors only** — `age`, `age_known`, `dep_month`, "
-        "`n_bookings` — so every cell is directly comparable. The other three anchors are *finer "
-        "versions of fields the rules do use*: `dest_region == 'Domestic'` **is** `is_domestic`, "
-        "`issue_country != 'PH'` **is** `foreign_issue`, `channel IN ('TMC','Corporate Web Portal')` "
-        "**is** `corp_channel`. Admitting those for a pair the rules split on that very bit returns "
-        "AUC ≈ 1.0 and proves only that the rule was applied consistently — a name-based guard cannot "
-        "catch that, so admissibility is decided **per pair**: an anchor is allowed only where the "
-        "rule bit it encodes is *not* the boundary under test. `auc_adaptive` is that "
-        "maximum-power version and `anchors_withheld` records what it dropped and why.\n",
+        "**Do not read the bands below against the strict matrix — read §0 first.** The strict "
+        "matrix now uses only **`dep_month` and `n_bookings`**, the two anchors that are "
+        "unconditionally independent of every rule field, and on those two a known-different pair "
+        "scores ~0.55. It is retained because all cells share one feature set and are therefore "
+        "*mutually* comparable, but its absolute level is not interpretable as similarity.\n",
+        "**<0.60 not distinguishable · 0.60–0.75 weakly · >0.75 clearly distinct** — these bands were "
+        "calibrated against the pre-correction ceiling and apply to **`auc_adaptive`**, not to the "
+        "strict column.\n",
+        "Five of the seven anchors are *finer versions of fields the rules do use*: "
+        "`dest_region == 'Domestic'` **is** `is_domestic`, `issue_country != 'PH'` **is** "
+        "`foreign_issue`, `channel IN ('TMC','Corporate Web Portal')` **is** `corp_channel`, and — "
+        "found 2026-07-30 — **`age_known` is `is_international`** (0.86% of domestic bookings capture "
+        "age vs 87.62% of international ones), which `age` inherits through its missingness pattern. "
+        "Admitting any of those for a pair the rules split on that very bit returns an inflated AUC "
+        "and proves only that the rule was applied consistently — a name-based guard cannot catch it, "
+        "so admissibility is decided **per pair**: an anchor is allowed only where the rule bit it "
+        "encodes is *not* the boundary under test. `auc_adaptive` is that version and "
+        "`anchors_withheld` records what it dropped and why.\n",
+        "**Consequence for the ranking:** pairs *within* the international world keep the age anchors "
+        "(OFW vs Balikbayan differ by 0.05pp on `age_known`) while pairs spanning domestic-vs-"
+        "international lose them. Those two groups of cells are no longer on a common scale, so "
+        "**the ranked table below is not a league table of boundary quality** — a pair can rank low "
+        "because its evidence was withheld. Compare within a group of equal `anchors_withheld`.\n",
         mat.to_markdown(),
         "\n### Ranked by strict AUC, with what does the distinguishing\n",
         pairs.to_markdown(index=False),
