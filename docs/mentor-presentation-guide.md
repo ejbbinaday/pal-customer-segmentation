@@ -108,10 +108,9 @@ Three EDA facts that *forced* design decisions — present them as consequences,
 
 Present it as a hypothesis that was tested and rejected, then acted on. Three lines of evidence:
 
-1. **The original plan was HDBSCAN → 10 segments.** On the synthetic v3 data, diagnostics killed it:
-   DBCV **negative in every configuration** (−0.04 to −0.19), KMeans silhouette flat at ~0.10 with no
-   peak. No density structure to find.
-2. **Real data, mixed-type methods, same answer.** LCA on a 60k stratified booking sample: BIC falls
+1. **The original plan was HDBSCAN → 10 segments**, and the real data killed it: on 38M coupons the
+   categorical-heavy feature space is not density-separable, so there is no density structure to find.
+2. **Mixed-type methods, same answer.** LCA on a 60k stratified booking sample: BIC falls
    monotonically 3→9 (1.016M → 932k) and picks the boundary — **no elbow means no natural k**.
    Agreement with the business taxonomy is only moderate: **ARI 0.20–0.34**.
 3. **Confirmed by a second model family.** k-prototypes vs k-modes vs LCA, k = 3–12: LCA wins as the
@@ -234,7 +233,7 @@ is what matters live: the number is only useful if you can say what it *means fo
 | **k-means / k-modes / k-prototypes** | Hard-assignment clustering: means for numbers, modes for categories, **prototypes for both**. You must pick k upfront. | Run as an independent cross-check. Same verdict, second model family — that's what makes the continuum finding credible. |
 | **PCA** *(Principal Component Analysis)* | Compresses many correlated features into a few axes carrying the most variance. Used to visualize high-dimensional data in 2D. | The scatter on `clust_02_pca.png`. On v3, PC1 held only ~11% of variance = diffuse cloud, no dominant axis. |
 | **Stratified sample** | A sample that preserves the proportions of each group, so small segments don't vanish. | How we run 20k–60k samples for the compute-heavy models. The rule labeling itself uses all 22.9M. |
-| **Bootstrap** | Resample the data repeatedly to see how stable a result is. | Gave high stability on v3 — which taught us stability ≠ validity. A stable partition of a structureless cloud is still meaningless. |
+| **Bootstrap** | Resample the data repeatedly to see how stable a result is. | KMeans and k-prototypes scored highest on stability with nearly the *least* separation — so **stability ≠ validity**. A stable partition of a structureless cloud is still meaningless. |
 
 ### Our pipeline vocabulary
 
@@ -271,7 +270,6 @@ save the rest for Q&A. Stacked analogies start to sound like you're avoiding the
 | Revenue asymmetry | One tasting-menu table = twenty walk-ins |
 | Sub-type cap of 4 | Zooming a map: stop at streets, not floorboards |
 | Booking grain, not customer | People wear hats — label the journey, not the driver |
-| Why the v3 synthetic stage mattered | Test-driving on an empty parking lot: proves the car runs, tells you nothing about traffic |
 
 ---
 
@@ -287,9 +285,6 @@ save the rest for Q&A. Stacked analogies start to sound like you're avoiding the
 **Don't:**
 - Don't call the 53–100% proxy recall "model accuracy." It isn't, and it's the one claim that can
   unravel the whole session.
-- Don't present the v3 synthetic work as a failure. Framing: it validated the plumbing and told us to
-  demand real data — which we got. ("Test-driving in an empty parking lot proves the car runs; it tells
-  you nothing about traffic. So we went and got traffic.")
 - Don't stack analogies. Three in the talk, max — the rainbow at beat 4, jeans at beat 3, restaurant at
   beat 5. Past that, they read as a substitute for evidence instead of a way into it.
 - Don't defend HDBSCAN. You dropped it with evidence; that's a strength, so say so plainly and move on.
@@ -300,7 +295,7 @@ $1,504-vs-$74 spread, and the SME ask. Skip pipeline and EDA entirely.
 
 ---
 
-*Sources: `docs/status-report.pdf`, `docs/methodology.md` (§at-a-glance, v0.8), `docs/v3-prototype-findings.md`,
+*Sources: `docs/status-report.pdf`, `docs/methodology.md` (§at-a-glance),
 `docs/knowledge-base.md` §15 (2026-07-23, 2026-07-27), `outputs/{features_real,cluster_diagnostic,kproto_compare,sub_segments}/summary.md`.*
 
-*Last updated: 28 July 2026*
+*Last updated: 31 July 2026*

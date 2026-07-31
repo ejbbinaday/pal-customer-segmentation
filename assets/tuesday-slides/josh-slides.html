@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PAL Segmentation — Tuesday Deck (Josh's items)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@200;400;700;800;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+  :root{
+    --midnight:#060A16; --gold:#C9A84C; --gold-lt:#E8C96C; --gold-dim:rgba(201,168,76,.18);
+    --blue:#00D4FF; --white:#FFF; --off-wh:#E8ECF4; --g3:#CBD5E1; --g5:#5A6A82;
+    --green:#4ADE80; --red:#FF4D6D; --violet:#A78BFA; --amber:#F59E0B;
+    --surface:rgba(255,255,255,.04); --line:rgba(255,255,255,.09);
+    --mono:'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace;
+  }
+
+  html,body{background:#03060F;font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    color:var(--white);-webkit-font-smoothing:antialiased}
+
+  .deck{display:flex;flex-direction:column;align-items:center;gap:26px;padding:26px 0 60px}
+  .slide{width:1600px;height:900px;position:relative;overflow:hidden;background:var(--midnight);
+    flex-shrink:0;border-radius:6px;box-shadow:0 24px 70px rgba(0,0,0,.6)}
+
+  .t-bar{position:absolute;top:0;left:0;right:0;height:3px;z-index:10;
+    background:linear-gradient(90deg,transparent 0%,var(--gold) 30%,var(--blue) 70%,transparent 100%)}
+  .b-bar{position:absolute;bottom:0;left:0;right:0;height:3px;z-index:10;
+    background:linear-gradient(90deg,var(--gold) 0%,var(--blue) 50%,var(--gold) 100%)}
+  .grid-bg{position:absolute;inset:0;pointer-events:none;
+    background-image:linear-gradient(rgba(255,255,255,.022) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(255,255,255,.022) 1px,transparent 1px);background-size:80px 80px}
+  .gb{position:absolute;border-radius:50%;filter:blur(110px);pointer-events:none}
+
+  .sh{position:absolute;top:34px;left:72px;right:72px;display:flex;justify-content:space-between;align-items:center;z-index:5}
+  .sh .brand{font-family:'Montserrat',sans-serif;font-weight:800;font-size:11px;letter-spacing:.22em;
+    text-transform:uppercase;color:var(--gold);display:flex;align-items:center;gap:12px}
+  .sh .brand::before{content:'';display:block;width:24px;height:2px;background:var(--gold)}
+  .sh .tag{font-size:11px;color:var(--g5);letter-spacing:.14em;text-transform:uppercase}
+  .owner{display:inline-block;margin-left:10px;padding:3px 9px;border-radius:100px;font-size:9px;
+    font-weight:800;letter-spacing:.12em;background:rgba(0,212,255,.12);border:1px solid rgba(0,212,255,.35);color:var(--blue)}
+
+  .body{position:absolute;top:100px;left:72px;right:72px;bottom:64px;display:flex;flex-direction:column}
+  .sec-lbl{font-family:'Montserrat',sans-serif;font-weight:700;font-size:11px;letter-spacing:.26em;
+    text-transform:uppercase;color:var(--gold);margin-bottom:8px}
+  h1{font-family:'Montserrat',sans-serif;font-weight:800;font-size:33px;line-height:1.1;margin-bottom:5px}
+  .sub{font-size:13.5px;color:var(--g5);line-height:1.5}
+  .hr-g{width:100%;height:1px;background:linear-gradient(90deg,transparent,var(--gold-dim),transparent);margin:15px 0}
+  em{color:var(--off-wh);font-style:italic}
+  strong{color:var(--white);font-weight:700}
+  .num{font-family:'Montserrat',sans-serif;font-weight:900;font-variant-numeric:tabular-nums}
+  code{font-family:var(--mono);font-size:.92em}
+
+  /* cards */
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:20px 22px;position:relative;overflow:hidden}
+  .card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--ac,var(--gold))}
+  .c-ttl{font-family:'Montserrat',sans-serif;font-size:14px;font-weight:800;margin-bottom:9px;color:var(--white)}
+  .c-txt{font-size:11.6px;color:var(--g3);line-height:1.68}
+  .pill{display:inline-block;padding:4px 11px;border-radius:100px;font-family:'Montserrat',sans-serif;
+    font-size:9px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;
+    background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.11);color:var(--ac,var(--gold))}
+  .ghost{position:absolute;bottom:-16px;right:12px;font-family:'Montserrat',sans-serif;font-weight:900;
+    font-size:96px;color:rgba(255,255,255,.035);line-height:1;user-select:none}
+
+  .foot{position:absolute;bottom:26px;left:72px;right:72px;display:flex;justify-content:space-between;
+    align-items:center;font-size:10.5px;color:var(--g5)}
+  .foot .src{font-family:var(--mono);font-size:10px}
+
+  /* ══ S1 methodology ══ */
+  .flip{display:grid;grid-template-columns:1fr 74px 1fr;gap:0;align-items:stretch;margin-bottom:16px}
+  .flip-side{border-radius:14px;padding:20px 24px;border:1px solid var(--line);background:var(--surface);position:relative;overflow:hidden}
+  .flip-side.was{border-color:rgba(255,77,109,.28);background:rgba(255,77,109,.05)}
+  .flip-side.now{border-color:rgba(74,222,128,.3);background:rgba(74,222,128,.055)}
+  .flip-hd{font-family:'Montserrat',sans-serif;font-size:10px;font-weight:800;letter-spacing:.18em;
+    text-transform:uppercase;margin-bottom:11px;display:flex;align-items:center;gap:8px}
+  .flip-side.was .flip-hd{color:var(--red)} .flip-side.now .flip-hd{color:var(--green)}
+  .flip-big{font-family:'Montserrat',sans-serif;font-size:19px;font-weight:800;line-height:1.28;margin-bottom:9px}
+  .flip-txt{font-size:11.4px;color:var(--g3);line-height:1.66}
+  .flip-arrow{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px}
+  .flip-arrow .a-glyph{font-size:26px;color:var(--gold)}
+  .flip-arrow .a-lbl{font-family:'Montserrat',sans-serif;font-size:8.5px;font-weight:800;letter-spacing:.14em;
+    color:var(--gold);writing-mode:vertical-rl;text-transform:uppercase}
+
+  .pipe{display:flex;align-items:stretch;gap:0;margin-top:4px}
+  .pstep{flex:1;border-radius:12px;padding:15px 15px 13px;background:var(--surface);
+    border:1px solid var(--line);position:relative;overflow:hidden}
+  .pstep::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--ac,var(--gold))}
+  .pstep.hero{border-color:rgba(201,168,76,.45);background:rgba(201,168,76,.08)}
+  .p-n{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    font-family:'Montserrat',sans-serif;font-weight:900;font-size:12px;margin-bottom:10px;
+    background:rgba(255,255,255,.07);border:1.5px solid var(--ac,var(--gold));color:var(--ac,var(--gold))}
+  .p-t{font-family:'Montserrat',sans-serif;font-size:12.5px;font-weight:800;margin-bottom:7px}
+  .p-d{font-size:10.6px;color:var(--g3);line-height:1.6}
+  .p-arr{display:flex;align-items:center;justify-content:center;width:28px;color:var(--g5);font-size:15px;flex-shrink:0}
+  .analogy{margin-top:14px;border-radius:12px;padding:14px 20px;border:1px dashed rgba(201,168,76,.35);
+    background:rgba(201,168,76,.045);font-size:12.4px;color:var(--off-wh);line-height:1.66}
+
+  /* ══ S2 waterfall ══ */
+  .wf{display:flex;flex-direction:column;gap:5px;margin-top:2px}
+  .wf-row{display:grid;grid-template-columns:34px 1fr 210px 1fr;align-items:center;gap:14px;
+    background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--sc,var(--gold));
+    border-radius:9px;padding:8px 15px}
+  .wf-row.gap{border-left-color:var(--g5);background:rgba(255,255,255,.02);border-style:dashed}
+  .wf-n{font-family:'Montserrat',sans-serif;font-weight:900;font-size:14px;color:var(--sc,var(--gold));text-align:center}
+  .wf-cond{font-size:11.7px;color:var(--off-wh);line-height:1.42}
+  .wf-seg{font-family:'Montserrat',sans-serif;font-size:12.4px;font-weight:800;display:flex;align-items:center;gap:9px}
+  .wf-dot{width:9px;height:9px;border-radius:50%;background:var(--sc);flex-shrink:0}
+  .wf-why{font-size:10.6px;color:var(--g5);line-height:1.42}
+  .wf-share{font-family:'Montserrat',sans-serif;font-size:10.5px;font-weight:800;color:var(--g3);
+    font-variant-numeric:tabular-nums}
+
+  /* ══ S3 metrics ══ */
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  .mdl{border-radius:14px;padding:19px 22px;border:1px solid var(--line);background:var(--surface);position:relative;overflow:hidden}
+  .mdl.bad{border-color:rgba(255,77,109,.3);background:rgba(255,77,109,.055)}
+  .mdl.good{border-color:rgba(74,222,128,.32);background:rgba(74,222,128,.06)}
+  .mdl-hd{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:13px}
+  .mdl-nm{font-family:'Montserrat',sans-serif;font-size:16px;font-weight:800;display:flex;align-items:center;gap:9px}
+  .mdl.bad .mdl-nm{color:var(--red)} .mdl.good .mdl-nm{color:var(--green)}
+  .mdl-acc{font-family:'Montserrat',sans-serif;font-size:12px;font-weight:800;color:var(--g3)}
+  .calc{font-family:var(--mono);font-size:11.4px;color:var(--g3);line-height:2.05}
+  .calc b{color:var(--off-wh);font-weight:600}
+  .calc .tot{color:var(--white);font-weight:700}
+  .mdl-tot{margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,.1);
+    display:flex;align-items:baseline;justify-content:space-between}
+  .mdl-tot .lbl{font-size:10.5px;color:var(--g5);letter-spacing:.06em;text-transform:uppercase}
+  .mdl-tot .val{font-family:'Montserrat',sans-serif;font-size:27px;font-weight:900;font-variant-numeric:tabular-nums}
+  .mdl.bad .val{color:var(--red)} .mdl.good .val{color:var(--green)}
+
+  /* bar chart — thin marks, rounded data-ends, direct labels */
+  .chart{margin-top:16px;border-radius:14px;border:1px solid var(--line);background:rgba(255,255,255,.025);padding:17px 22px 15px}
+  .chart-ttl{font-family:'Montserrat',sans-serif;font-size:11px;font-weight:800;letter-spacing:.13em;
+    text-transform:uppercase;color:var(--g3);margin-bottom:3px}
+  .chart-sub{font-size:10.6px;color:var(--g5);margin-bottom:15px}
+  .brow{display:grid;grid-template-columns:104px 1fr;align-items:center;gap:15px;margin-bottom:11px}
+  .brow-lbl{font-family:'Montserrat',sans-serif;font-size:11.5px;font-weight:800;display:flex;align-items:center;gap:7px}
+  .btrack{position:relative;height:26px;display:flex;align-items:center}
+  .bfill{height:15px;border-radius:0 4px 4px 0;position:relative;box-shadow:0 0 0 2px var(--midnight)}
+  .bval{position:absolute;left:calc(100% + 11px);top:50%;transform:translateY(-50%);
+    font-family:'Montserrat',sans-serif;font-size:12.5px;font-weight:900;white-space:nowrap;font-variant-numeric:tabular-nums}
+  /* axis shares the bar row's grid so ticks line up with the track, not the whole card */
+  .baxis{display:grid;grid-template-columns:104px 1fr;gap:15px;margin-top:3px}
+  .baxis .ticks{padding-top:8px;border-top:1px solid rgba(255,255,255,.07);display:flex;
+    justify-content:space-between;font-size:9.5px;color:var(--g5);font-variant-numeric:tabular-nums}
+  .chart-note{margin-top:9px;font-size:10.4px;color:var(--g5);font-style:italic}
+
+  .kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:16px}
+  .kpi{border-radius:12px;border:1px solid var(--line);background:var(--surface);padding:14px 17px}
+  .kpi-l{font-size:9.6px;letter-spacing:.13em;text-transform:uppercase;color:var(--g5);margin-bottom:7px}
+  .kpi-v{font-family:'Montserrat',sans-serif;font-size:25px;font-weight:900;line-height:1;margin-bottom:5px;font-variant-numeric:tabular-nums}
+  .kpi-d{font-size:10.4px;color:var(--g3);line-height:1.5}
+
+  .warn{margin-top:15px;border-radius:11px;padding:13px 19px;border:1px solid rgba(245,158,11,.32);
+    background:rgba(245,158,11,.07);font-size:11.8px;color:var(--off-wh);line-height:1.62}
+  .warn b{color:var(--amber)}
+
+  /* ══ S4 constraints ══ */
+  .cst{border-radius:14px;border:1px solid var(--line);background:var(--surface);padding:19px 22px;
+    position:relative;overflow:hidden;display:flex;flex-direction:column}
+  .cst::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--ac)}
+  .cst-hd{display:flex;align-items:center;gap:11px;margin-bottom:5px}
+  .cst-ttl{font-family:'Montserrat',sans-serif;font-size:17px;font-weight:800}
+  .cst-def{font-size:11.8px;color:var(--g3);line-height:1.65;margin-bottom:12px}
+  .cst-def b{color:var(--white)}
+  .file{font-family:var(--mono);font-size:11px;padding:8px 13px;border-radius:8px;
+    background:rgba(0,0,0,.42);border:1px solid rgba(255,255,255,.1);color:var(--blue);margin-bottom:12px;
+    display:flex;align-items:center;gap:9px}
+  .file .fi{color:var(--g5)}
+  pre.csv{font-family:var(--mono);font-size:9.9px;line-height:1.85;color:var(--g3);
+    background:rgba(0,0,0,.42);border:1px solid rgba(255,255,255,.1);border-radius:8px;
+    padding:12px 14px;overflow-x:auto;white-space:pre;margin-bottom:11px}
+  pre.csv .hdr{color:var(--gold);font-weight:600}
+  pre.csv .k{color:var(--off-wh)}
+  .cst-note{font-size:10.9px;color:var(--g5);line-height:1.62;margin-top:auto}
+  .cst-note b{color:var(--g3)}
+
+  /* ══ S5 persona card mock ══ */
+  .pcard{border-radius:14px;border:1px solid var(--line);background:var(--surface);padding:0;overflow:hidden;
+    display:flex;flex-direction:column}
+  .pc-top{padding:15px 18px 13px;border-bottom:1px solid var(--line);background:rgba(255,255,255,.022)}
+  .pc-seg{font-family:'Montserrat',sans-serif;font-size:14.5px;font-weight:800;display:flex;align-items:center;gap:9px;margin-bottom:4px}
+  .pc-persona{font-size:11px;color:var(--sc);font-weight:600;letter-spacing:.04em}
+  .pc-body{padding:13px 18px;display:flex;flex-direction:column;gap:9px;flex:1}
+  .pc-stats{display:grid;grid-template-columns:repeat(2,1fr);gap:8px 14px}
+  .pc-st{display:flex;justify-content:space-between;align-items:baseline;font-size:10.4px;
+    border-bottom:1px dotted rgba(255,255,255,.09);padding-bottom:4px}
+  .pc-st .sl{color:var(--g5)} .pc-st .sv{font-family:'Montserrat',sans-serif;font-weight:800;color:var(--off-wh);font-variant-numeric:tabular-nums}
+  .pc-line{font-size:10.7px;color:var(--g3);line-height:1.58}
+  .pc-line .k{font-family:'Montserrat',sans-serif;font-size:8.6px;font-weight:800;letter-spacing:.13em;
+    text-transform:uppercase;color:var(--g5);display:block;margin-bottom:3px}
+  .pc-caveat{margin-top:auto;font-size:10.2px;line-height:1.55;padding:10px 12px;border-radius:8px;
+    background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.28);color:var(--off-wh)}
+  .pc-caveat b{color:var(--amber)}
+  .pc-caveat.ok{background:rgba(74,222,128,.07);border-color:rgba(74,222,128,.26)}
+  .pc-caveat.ok b{color:var(--green)}
+  .schema{margin-top:11px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.025);padding:12px 18px}
+  .schema-t{font-family:'Montserrat',sans-serif;font-size:10.5px;font-weight:800;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--g3);margin-bottom:8px}
+  .schema-g{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
+  .schema-c .sc-h{font-size:9.6px;letter-spacing:.11em;text-transform:uppercase;margin-bottom:6px;font-weight:800}
+  .schema-c .sc-l{font-family:var(--mono);font-size:10px;color:var(--g3);line-height:1.58}
+
+  @media print{
+    html,body{background:#fff} .deck{gap:0;padding:0}
+    .slide{box-shadow:none;border-radius:0;page-break-after:always;break-after:page}
+    @page{size:1600px 900px;margin:0}
+  }
+</style>
+</head>
+<body>
+<div class="deck">
+
+<!-- ══════════ SLIDE 1 — CURRENT METHODOLOGY ══════════ -->
+<section class="slide">
+  <div class="t-bar"></div><div class="grid-bg"></div>
+  <div class="gb" style="width:620px;height:620px;background:rgba(201,168,76,.09);top:-240px;right:-180px"></div>
+  <div class="gb" style="width:520px;height:520px;background:rgba(0,212,255,.07);bottom:-230px;left:-170px"></div>
+  <div class="sh"><div class="brand">PAL Customer Segmentation</div>
+    <div class="tag">Agenda 1 · Current Methodology<span class="owner">JOSH</span></div></div>
+
+  <div class="body">
+    <div class="sec-lbl">Where the approach stands</div>
+    <h1>We stopped asking the machine to invent the segments —<br>and started asking it to check ours.</h1>
+    <div class="hr-g"></div>
+
+    <div class="flip">
+      <div class="flip-side was">
+        <div class="flip-hd">✕ What we planned</div>
+        <div class="flip-big">ML discovers the segments; we name them.</div>
+        <div class="flip-txt">Point a clustering algorithm at 22.9M bookings, let natural groups fall out,
+          attach business names. Standard playbook.<br><br>
+          <strong>It failed — and we can prove it failed for a real reason.</strong> Ten methods across six
+          families, best separation <strong>0.381</strong> where ~0.5 is the usual minimum to claim structure exists.</div>
+      </div>
+      <div class="flip-arrow"><div class="a-glyph">➜</div><div class="a-lbl">The pivot</div></div>
+      <div class="flip-side now">
+        <div class="flip-hd">✓ What we do now</div>
+        <div class="flip-big">Business rules draw the lines; ML checks them.</div>
+        <div class="flip-txt">PAL's commercial logic assigns the segment. The machine's three jobs:
+          <strong>split</strong> oversized segments, <strong>test</strong> whether the boundaries hold, and
+          <strong>monitor</strong> for drift.<br><br>
+          <strong>More defensible, not less</strong> — every boundary is written down and reviewable.</div>
+      </div>
+    </div>
+
+    <div class="pipe">
+      <div class="pstep" style="--ac:#00D4FF"><div class="p-n">1</div><div class="p-t">Assemble</div>
+        <div class="p-d">38.1M flight legs → fast columnar store</div></div>
+      <div class="p-arr">→</div>
+      <div class="pstep" style="--ac:#00D4FF"><div class="p-n">2</div><div class="p-t">Clean &amp; flag</div>
+        <div class="p-d">Fare→value ladder; flag staff, awards, groups, refunds</div></div>
+      <div class="p-arr">→</div>
+      <div class="pstep" style="--ac:#00D4FF"><div class="p-n">3</div><div class="p-t">Group up</div>
+        <div class="p-d">Legs → <strong>22.9M bookings</strong> → 13.4M customers</div></div>
+      <div class="p-arr">→</div>
+      <div class="pstep hero"><div class="p-n">4</div><div class="p-t">Label — the rules</div>
+        <div class="p-d"><strong>10 segments, priority order.</strong> Slide 2</div></div>
+      <div class="p-arr">→</div>
+      <div class="pstep" style="--ac:#A78BFA"><div class="p-n">5</div><div class="p-t">Deliver</div>
+        <div class="p-d">Star schema + persona dimension → Power BI</div></div>
+    </div>
+
+    <div class="analogy"><strong>The analogy for the room:</strong> a <em>fruit stand</em> has obvious piles —
+      you can spot the gap between apples and oranges across the room. A <em>paint store</em> runs continuously
+      from white to cream to beige, with no natural gap — yet it still needs named colours on the shelf, because
+      nobody orders "wavelength 578nm". <strong>PAL's passengers are a paint store.</strong> So we choose the
+      boundaries deliberately, for commercial usefulness, instead of pretending we discovered piles.</div>
+
+    <div style="margin-top:18px">
+      <div class="chart-ttl" style="margin-bottom:11px">The evidence behind "there are no natural clumps" —
+        because <em style="color:var(--g5)">"we tried and it didn't work"</em> is a much weaker claim</div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px">
+        <div class="kpi" style="--ac:#00D4FF"><div class="kpi-l">Breadth of search</div>
+          <div class="kpi-v" style="color:var(--blue)">10</div>
+          <div class="kpi-d">methods across <strong>six families</strong> — three of which assume nothing about
+            cluster shape at all.</div></div>
+        <div class="kpi"><div class="kpi-l">Separation ceiling</div>
+          <div class="kpi-v" style="color:var(--gold)">0.381</div>
+          <div class="kpi-d">Best any method reached, on a 0–1 scale where <strong>~0.5</strong> is the usual floor
+            for claiming structure.</div></div>
+        <div class="kpi"><div class="kpi-l">Are we simply blind?</div>
+          <div class="kpi-v" style="color:var(--green)">2%</div>
+          <div class="kpi-d">We <strong>planted</strong> fake segments in the real data. Recovered reliably at ≥2%
+            of bookings — so the methods work.</div></div>
+        <div class="kpi"><div class="kpi-l">Our stated blind spot</div>
+          <div class="kpi-v" style="color:var(--amber)">&lt;1%</div>
+          <div class="kpi-d">≈229k bookings. <strong>A segment this small could exist and we would have missed
+            it</strong> — published with the finding.</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot"><div>Tested ten ways · stable across a 12-month step · a model fitted a year earlier still transfers (ARI 0.763)</div>
+    <div class="src">docs/methodology.md v1.3 · docs/stakeholder-report.md §3–5</div></div>
+  <div class="b-bar"></div>
+</section>
+
+<!-- ══════════ SLIDE 2 — THE BUSINESS RULES ══════════ -->
+<section class="slide">
+  <div class="t-bar"></div><div class="grid-bg"></div>
+  <div class="gb" style="width:560px;height:560px;background:rgba(201,168,76,.075);top:-220px;left:-160px"></div>
+  <div class="sh"><div class="brand">PAL Customer Segmentation</div>
+    <div class="tag">Agenda 1 · The rules as implemented<span class="owner">JOSH</span></div></div>
+
+  <div class="body">
+    <div class="sec-lbl">Initial business rules in the model</div>
+    <h1>A triage checklist: first match wins.</h1>
+    <div class="sub">Priority order is the design. A booking can satisfy several rules at once — the order decides
+      which one it lands in, so the most decisive signal is checked first.</div>
+    <div class="hr-g" style="margin:13px 0"></div>
+
+    <div class="wf">
+      <div class="wf-row" style="--sc:#FBBF24"><div class="wf-n">1</div>
+        <div class="wf-cond">Paid with <strong>Mabuhay Miles</strong> (award redemption)</div>
+        <div class="wf-seg"><span class="wf-dot"></span>Mabuhay Loyalist <span class="wf-share">0.03%</span></div>
+        <div class="wf-why">Redeeming miles is definitive programme engagement</div></div>
+
+      <div class="wf-row" style="--sc:#38BDF8"><div class="wf-n">2</div>
+        <div class="wf-cond"><strong>Corporate channel</strong> (TMC / portal) <em>or</em> business cabin booked ≤7 days out</div>
+        <div class="wf-seg"><span class="wf-dot"></span>Corporate <span class="wf-share">4.37%</span></div>
+        <div class="wf-why">Either the channel says "company travel", or the behaviour does</div></div>
+
+      <div class="wf-row" style="--sc:#F97316"><div class="wf-n">3</div>
+        <div class="wf-cond">Flying to <strong>Jeddah or Medina</strong></div>
+        <div class="wf-seg"><span class="wf-dot"></span>Pilgrimage <span class="wf-share">0.19%</span></div>
+        <div class="wf-why">Destination alone settles it — the cleanest rule we have</div></div>
+
+      <div class="wf-row" style="--sc:#EF4444"><div class="wf-n">4</div>
+        <div class="wf-cond">Booked through the <strong>Sea Crew</strong> channel</div>
+        <div class="wf-seg"><span class="wf-dot"></span>OFW/Migrant <span class="wf-share">(1.1M)</span></div>
+        <div class="wf-why">Maritime crew — identified by definition, needs no validating</div></div>
+
+      <div class="wf-row" style="--sc:#EF4444"><div class="wf-n">5</div>
+        <div class="wf-cond">Issued abroad · international · economy · <strong>one-way</strong></div>
+        <div class="wf-seg"><span class="wf-dot"></span>OFW/Migrant <span class="wf-share">17.11%</span></div>
+        <div class="wf-why">Bought overseas, single leg — the migrant-worker pattern</div></div>
+
+      <div class="wf-row" style="--sc:#22C55E"><div class="wf-n">6</div>
+        <div class="wf-cond">Issued abroad · international · economy · <strong>round trip</strong></div>
+        <div class="wf-seg"><span class="wf-dot"></span>Balikbayan/VFR <span class="wf-share">12.71%</span></div>
+        <div class="wf-why">Same profile but returning — a visit home, not a relocation</div></div>
+
+      <div class="wf-row" style="--sc:#C084FC"><div class="wf-n">7</div>
+        <div class="wf-cond"><strong>Premium cabin</strong> on an international route</div>
+        <div class="wf-seg"><span class="wf-dot"></span>Premium Bleisure <span class="wf-share">2.10%</span></div>
+        <div class="wf-why">Paying up on a long flight with no corporate signal</div></div>
+
+      <div class="wf-row" style="--sc:#E879F9"><div class="wf-n">8</div>
+        <div class="wf-cond"><strong>Group</strong> booking</div>
+        <div class="wf-seg"><span class="wf-dot"></span>Family <span class="wf-share">1.62%</span></div>
+        <div class="wf-why">⚠️ Means "ticketed as a group", <em>not</em> "is a family"</div></div>
+
+      <div class="wf-row" style="--sc:#94A3B8"><div class="wf-n">9</div>
+        <div class="wf-cond">Booked within <strong>3 days</strong> of departure</div>
+        <div class="wf-seg"><span class="wf-dot"></span>Last-Minute <span class="wf-share">12.86%</span></div>
+        <div class="wf-why">Urgency, whatever the underlying reason</div></div>
+
+      <div class="wf-row" style="--sc:#A3E635"><div class="wf-n">10</div>
+        <div class="wf-cond"><strong>Domestic, non-premium</strong></div>
+        <div class="wf-seg"><span class="wf-dot"></span>Budget/Adventure <span class="wf-share">39.44%</span></div>
+        <div class="wf-why">The price-sensitive domestic core — where the LCC fight is</div></div>
+
+      <div class="wf-row gap" style="--sc:#4B5563"><div class="wf-n">—</div>
+        <div class="wf-cond">None of the above → <strong>left deliberately blank</strong></div>
+        <div class="wf-seg"><span class="wf-dot"></span>Unassigned <span class="wf-share">9.58%</span></div>
+        <div class="wf-why">🚨 Mostly PH-issued outbound economy. <strong>Needs a PAL definition</strong></div></div>
+    </div>
+
+    <div class="two" style="margin-top:14px;gap:16px">
+      <div class="card" style="--ac:#F59E0B;padding:15px 19px">
+        <div class="c-ttl">Before any of this: exclusions &amp; the value ladder</div>
+        <div class="c-txt">Staff/industry/comp fares (<code>A R P</code>) and 12,306 all-non-revenue customers are
+          removed. Booking classes map to PAL's own <strong>7-tier farebrand ladder</strong> (V1 dictionary).
+          <code>F</code>/<code>G</code> <strong>swap meaning on 2026-04-01</strong> — handled explicitly; missing it
+          would have discarded ~8,100 award bookings.</div>
+      </div>
+      <div class="card" style="--ac:#FF4D6D;padding:15px 19px">
+        <div class="c-ttl">The weakest boundary — first SME question</div>
+        <div class="c-txt">Rules 5 and 6 differ by <strong>exactly one bit: round trip or not</strong>, and that bit
+          splits <strong>6.8M bookings</strong>. Their measured behaviour does diverge (Balikbayan books 48 days
+          out at 2.61 coupons; OFW 14 days at 1.34), but <strong>if PAL treats them the same commercially,
+          merging is the more honest deliverable.</strong></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot"><div>Implemented in <span class="src">src/features_real.py</span> — the prioritised CASE waterfall · shares are % of 22.9M bookings</div>
+    <div class="src">docs/stakeholder-report.md §4</div></div>
+  <div class="b-bar"></div>
+</section>
+
+<!-- ══════════ SLIDE 3 — ML SUCCESS METRICS ══════════ -->
+<section class="slide">
+  <div class="t-bar"></div><div class="grid-bg"></div>
+  <div class="gb" style="width:600px;height:600px;background:rgba(0,212,255,.075);top:-240px;right:-180px"></div>
+  <div class="sh"><div class="brand">PAL Customer Segmentation</div>
+    <div class="tag">Agenda 2 · ML success metrics + sample calc<span class="owner">JOSH</span></div></div>
+
+  <div class="body">
+    <div class="sec-lbl">What we optimise, and why not accuracy</div>
+    <h1>Two models. Identical 90% accuracy. <span style="color:var(--gold)">2.4× different</span> business impact.</h1>
+    <div class="sub">A warehouse sorts 1,000 parcels and gets 90% right. Good? It depends entirely on <em>which</em>
+      10% — swapping two boxes of identical envelopes costs nothing; putting the medical-supplies crate on the wrong
+      truck is serious. Same error rate, different consequence. <strong>Segmentation is the same, so we weight errors
+      by what they cost.</strong></div>
+    <div class="hr-g" style="margin:13px 0"></div>
+
+    <div class="two">
+      <div class="mdl bad">
+        <div class="mdl-hd"><div class="mdl-nm">✕ Model A</div><div class="mdl-acc">90% accurate · 900 / 1,000 correct</div></div>
+        <div class="calc">
+          <b>20</b> Corporate → labelled Budget &nbsp;<span style="color:var(--g5)">×</span>&nbsp; ₱40,000 &nbsp;=&nbsp; <span class="tot">₱800,000</span><br>
+          <b>80</b> Budget → labelled Last-Minute &nbsp;<span style="color:var(--g5)">×</span>&nbsp; ₱4,000 &nbsp;=&nbsp; <span class="tot">₱320,000</span>
+        </div>
+        <div class="mdl-tot"><div class="lbl">Revenue at risk</div><div class="val">₱1,120,000</div></div>
+      </div>
+      <div class="mdl good">
+        <div class="mdl-hd"><div class="mdl-nm">✓ Model B</div><div class="mdl-acc">90% accurate · 900 / 1,000 correct</div></div>
+        <div class="calc">
+          <b>&nbsp;2</b> Corporate → labelled Budget &nbsp;<span style="color:var(--g5)">×</span>&nbsp; ₱40,000 &nbsp;=&nbsp; <span class="tot">₱80,000</span><br>
+          <b>98</b> Budget → labelled Last-Minute &nbsp;<span style="color:var(--g5)">×</span>&nbsp; ₱4,000 &nbsp;=&nbsp; <span class="tot">₱392,000</span>
+        </div>
+        <div class="mdl-tot"><div class="lbl">Revenue at risk</div><div class="val">₱472,000</div></div>
+      </div>
+    </div>
+
+    <div class="chart">
+      <div class="chart-ttl">Revenue at risk per 1,000 bookings scored</div>
+      <div class="chart-sub">Test batch at true segment mix: 44 genuinely Corporate, 394 genuinely Budget/Adventure.
+        Both models place 100 errors — only the placement differs.</div>
+      <div class="brow"><div class="brow-lbl" style="color:var(--red)">✕ Model A</div>
+        <div class="btrack"><div class="bfill" style="width:70%;background:var(--red)">
+          <span class="bval" style="color:var(--red)">₱1,120,000</span></div></div></div>
+      <div class="brow" style="margin-bottom:2px"><div class="brow-lbl" style="color:var(--green)">✓ Model B</div>
+        <div class="btrack"><div class="bfill" style="width:29.5%;background:var(--green)">
+          <span class="bval" style="color:var(--green)">₱472,000</span></div></div></div>
+      <div class="baxis"><div></div>
+        <div class="ticks"><span>₱0</span><span>₱400k</span><span>₱800k</span><span>₱1.2M</span><span>₱1.6M</span></div></div>
+      <div class="chart-note">Same 90% accuracy, same 100 errors — plain accuracy cannot tell these two bars apart.</div>
+    </div>
+
+    <div class="kpis">
+      <div class="kpi"><div class="kpi-l">Metric 1 · per-segment recall</div>
+        <div class="kpi-v"><span style="color:var(--red)">54.5%</span> <span style="color:var(--g5);font-size:17px">vs</span> <span style="color:var(--green)">95.5%</span></div>
+        <div class="kpi-d">Of genuine Corporate travellers, the share we caught (24/44 vs 42/44).
+          <strong>Target ≥91%</strong> — A fails, B passes.</div></div>
+      <div class="kpi"><div class="kpi-l">Metric 2 · weighted cost / booking</div>
+        <div class="kpi-v"><span style="color:var(--red)">₱1,120</span> <span style="color:var(--g5);font-size:17px">vs</span> <span style="color:var(--green)">₱472</span></div>
+        <div class="kpi-d">Peso-weighted error rate. <strong>Minimise.</strong> This is the optimisation target, not accuracy.</div></div>
+      <div class="kpi"><div class="kpi-l">Why asymmetric</div>
+        <div class="kpi-v" style="font-size:19px;color:var(--gold);line-height:1.25">Over-serving<br>is cheap</div>
+        <div class="kpi-d">Corporate→Budget costs <strong>~₱40,000</strong> (under-served, promo fare quoted). The
+          reverse costs a courtesy upgrade. Weights: Corporate ×10 → Budget ×1.</div></div>
+    </div>
+
+    <div class="warn"><b>⚠️ The honest caveat — this is why the SME ask matters.</b> The machinery is built and tested,
+      but today "correct" means <em>"matches what our own rules said"</em> — we are grading our own homework.
+      We <em>have</em> shown the segments carry real signal (they predict refunds and 180-day rebooking, which no rule
+      looks at), so the labels are not noise. <strong>What's missing is an answer key.</strong> → next slide.</div>
+  </div>
+
+  <div class="foot"><div>Weights &amp; peso figures are <strong>PAL's own estimates</strong> (requirements FR-28 / NFR-01), not our invention — they should be confirmed</div>
+    <div class="src">docs/stakeholder-report.md §6 · src/dashboard.py PENALTY_10</div></div>
+  <div class="b-bar"></div>
+</section>
+
+<!-- ══════════ SLIDE 4 — SME ASKS ══════════ -->
+<section class="slide">
+  <div class="t-bar"></div><div class="grid-bg"></div>
+  <div class="gb" style="width:580px;height:580px;background:rgba(167,139,250,.08);bottom:-230px;right:-170px"></div>
+  <div class="sh"><div class="brand">PAL Customer Segmentation</div>
+    <div class="tag">Agenda 3 · Asks from SMEs — constraints<span class="owner">JOSH</span></div></div>
+
+  <div class="body">
+    <div class="sec-lbl">What we need, in what format, in what file</div>
+    <h1>Two constraint files — already created and pre-filled with our guesses.</h1>
+    <div class="sub">A blank template gets a blank response, so both files ship with <strong>7 example rules each</strong>.
+      The ask is to <em>correct, delete and extend</em> them — a rule we invented and an SME confirmed is worth far more
+      than a rule we invented alone.</div>
+    <div class="hr-g" style="margin:13px 0"></div>
+
+    <div class="two" style="flex:1;gap:22px">
+      <div class="cst" style="--ac:#FF4D6D">
+        <div class="cst-hd"><span class="pill" style="--ac:#FF4D6D">Hard</span>
+          <div class="cst-ttl">Rules that must never be broken</div></div>
+        <div class="cst-def">Statements of <b>impossibility</b>. "Booked 60+ days out, economy, no loyalty ID —
+          <b>cannot</b> be Corporate." These shrink the decision space before anyone makes a judgement call: instead of
+          choosing among 10 segments, an annotator picks among 2–3.</div>
+        <div class="file"><span class="fi">📄</span> data/constraints/hard_constraints.csv</div>
+        <pre class="csv"><span class="hdr">rule_id,condition,verdict,segments,owner,confidence,notes</span>
+<span class="k">H01</span>,lead_days &gt;= 60 AND max_tier &lt;= 4,<span class="k">cannot_be</span>,Corporate,RM Dom,certain,…
+<span class="k">H02</span>,channel = 'Sea Crew',<span class="k">must_be</span>,OFW/Migrant,RM Intl,certain,…
+<span class="k">H03</span>,is_award,<span class="k">must_be</span>,Mabuhay Loyalist,FF Owner,certain,…
+<span class="k">H04</span>,any_business AND lead_days &lt;= 1,<span class="k">narrow_to</span>,Corporate<b>|</b>Prem Bleisure,…
+<span class="k">H05</span>,pilgrimage_dest AND max_tier &lt;= 2,<span class="k">cannot_be</span>,Premium Bleisure,…
+<span class="k">H06</span>,is_domestic AND NOT any_premium,<span class="k">cannot_be</span>,Premium Bleisure,RM Dom,certain,…
+<span class="k">H07</span>,foreign_issue AND max_tier &lt;= 2,<span class="k">cannot_be</span>,Corporate,RM Intl,<b>likely</b>,…</pre>
+        <div class="cst-note"><b>verdict</b> = <code>must_be</code> · <code>cannot_be</code> · <code>narrow_to</code>
+          (shortlist, <code>|</code>-separated). &nbsp;<b>confidence</b> = <code>certain</code> or <code>likely</code>
+          — only <code>certain</code> is auto-enforced; <code>likely</code> gets tested against the data and brought
+          back to you if it conflicts.</div>
+      </div>
+
+      <div class="cst" style="--ac:#4ADE80">
+        <div class="cst-hd"><span class="pill" style="--ac:#4ADE80">Soft</span>
+          <div class="cst-ttl">Tendencies, not laws</div></div>
+        <div class="cst-def">A <b>lean</b>. "Middle East bookings <em>tend</em> to be OFW rather than leisure — but a
+          Manila–Dubai holiday is perfectly possible." These tilt ambiguous cases, and they tell us
+          <b>which boundaries PAL considers soft</b> — where we should report ambiguity instead of forcing a
+          confident label.</div>
+        <div class="file"><span class="fi">📄</span> data/constraints/soft_constraints.csv</div>
+        <pre class="csv"><span class="hdr">rule_id,condition,leans_toward,leans_away_from,strength,owner,notes</span>
+<span class="k">S01</span>,dest_region = 'Middle East',OFW/Migrant,Prem Bleisure,<span class="k">strong</span>,…
+<span class="k">S02</span>,dep_month IN (4,5,12),Balikbayan/VFR,Corporate,<span class="k">moderate</span>,…
+<span class="k">S03</span>,lead_days &lt;= 3 AND max_tier &gt;= 6,Corporate,Last-Minute,<span class="k">strong</span>,…
+<span class="k">S04</span>,is_domestic AND n_bookings &gt;= 6,Corporate,Budget/Adv,<span class="k">weak</span>,…
+<span class="k">S05</span>,connecting AND NOT round_trip,OFW/Migrant,Family,<span class="k">moderate</span>,RM Intl,…
+<span class="k">S06</span>,issue_country='PH' AND intl,Budget/Adv,OFW/Migrant,<span class="k">moderate</span>,…
+<span class="k">S07</span>,is_group AND dest='Middle East',Pilgrimage,Family,<span class="k">moderate</span>,…</pre>
+        <div class="cst-note"><b>strength</b> = <code>weak</code> · <code>moderate</code> · <code>strong</code>.
+          &nbsp;Where a soft constraint <b>contradicts the data, that disagreement is the finding</b> — we bring it
+          back rather than quietly overriding either side. S06 is a candidate rule for the 9.58% Unassigned gap.</div>
+      </div>
+    </div>
+
+    <div class="two" style="margin-top:20px;gap:22px">
+      <div class="card" style="--ac:#00D4FF;padding:16px 20px">
+        <div class="c-ttl">Ask 3 — the answer key · <code>data/labels/sme_sample.csv</code></div>
+        <div class="c-txt"><strong>~1,000 bookings labelled by hand.</strong> We supply route, dates, lead time, cabin,
+          fare tier, channel, group flag, issue country, revenue band — nothing more. SME fills
+          <code>true_segment</code>, <code>confidence</code>, <code>notes</code>.
+          <strong>"Unsure" is a first-class answer</strong> — forcing a guess manufactures noise we cannot detect.
+          Stratified, not random (a random 1,000 yields ~2 Pilgrimage, 0 Mabuhay). ~100 rows go to
+          <strong>every</strong> SME: where SMEs disagree with each other, that rate is a hard ceiling on any accuracy
+          we could ever claim. <strong>8–16 hours total across 2–3 SMEs. Scorer is already written.</strong></div>
+      </div>
+      <div class="card" style="--ac:#C9A84C;padding:16px 20px">
+        <div class="c-ttl">Decisions only PAL can make</div>
+        <div class="c-txt">
+          • <strong>6 segments or 10?</strong> Requirements say 6; the model produces 10.<br>
+          • <strong>How is PH-issued outbound international economy segmented?</strong> The 9.58% gap.<br>
+          • <strong>OFW/Migrant vs Balikbayan/VFR — one segment or two?</strong> 6.8M bookings on one bit.<br>
+          • <strong>Are the penalty weights right?</strong> ×10 and ₱40,000 drive the whole optimisation.<br>
+          • <strong>Can we get Mabuhay tier?</strong> Without it that segment stays invisible.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot"><div>CSV is deliberate — opens in Excel, <code>condition</code> accepts near-plain language.
+    <strong>Prose in an email is fine; we transcribe.</strong> Format must never be the blocker</div>
+    <div class="src">data/constraints/README.md · docs/stakeholder-report.md §7</div></div>
+  <div class="b-bar"></div>
+</section>
+
+<!-- ══════════ SLIDE 5 — PERSONA CARDS IN PBI ══════════ -->
+<section class="slide">
+  <div class="t-bar"></div><div class="grid-bg"></div>
+  <div class="gb" style="width:600px;height:600px;background:rgba(74,222,128,.06);top:-250px;left:-170px"></div>
+  <div class="sh"><div class="brand">PAL Customer Segmentation</div>
+    <div class="tag">Bonus · Persona cards ship in the model output<span class="owner">JOSH</span></div></div>
+
+  <div class="body">
+    <div class="sec-lbl">Now a table in the Power BI model, not just a slide</div>
+    <h1>Persona cards, driven by <code style="font-size:.82em">model/dim_segment.csv</code></h1>
+    <div class="sub">One row per segment, joined on <code>CustomerSegment = Segment</code>. Bind a card visual to it and
+      it <strong>cross-filters with every other visual</strong> — slice to a route or a quarter and the behaviour
+      numbers follow. Three of the eleven rows shown as they would render.</div>
+    <div class="hr-g" style="margin:13px 0"></div>
+
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:18px;flex:1">
+      <div class="pcard" style="--sc:#38BDF8">
+        <div class="pc-top"><div class="pc-seg"><span class="wf-dot" style="--sc:#38BDF8"></span>Corporate
+          <span class="pill" style="--ac:#FF4D6D;font-size:8px;padding:2px 8px">×10 CRITICAL</span></div>
+          <div class="pc-persona">"The Deadline Traveller"</div></div>
+        <div class="pc-body">
+          <div class="pc-stats">
+            <div class="pc-st"><span class="sl">Bookings</span><span class="sv">1.00M</span></div>
+            <div class="pc-st"><span class="sl">Share</span><span class="sv">4.37%</span></div>
+            <div class="pc-st"><span class="sl">Median lead</span><span class="sv">6 d</span></div>
+            <div class="pc-st"><span class="sl">Round trip</span><span class="sv">47.6%</span></div>
+            <div class="pc-st"><span class="sl">Premium cabin</span><span class="sv">29.1%</span></div>
+            <div class="pc-st"><span class="sl">Med / avg rev</span><span class="sv">231 / 493</span></div>
+          </div>
+          <div class="pc-line"><span class="k">Top regions</span>Domestic 51% · SE Asia 19% · East Asia 15%</div>
+          <div class="pc-line"><span class="k">Why they fly</span>A meeting with a fixed date. Schedule beats price — the trip cannot move.</div>
+          <div class="pc-line"><span class="k">What they want</span>Reliability, lounge, change flexibility, fast rebooking.</div>
+          <div class="pc-line"><span class="k">What not to do</span>Do not send promo fares. Do not read a cancelled
+            meeting as churn.</div>
+          <div class="pc-line"><span class="k">The tell</span>Half their flying is <strong>domestic</strong> (51%),
+            which surprises people. Highest repeat rate in the base.</div>
+          <div class="pc-caveat"><b>⚠ Trust: Diluted.</b> No loyalty or company identifier, so "business cabin +
+            short notice" also catches the wealthy last-minute leisure traveller.</div>
+        </div>
+      </div>
+
+      <div class="pcard" style="--sc:#FBBF24">
+        <div class="pc-top"><div class="pc-seg"><span class="wf-dot" style="--sc:#FBBF24"></span>Mabuhay Loyalist
+          <span class="pill" style="--ac:#FF4D6D;font-size:8px;padding:2px 8px">×8 CRITICAL</span></div>
+          <div class="pc-persona">"The Miles Spender"</div></div>
+        <div class="pc-body">
+          <div class="pc-stats">
+            <div class="pc-st"><span class="sl">Bookings</span><span class="sv">6,453</span></div>
+            <div class="pc-st"><span class="sl">Share</span><span class="sv">0.03%</span></div>
+            <div class="pc-st"><span class="sl">Median lead</span><span class="sv">14 d</span></div>
+            <div class="pc-st"><span class="sl">International</span><span class="sv">85.1%</span></div>
+            <div class="pc-st"><span class="sl">Connecting</span><span class="sv">32.1%</span></div>
+            <div class="pc-st"><span class="sl">Med / avg rev</span><span class="sv">22 / 113</span></div>
+          </div>
+          <div class="pc-line"><span class="k">The tell</span><strong>Median revenue 22</strong> — they paid in miles,
+            so the cash line is only taxes. Revenue ≠ value.</div>
+          <div class="pc-line"><span class="k">Top regions</span>East Asia 41% · Middle East 24% · Domestic 15%</div>
+          <div class="pc-line"><span class="k">Why they fly</span>Years of accumulated flying, now being spent. Often
+            the trip they saved for.</div>
+          <div class="pc-line"><span class="k">What they want</span>Award availability on routes they actually want,
+            tier recognition, upgrade paths.</div>
+          <div class="pc-caveat"><b>🚨 Trust: Not trustworthy.</b> 0.03% cannot be true. No loyalty-tier field, so
+            award redemption is the only signal. <strong>The segment is real; our ability to see it is not.</strong></div>
+        </div>
+      </div>
+
+      <div class="pcard" style="--sc:#22C55E">
+        <div class="pc-top"><div class="pc-seg"><span class="wf-dot" style="--sc:#22C55E"></span>Balikbayan/VFR
+          <span class="pill" style="--ac:#4ADE80;font-size:8px;padding:2px 8px">×2 LOW</span></div>
+          <div class="pc-persona">"The One Coming Home"</div></div>
+        <div class="pc-body">
+          <div class="pc-stats">
+            <div class="pc-st"><span class="sl">Bookings</span><span class="sv">2.91M</span></div>
+            <div class="pc-st"><span class="sl">Share</span><span class="sv">12.71%</span></div>
+            <div class="pc-st"><span class="sl">Median lead</span><span class="sv">48 d</span></div>
+            <div class="pc-st"><span class="sl">Round trip</span><span class="sv">100%</span></div>
+            <div class="pc-st"><span class="sl">Coupons/bkg</span><span class="sv">2.61</span></div>
+            <div class="pc-st"><span class="sl">Med / avg rev</span><span class="sv">471 / 618</span></div>
+          </div>
+          <div class="pc-line"><span class="k">The tell</span>Books furthest ahead of anyone, most complex itinerary,
+            always returns. The family is expecting them.</div>
+          <div class="pc-line"><span class="k">Top regions</span>East Asia 32% · North America 28% · SE Asia 21%</div>
+          <div class="pc-line"><span class="k">What they want</span>Baggage for pasalubong, family seating,
+            peak-season availability.</div>
+          <div class="pc-line"><span class="k">Boundary risk</span>Separated from OFW/Migrant by <strong>one bit</strong>
+            — round trip or not. 6.8M bookings.</div>
+          <div class="pc-caveat"><b>⚠ Trust: Watch.</b> Held its passenger share while falling
+            <strong>29.35% → 26.64% of revenue</strong> YoY. A segment holding its size is not evidence its value held.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="schema">
+      <div class="schema-t">28 columns — and the split is deliberate, so nobody has to guess what is evidence</div>
+      <div class="schema-g">
+        <div class="schema-c"><div class="sc-h" style="color:var(--green)">✓ MEASURED · recomputed every build</div>
+          <div class="sc-l">MedianLeadDays · RoundTripPct · InternationalPct<br>PremiumCabinPct · ConnectingPct ·
+            GroupBookingPct<br>Median/AvgRevenuePerBooking · AvgCouponsPerBooking<br>TopDestinationRegions ·
+            ModalChannel · Bookings</div></div>
+        <div class="schema-c"><div class="sc-h" style="color:var(--violet)">✎ EDITORIAL · written by us</div>
+          <div class="sc-l">PersonaName · PersonaHeadline<br>WhyTheyFly · WhatTheyWant · WhatNotToDo<br><br>
+            <span style="color:var(--g5)">Motivation cannot be measured from a booking extract. Informed inference —
+            never presented as a finding.</span></div></div>
+        <div class="schema-c"><div class="sc-h" style="color:var(--amber)">⚠ GOVERNANCE · put these on the card</div>
+          <div class="sc-l">Trust · DataCaveat · IsModelledSegment<br>PenaltyWeight · RevenueAtRiskPerError ·
+            SegmentColorHex<br><br><span style="color:var(--g5)">Cards persuade. A cropped caveat is how "0.03%"
+            becomes "the loyalty programme doesn't matter".</span></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot"><div>Behaviour measured at <strong>booking grain</strong> — coupon grain would over-weight
+    multi-leg segments (Balikbayan 2.61 coupons vs Last-Minute 1.32) · <code>SegmentColorHex</code> keeps PBI, Python
+    and this deck identically coloured</div>
+    <div class="src">src/export_powerbi.py build_dim_segment()</div></div>
+  <div class="b-bar"></div>
+</section>
+
+</div>
+</body>
+</html>
