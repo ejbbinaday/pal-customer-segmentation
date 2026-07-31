@@ -10,6 +10,7 @@ Outputs — pick per dashboard:
     START-HERE.md                  5-min starter guide (copied from docs/powerbi-guide.md)
     summary.md                     field dictionary, reconciliation, caveats
     model/dim_date.csv             Date dimension for DAX time intelligence
+    model/dim_segment.csv          Segment persona dimension — drives the persona-card visuals
     model/fact_dashboard.parquet   headline grain (~2.1M rows) — bind the summary visuals here
     model/fact_flight/             flight-level rollup (~20.6M) — full dashboard incl. flight no.
     detail/fact_coupons/           coupon grain (38.1M) — only for Age / UniqueID
@@ -50,11 +51,198 @@ COUPONS = DETAIL / "fact_coupons"
 AGG = MODEL / "fact_flight"
 AGG_DASH = MODEL / "fact_dashboard.parquet"
 DIM_DATE = MODEL / "dim_date.csv"
+DIM_SEGMENT = MODEL / "dim_segment.csv"
 SAMPLE = QA / "sample_100k.csv"
 GUIDE_OUT = OUT / "START-HERE.md"
 TMP = OUT / ".duckdb_tmp"
 
 EXCLUDED = "Excluded (non-revenue)"
+
+# ── Persona dimension ────────────────────────────────────────────────────────────
+# One row per segment, so Power BI can render **persona cards** natively (a card/table visual
+# bound to dim_segment, cross-filtered by the same slicers as the fact table) instead of the
+# narrative living only in docs/stakeholder-report.md §8.
+#
+# Two kinds of column, kept deliberately separate — a reader must be able to tell what is measured
+# from what is asserted:
+#   • QUALITATIVE (here)  — editorial. Motivation, service priorities, caveats. Written by us.
+#   • QUANTITATIVE (SQL)  — recomputed from pal_features_booking.parquet on every build, so the
+#     cards cannot silently drift from the data the way a hardcoded snapshot would.
+#
+# `Trust`/`DataCaveat` exist because persona cards are persuasive: a card reading
+# "Mabuhay Loyalist — 0.03% of bookings" invites the reader to conclude the loyalty programme is
+# irrelevant, when the truth is that we cannot see it. The caveat must travel *with* the card, so it
+# ships as a column rather than as a footnote someone can crop out.
+#
+# (name, sort, tier, penalty, rev_at_risk, persona, headline, why, wants, avoid, trust, caveat)
+PERSONA = [
+    (
+        "Corporate",
+        1,
+        "Critical",
+        10,
+        40_000,
+        "The Deadline Traveller",
+        "Short notice, expensive seat, someone else's booking system.",
+        "A meeting with a fixed date. Schedule beats price — the trip cannot move.",
+        "Reliability, lounge access, change flexibility, fast rebooking when disrupted.",
+        "Do not send promo fares. Do not read a cancelled meeting as churn.",
+        "Diluted",
+        "No loyalty or company identifier, so 'business cabin + short notice' also catches the "
+        "wealthy last-minute leisure traveller. Most likely rule to change after SME review.",
+    ),
+    (
+        "Mabuhay Loyalist",
+        2,
+        "Critical",
+        8,
+        32_000,
+        "The Miles Spender",
+        "Paid in miles, so the cash line is only taxes — revenue is not value here.",
+        "Years of accumulated flying, now being spent. Often the trip they saved for.",
+        "Award availability on routes they actually want, tier recognition, upgrade paths.",
+        "Do not judge this segment by revenue per booking — it is structurally near zero.",
+        "Not trustworthy",
+        "0.03% of bookings cannot be true. With no loyalty-tier field the only signal is award "
+        "redemption. The segment is real; our ability to see it is not. Needs Mabuhay tier data.",
+    ),
+    (
+        "OFW/Migrant",
+        3,
+        "High",
+        5,
+        20_000,
+        "The Overseas Worker",
+        "One-way, bought abroad, economy, often connecting. Relocation, not a holiday.",
+        "Work abroad. The trip is a life event planned around a contract, not a calendar.",
+        "Generous baggage, agency support in-language, payment options, reliable connections.",
+        "Do not optimise on fare alone — baggage and connection reliability likely matter more.",
+        "Partly definitional",
+        "1.1M of these are Sea Crew, identified by channel with certainty. The open question is "
+        "the other 72%, and the boundary against Balikbayan/VFR is a single bit (round trip).",
+    ),
+    (
+        "Premium Bleisure",
+        4,
+        "Moderate",
+        4,
+        16_000,
+        "The Voluntary Upgrader",
+        "Highest revenue per booking of any segment, and they plan ahead.",
+        "Blending work and leisure, or simply affluent leisure — they chose to pay up.",
+        "Seat comfort, lounge, an experience worth the premium they volunteered.",
+        "Do not deprioritise on headcount — 2.1% of bookings, far more of the revenue.",
+        "Measured",
+        "Premium cabin on an international route with no corporate signal. A clean rule, though "
+        "it inherits whatever Corporate fails to catch.",
+    ),
+    (
+        "Pilgrimage",
+        5,
+        "Moderate",
+        3,
+        12_000,
+        "The Pilgrim",
+        "Jeddah or Medina, and almost always connecting — no direct service exists.",
+        "Religious obligation. Timing is fixed by the calendar, not by price or convenience.",
+        "Group handling, baggage for gifts, connection reliability above all else.",
+        "Do not treat a missed connection as a reschedulable inconvenience here.",
+        "Measured",
+        "The most cleanly defined segment in the taxonomy — destination alone settles it. Also the "
+        "smallest, so per-segment rates are volatile.",
+    ),
+    (
+        "Balikbayan/VFR",
+        6,
+        "Low",
+        2,
+        8_000,
+        "The One Coming Home",
+        "Books furthest ahead of anyone, most complex itinerary, always returns.",
+        "Coming home to family. Emotional, seasonal, price-aware but not price-driven.",
+        "Baggage allowance for pasalubong, family seating, peak-season availability.",
+        "Do not assume stable size means stable value — see the caveat.",
+        "Watch",
+        "Held its passenger share while falling 29.35% → 26.64% of revenue year on year. A segment "
+        "holding its size is not evidence its value held. Boundary vs OFW/Migrant is one bit.",
+    ),
+    (
+        "Family",
+        7,
+        "Low",
+        2,
+        8_000,
+        "The Travelling Party",
+        "Ticketed as a group, and books late for a leisure trip.",
+        "Travelling together — reunions, holidays, group events.",
+        "Seating together, simple group changes, baggage, kid-friendly handling.",
+        "Do not read this as a count of families travelling — see the caveat.",
+        "Under-counted",
+        "This segment means 'ticketed as a group', not 'is a family'. Pax Count is always 1 by "
+        "design, so a family of four booking individually is invisible here.",
+    ),
+    (
+        "Last-Minute",
+        8,
+        "Baseline",
+        1,
+        4_000,
+        "The Sudden Traveller",
+        "Booked a day out, domestic, one-way — but they come back often.",
+        "Something happened: a family emergency, a sudden work need, a plan that changed.",
+        "Availability, a booking flow that works on a phone under stress, easy changes.",
+        "Do not treat low value per booking as low lifetime value — repeat rate is high.",
+        "Measured",
+        "Behavioural rather than demographic: it cuts across the other segments, catching anyone "
+        "who books inside 3 days once the higher-priority rules have passed.",
+    ),
+    (
+        "Budget/Adventure",
+        9,
+        "Baseline",
+        1,
+        4_000,
+        "The Domestic Explorer",
+        "The largest segment by far and the cheapest per booking. Where the LCC fight happens.",
+        "Leisure within the Philippines. Price-led, flexible on timing.",
+        "Price transparency, promos, no surprises at check-in.",
+        "Do not dismiss on unit value — collectively this is 4 in 10 bookings.",
+        "Measured",
+        "The catch-all for domestic non-premium travel, so it absorbs anything the earlier rules "
+        "did not claim. Broad by construction.",
+    ),
+    (
+        "Unassigned",
+        10,
+        "Undefined",
+        0,
+        0,
+        "The Gap In The Taxonomy",
+        "Not junk: out-earns OFW/Migrant per booking, and 18.6% fly premium.",
+        "Mostly one identifiable group — an ordinary Filipino, ticket issued in PH, flying abroad "
+        "in economy — who matches none of the ten rules.",
+        "A segment definition from PAL. This is a commercial decision, not a modelling problem.",
+        "Do not fold these into the nearest segment to make the chart tidy.",
+        "Open ask",
+        "The single largest actionable gap in the deliverable. Left deliberately blank rather than "
+        "guessed. Needs a PAL definition before it can be acted on.",
+    ),
+    (
+        EXCLUDED,
+        11,
+        "Not a customer",
+        0,
+        0,
+        "Not A Customer",
+        "Staff, industry and complimentary travel — every coupon non-revenue.",
+        "Not commercial travel.",
+        "Nothing — exclude from all commercial measures.",
+        "Do not include in revenue, share or per-passenger measures.",
+        "By definition",
+        "Present only so Power BI totals reconcile to the full 38.1M-row extract. Filter it out of "
+        "every commercial visual.",
+    ),
+]
 
 # Deterministic leg order within a booking — drives IsPrimaryCoupon.
 LEG_ORDER = "cl.coupon_number, cl.departure_date, cl.sector, cl.flight_number"
@@ -338,6 +526,135 @@ def build_dim_date(con: duckdb.DuckDBPyConnection, last_month: date) -> int:
     return (hi - lo).days + 1
 
 
+def _sql_str(s: str) -> str:
+    """Quote a Python str as a SQL literal. Persona text is ours, but apostrophes are inevitable."""
+    return "'" + s.replace("'", "''") + "'"
+
+
+def build_dim_segment(con: duckdb.DuckDBPyConnection) -> int:
+    """Segment persona dimension — editorial fields joined to freshly-measured behaviour.
+
+    One row per segment. Joins to the fact tables on `CustomerSegment` = `Segment`, so a card visual
+    bound here cross-filters with every other visual on the page.
+
+    The behavioural columns are **recomputed from the booking table on every build** rather than
+    hardcoded, so a card claiming "books 48 days ahead" cannot outlive the number that justified it.
+    Revenue columns carry no currency symbol: the extract's revenue unit is undocumented (plausibly
+    single-currency, magnitudes look like USD), so ratios are safe and absolutes are not.
+    """
+    from pal_colors import SEG_COLORS  # noqa: PLC0415 — optional dep of this stage only
+
+    rows = ",\n".join(
+        "("
+        + ", ".join(
+            [
+                _sql_str(name),
+                str(sort),
+                _sql_str(tier),
+                str(pen),
+                str(risk),
+                _sql_str(SEG_COLORS.get(name, "#4B5563")),
+                _sql_str(persona),
+                _sql_str(head),
+                _sql_str(why),
+                _sql_str(wants),
+                _sql_str(avoid),
+                _sql_str(trust),
+                _sql_str(caveat),
+            ]
+        )
+        + ")"
+        for (
+            name,
+            sort,
+            tier,
+            pen,
+            risk,
+            persona,
+            head,
+            why,
+            wants,
+            avoid,
+            trust,
+            caveat,
+        ) in PERSONA
+    )
+    # Behaviour is measured at BOOKING grain — the purpose unit. Measuring lead time or round-trip
+    # share at coupon grain would weight every booking by its leg count and quietly favour
+    # multi-coupon segments (Balikbayan/VFR averages 2.61 coupons against Last-Minute's 1.32).
+    con.execute(f"""
+        CREATE OR REPLACE TEMP VIEW seg_stats AS
+        WITH b AS (SELECT * FROM read_parquet('{BOOKING}')),
+        agg AS (
+            SELECT proxy_segment                              AS seg,
+                   count(*)                                   AS bookings,
+                   round(100.0*count(*)/sum(count(*)) OVER (), 2) AS share_pct,
+                   round(median(lead_days))::INT              AS med_lead,
+                   round(100*avg(round_trip::INT), 1)         AS rt_pct,
+                   round(100*avg(is_international::INT), 1)   AS intl_pct,
+                   round(100*avg(any_premium::INT), 1)        AS prem_pct,
+                   round(100*avg(connecting::INT), 1)         AS conn_pct,
+                   round(100*avg(is_group::INT), 1)           AS group_pct,
+                   round(median(rev_pos))::INT                AS med_rev,
+                   round(avg(rev_pos))::INT                   AS avg_rev,
+                   round(avg(n_coupons), 2)                   AS avg_coupons,
+                   mode(channel)                              AS modal_channel,
+                   mode(issue_country)                        AS modal_country
+            FROM b GROUP BY 1
+        ),
+        reg AS (  -- top three destination regions, as one display string per segment
+            SELECT seg, string_agg(label, ' · ' ORDER BY rk) AS top_regions FROM (
+                SELECT proxy_segment AS seg,
+                       coalesce(dest_region, 'Domestic') || ' '
+                         || round(100.0*count(*)/sum(count(*)) OVER (PARTITION BY proxy_segment), 0)
+                         || '%' AS label,
+                       row_number() OVER (PARTITION BY proxy_segment ORDER BY count(*) DESC) AS rk
+                FROM b GROUP BY proxy_segment, coalesce(dest_region, 'Domestic')
+            ) WHERE rk <= 3 GROUP BY seg
+        )
+        SELECT agg.*, reg.top_regions FROM agg LEFT JOIN reg USING (seg)
+    """)
+    con.execute(f"""
+        COPY (
+            SELECT
+                p.seg                     AS "Segment",
+                p.sort                    AS "SegmentSortOrder",
+                p.tier                    AS "PriorityTier",
+                p.pen                     AS "PenaltyWeight",
+                p.risk                    AS "RevenueAtRiskPerError",
+                p.color                   AS "SegmentColorHex",
+                (p.pen > 0)               AS "IsModelledSegment",
+                p.persona                 AS "PersonaName",
+                p.headline                AS "PersonaHeadline",
+                p.why                     AS "WhyTheyFly",
+                p.wants                   AS "WhatTheyWant",
+                p.avoid                   AS "WhatNotToDo",
+                p.trust                   AS "Trust",
+                p.caveat                  AS "DataCaveat",
+                s.bookings                AS "Bookings",
+                s.share_pct               AS "BookingSharePct",
+                s.med_lead                AS "MedianLeadDays",
+                s.rt_pct                  AS "RoundTripPct",
+                s.intl_pct                AS "InternationalPct",
+                s.prem_pct                AS "PremiumCabinPct",
+                s.conn_pct                AS "ConnectingPct",
+                s.group_pct               AS "GroupBookingPct",
+                s.med_rev                 AS "MedianRevenuePerBooking",
+                s.avg_rev                 AS "AvgRevenuePerBooking",
+                s.avg_coupons             AS "AvgCouponsPerBooking",
+                s.top_regions             AS "TopDestinationRegions",
+                s.modal_channel           AS "ModalChannel",
+                s.modal_country           AS "ModalIssueCountry"
+            FROM (VALUES\n{rows}
+            ) AS p(seg, sort, tier, pen, risk, color, persona, headline, why, wants, avoid,
+                   trust, caveat)
+            LEFT JOIN seg_stats s ON s.seg = p.seg
+            ORDER BY p.sort
+        ) TO '{DIM_SEGMENT}' (FORMAT CSV, HEADER)
+    """)
+    return len(PERSONA)
+
+
 def dir_mb(p: Path) -> float:
     if p.is_file():
         return round(p.stat().st_size / 1e6, 1)
@@ -417,9 +734,36 @@ def write_report(con, n_clean, n_fact, n_agg, n_dash, n_dates, bounds) -> None: 
         if n_dash
         else "| `model/fact_dashboard.parquet` | skipped | — | — |",
         f"| `model/dim_date.csv` | {n_dates:,} | — | mark as Date table for YoY / 12-mo trend |",
+        f"| `model/dim_segment.csv` | {len(PERSONA)} | — | **persona cards** + segment colours, "
+        "penalty weights, caveats |",
         "| `qa/sample_100k.csv` | 100,000 | — | build + validate DAX first |",
         "| `START-HERE.md` | — | — | **read this first** |",
         "",
+        "## Persona cards — `model/dim_segment.csv`\n",
+        "One row per segment, joined to the fact tables on `CustomerSegment` = `Segment`. Build a "
+        "persona card as a **card or table visual bound to this table**, and it cross-filters with "
+        "every other visual on the page (slice to a route and the card's behaviour columns follow).\n",
+        "Two kinds of column, and the distinction matters when someone asks *how do you know*:\n",
+        "- **Measured** (`MedianLeadDays`, `RoundTripPct`, `InternationalPct`, `PremiumCabinPct`, "
+        "`ConnectingPct`, `GroupBookingPct`, `Median`/`AvgRevenuePerBooking`, `AvgCouponsPerBooking`, "
+        "`TopDestinationRegions`, `ModalChannel`, `ModalIssueCountry`, `Bookings`, `BookingSharePct`) "
+        "— recomputed from the booking table on every build, at **booking grain** so multi-coupon "
+        "segments are not over-weighted.",
+        "- **Editorial** (`PersonaName`, `PersonaHeadline`, `WhyTheyFly`, `WhatTheyWant`, "
+        "`WhatNotToDo`) — written by the project team. Motivation cannot be measured from a booking "
+        "extract; these are informed inference and must not be presented as findings.\n",
+        "**`Trust` and `DataCaveat` are not optional decoration — put them on the card.** Persona "
+        "cards persuade, so a card reading *Mabuhay Loyalist · 0.03% of bookings* invites the "
+        "conclusion that the loyalty programme is irrelevant, when the truth is that we cannot see "
+        "it (no loyalty-tier field; award redemption is the only signal). Same for `Family`, which "
+        "means *ticketed as a group*, not *is a family*.\n",
+        "`SegmentColorHex` carries the project palette (`src/pal_colors.py`) so Power BI, the "
+        "Python figures and the slide deck all colour a segment identically. `PenaltyWeight` and "
+        "`RevenueAtRiskPerError` are **PAL's own estimates** from the requirements document, in "
+        "pesos — unlike the extract's revenue columns, whose unit is undocumented.\n",
+        "Filter `IsModelledSegment = FALSE` out of commercial visuals — it flags `Unassigned` (a "
+        "real gap awaiting a PAL definition) and `Excluded (non-revenue)` (staff/industry travel, "
+        "present only so totals reconcile).\n",
         f"**Reconciliation:** cleaned coupons **{n_clean:,}** → exported **{n_fact:,}** "
         f"({'match ✅' if n_clean == n_fact else '**MISMATCH ⚠️**'}). "
         "The join adds no rows and drops none.\n",
@@ -534,6 +878,9 @@ def main() -> None:
         n_fact = con.execute("SELECT count(*) FROM fact").fetchone()[0]
         n_agg, n_dash = count_of(AGG, True), count_of(AGG_DASH, False)
         n_dates = sum(1 for _ in DIM_DATE.open()) - 1
+        # Cheap and behaviour-only — rebuild it even in --report-only so the personas cannot go
+        # stale relative to a summary that describes them.
+        build_dim_segment(con)
         print(f"Report-only: reusing {n_fact:,} exported coupons")
     else:
         print(f"Joining segments onto {n_clean:,} coupons → {COUPONS} ...")
@@ -553,6 +900,10 @@ def main() -> None:
         print("Building date dimension ...")
         n_dates = build_dim_date(con, last_month)
         print(f"  wrote {n_dates:,} days")
+
+        print("Building segment persona dimension ...")
+        n_seg = build_dim_segment(con)
+        print(f"  wrote {n_seg} segment rows → {DIM_SEGMENT.name}")
 
         print("Writing QA sample ...")
         con.execute(f"""

@@ -50,8 +50,9 @@ powerbi_export/
 ├── START-HERE.md                 ← you are here
 ├── summary.md                    full field dictionary + data-quality detail
 │
-├── model/                        ✅ LOAD THESE THREE
+├── model/                        ✅ LOAD THESE
 │   ├── dim_date.csv                 120 KB — mark as Date table
+│   ├── dim_segment.csv               11 rows — persona cards + segment colours & caveats
 │   ├── fact_flight/                 470 MB — your main fact table
 │   └── fact_dashboard.parquet        29 MB — optional lightweight alternative
 │
@@ -72,7 +73,7 @@ headline visuals — but it has **no** flight number, O&D or `LeadTimeDays`.
 
 ---
 
-## 3. Build it in five steps
+## 3. Build it in six steps
 
 1. **Get Data → Folder →** point at `model/fact_flight/`, Combine & Load. *(Parquet, partitioned
    by year — Power BI handles this natively.)*
@@ -80,8 +81,43 @@ headline visuals — but it has **no** flight number, O&D or `LeadTimeDays`.
 3. **Modeling → Mark as Date Table →** pick `dim_date`, key column `Date`.
 4. **Relationships:** drag `dim_date[Date]` → `FACT[TravelMonth]`. Make it **active**.
    Add a second relationship to `FACT[IssueMonth]` and leave it **inactive**.
-5. **Add a page-level filter: `IsCompleteTravelMonth = TRUE`.** Do this before anything else —
+5. **Get Data → Text/CSV →** load `model/dim_segment.csv`, then relate
+   `dim_segment[Segment]` → `FACT[CustomerSegment]` (one-to-many, active).
+6. **Add a page-level filter: `IsCompleteTravelMonth = TRUE`.** Do this before anything else —
    see note ⚠️ #1 below. Then start building.
+
+---
+
+## 3b. Persona cards — `dim_segment.csv`
+
+One row per segment. Because it relates to the fact table, a **card or table visual bound to
+`dim_segment` cross-filters with everything else on the page** — slice to a route or a quarter and the
+behavioural columns follow. Sort segment visuals by `SegmentSortOrder` (priority order, not
+alphabetical), and colour them by `SegmentColorHex` so Power BI, the Python figures and the slide deck
+agree.
+
+Three kinds of column, and the difference matters when someone asks *how do you know*:
+
+| Kind | Columns | Provenance |
+|---|---|---|
+| **Measured** | `Bookings` · `BookingSharePct` · `MedianLeadDays` · `RoundTripPct` · `InternationalPct` · `PremiumCabinPct` · `ConnectingPct` · `GroupBookingPct` · `MedianRevenuePerBooking` · `AvgRevenuePerBooking` · `AvgCouponsPerBooking` · `TopDestinationRegions` · `ModalChannel` · `ModalIssueCountry` | Recomputed from the booking table on **every build**, at **booking grain** |
+| **Editorial** | `PersonaName` · `PersonaHeadline` · `WhyTheyFly` · `WhatTheyWant` · `WhatNotToDo` | Written by the project team — informed inference. **Motivation cannot be measured from a booking extract; do not present these as findings.** |
+| **Governance** | `Trust` · `DataCaveat` · `IsModelledSegment` · `PenaltyWeight` · `RevenueAtRiskPerError` · `SegmentColorHex` | Project metadata; the penalty/peso figures are **PAL's own estimates** |
+
+**Put `Trust` and `DataCaveat` on the card itself — they are not footnotes.** Persona cards persuade,
+so a card reading *"Mabuhay Loyalist · 0.03% of bookings"* invites the reader to conclude the loyalty
+programme is irrelevant, when the truth is that we cannot see it (no loyalty-tier field; award
+redemption is the only signal). `Family` has the same problem — it means *ticketed as a group*, not
+*is a family*.
+
+Filter `IsModelledSegment = FALSE` out of commercial visuals: it flags `Unassigned` (9.6% — a real
+taxonomy gap awaiting a PAL definition, **not** junk: it out-earns OFW/Migrant per booking) and
+`Excluded (non-revenue)` (staff/industry travel, present only so totals reconcile).
+
+Revenue columns here carry **no currency symbol** — the extract's revenue unit is undocumented
+(plausibly single-currency, magnitudes look like USD). Ratios are safe; absolutes should not be quoted
+externally until PAL confirms the unit. The peso figures in `RevenueAtRiskPerError` are a different
+thing: those come from the requirements document.
 
 ---
 
