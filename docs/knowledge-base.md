@@ -31,7 +31,7 @@ appended to the **[Learning Log](#15-learning-log-living)** (§15) — the newes
 3. [Revenue Loss Per Misclassification](#3-revenue-loss-per-misclassification)
 4. [The 8-Stage Pipeline](#4-the-8-stage-pipeline)
 5. [Algorithm Selection — Why HDBSCAN](#5-algorithm-selection--why-hdbscan)
-6. [POC Results](#6-poc-results)
+6. [POC Results (withdrawn)](#6-poc-results-withdrawn)
 7. [Data Sources](#7-data-sources)
 8. [Key Business Rules (Proxy Label Waterfall)](#8-key-business-rules-proxy-label-waterfall)
 9. [Negative Learning Rules](#9-negative-learning-rules)
@@ -180,40 +180,22 @@ Seven algorithms were evaluated on the real 40-feature dataset (`sample-features
 
 ---
 
-## 6. POC Results
+## 6. POC Results (withdrawn)
 
-The synthetic POC ran the full 8-stage pipeline on **10,000 synthetic records** structured to mirror real PAL booking patterns (from `synthetic_flight_passenger_data.csv`).
+The original proof-of-concept scorecard in this section was produced on the **superseded prototype
+track**, so its figures — overall accuracy, per-segment recall and an estimated revenue-risk total — do
+**not** describe performance on real PAL data and have been withdrawn rather than relabelled. Quoting
+them alongside real-data results would misattribute the evidence.
 
-### Top-Line KPIs
+**Where the real numbers live:** rule-based segment shares and revenue per segment in
+`outputs/features_real/summary.md`; the ten-method benchmark in `outputs/model_stress_test/summary.md`;
+non-circular validation in `outputs/validate_construct/`, `validate_criterion/`, `detection_power/` and
+`validate_temporal/`. **Per-segment recall against ground truth is not yet available** — it needs the SME
+labels (`data/labels/`), and until those land every accuracy figure is circular by construction.
 
-| Metric | Value | What It Means |
-|--------|------:|---------------|
-| Overall Accuracy | **77.7%** | Share of labelled records correctly identified |
-| Estimated Revenue Risk | **₱18.09M** | Conservative misclassification cost across 5,055 evaluated records |
-| Corporate Recall | **100%** | Highest-penalty segment captured perfectly |
-| Micro-Clusters Found | **78** | Mapped to 10 named segments |
-| Records Processed | **10,000** | Full pipeline, zero manual steps |
-
-### Per-Segment Recall (POC)
-
-NFR-01 target: **≥ 91%**
-
-| Segment | Recall | vs. Target | Penalty |
-|---------|:------:|:----------:|:-------:|
-| Corporate | 100% | ✓ Above | ×10 |
-| Family | 99% | ✓ Above | ×2 |
-| Digital Nomad | 95% | ✓ Above | ×2 |
-| Last-Minute | 91% | ✓ At target | ×1 |
-| Balikbayan/VFR | 73% | ✗ Below | ×2 |
-| Mabuhay Loyalist | 63% | ✗ Below | ×8 |
-| Pilgrimage | 54% | ✗ Below | ×3 |
-| Premium Bleisure | 38% | ✗ Below | ×4 |
-| Budget/Adventure | 22% | ✗ Below | ×1 |
-| OFW/Migrant | 18% | ✗ Below | ×5 |
-
-### Why OFW and Budget Recall Is Low
-
-OFW, Budget, and Balikbayan passengers overlap heavily in booking behaviour (economy, bags, price). Without the Mabuhay Miles loyalty field, the model cannot disambiguate them. **One data field — loyalty tier — is the single biggest unlock for improving these scores.**
+One finding from that era does survive, because the real data reproduced it independently: **OFW,
+Budget and Balikbayan overlap heavily in booking behaviour**, and without a loyalty-tier field the model
+cannot cleanly separate them. **Loyalty tier remains the single biggest data unlock.**
 
 ---
 
@@ -222,8 +204,6 @@ OFW, Budget, and Balikbayan passengers overlap heavily in booking behaviour (eco
 | Dataset | File | Records | Purpose |
 |---------|------|--------:|---------|
 | Real PAL bookings (Jan 2025 snapshot) | `data/raw/sample-features.csv` | 29,999 | Main pipeline development and algorithm evaluation |
-| Synthetic POC dataset | `data/raw/synthetic_flight_passenger_data.csv` | 10,000 | POC validation on PAL-structure data |
-| **PNR-level prototype (v3)** | `data/raw/PAL_PNR_Synthetic_Data_1000-v3.csv` | 1,000 | New 41-field PNR/coupon schema for clustering prototype — see §15 (2026-07-17) for profile, quirks, buildable features. Dictionary: `...-v2.csv` |
 
 ### Fields in `sample-features.csv`
 
@@ -345,7 +325,7 @@ Applied *after* proxy labelling to invalidate impossible assignments before any 
 | `dbscan_viz.py` | DBSCAN deep-dive visualisations |
 | `pca_boundaries.py` | Decision boundary + per-segment PCA zoom |
 | `hdbscan_final.py` | Stages 5–7: penalty-weighted HDBSCAN, mapping, validation |
-| `poc_synthetic.py` | Full 8-stage pipeline on synthetic POC data |
+| `poc_synthetic.py` | Legacy 8-stage POC runner — superseded track, results withdrawn |
 | `pal_colors.py` | Canonical 10-segment colour palette (import this everywhere) |
 | `generate_dark_slides.py` | Generates 3 dark-themed POC output PNGs |
 | `generate_report.py` | Generates `PAL_EDA_Report.html` |
@@ -356,7 +336,6 @@ Applied *after* proxy labelling to invalidate impossible assignments before any 
 | File | Records | Description |
 |------|--------:|-------------|
 | `sample-features.csv` | 29,999 | Real PAL bookings — Jan 2025 snapshot |
-| `synthetic_flight_passenger_data.csv` | 10,000 | Synthetic PAL-structure data for POC |
 
 ### Output Directories
 
@@ -462,11 +441,6 @@ Dashboard Wireframe → Requirements Checklist → [Appendix] Literature
 | 10 | Named customer segments |
 | ×10 | Highest penalty weight (Corporate) |
 | ₱40,000 | Revenue loss per wrong Corporate label |
-| 10,000 | Synthetic POC records |
-| 77.7% | POC overall accuracy |
-| 100% | POC Corporate recall |
-| 18% | POC OFW/Migrant recall (lowest — loyalty data gap) |
-| ₱18.09M | POC estimated revenue risk |
 | 91% | NFR-01 recall target (the red line) |
 | 5 | Years of historical PAL data available for full retrain |
 | 6M | Estimated full PAL PNR records for production pipeline |
@@ -477,6 +451,197 @@ Dashboard Wireframe → Requirements Checklist → [Appendix] Literature
 
 > Append-only working memory. Newest first. Entry format:
 > `#### YYYY-MM-DD — Title` · **Domain** · learning · **Source**.
+
+---
+
+#### 2026-07-31 — Prototype-track references removed from the docs; results **withdrawn, not relabelled**
+**Domain:** Project Decision
+All references to prototyping on a synthetic dataset were removed from the documentation surface
+(`docs/*.md`, `README.md`, `CLAUDE.md`, `data/labels/README.md`). Two rules governed the sweep, and they
+are the reusable part:
+1. **A finding is removed together with its provenance, never separated from it.** Stripping the word
+   "synthetic" while keeping the number would silently re-attribute the result to real PAL data. This was
+   not hypothetical: **§6 POC Results carried a full scorecard — 77.7% overall accuracy, 100% Corporate
+   recall, ₱18.09M estimated revenue risk — all produced on prototype data.** Relabelling it would have
+   published prototype figures as real-data performance. The section is now marked **withdrawn** with a
+   pointer to where real numbers live, and the same treatment was applied to the two learning-log entries
+   that were purely prototype-data results. Nothing evidential was lost: the real extract reproduces the
+   only conclusion that mattered (no natural clusters) across ten methods with a stated detection bound.
+2. **"Synthetic" had two unrelated meanings in these docs, and only one was in scope.** The other is
+   Stage V3 detection power, where segments of known prevalence are **planted into the real population**
+   to measure our own sensitivity. That is real-data methodology, not prototyping — removing it would
+   have destroyed the only thing that makes the null result falsifiable. Those passages now say
+   **"planted"** rather than "synthetic" so the two can never be conflated again.
+Superseded material is reduced to a stub in `docs/methodology.md` §Prior Prototype Track and `README.md`,
+recording that an earlier track existed without characterising its data. `docs/v3-prototype-findings.md`
+was removed via `git rm` (recoverable from history). **Code filenames and `data/raw/` inputs were left
+untouched** — the prototype scripts still run; they are simply not quoted in any deliverable.
+**Source:** project decision, 31 Jul 2026.
+
+#### 2026-07-31 — Persona cards belong in the **model output**, not in a document — and the column split is what makes them safe
+**Domain:** Project Decision
+Personas written into a report are a snapshot that starts rotting immediately and cannot respond to a
+slicer. Shipping them as `model/dim_segment.csv` from Stage X (`src/export_powerbi.py`,
+`build_dim_segment()`) fixes both: related to the fact table on `Segment` = `CustomerSegment`, a card
+visual bound to it **cross-filters with every other visual**, so the behaviour numbers move when someone
+slices to a route or a quarter. Three design decisions worth keeping:
+- **Behaviour is recomputed every build, never hardcoded** — a card claiming "books 48 days ahead" cannot
+  outlive the number that justified it.
+- **Measured at booking grain, not coupon grain.** Coupon grain would weight every booking by its leg
+  count and silently flatter multi-coupon segments (Balikbayan/VFR 2.61 coupons vs Last-Minute 1.32).
+- **Columns are split into measured / editorial / governance**, because a persona card mixes evidence with
+  inference and the reader cannot otherwise tell which is which. Motivation (`WhyTheyFly`) is *not*
+  measurable from a booking extract and is labelled as inference in the schema itself.
+`Trust` + `DataCaveat` ship **as columns** rather than as report footnotes: persona cards persuade, so the
+caveat has to be structurally attached to the thing that misleads. The failure mode being defended
+against is concrete — a card reading *"Mabuhay Loyalist · 0.03%"* invites "the loyalty programme is
+irrelevant" when the truth is "we cannot see it". `SegmentColorHex` carries `pal_colors.py` into BI so
+Power BI, the Python figures and the slide deck colour a segment identically.
+**Source:** project decision, 31 Jul 2026 — `src/export_powerbi.py`, `docs/powerbi-guide.md` §3b,
+`docs/methodology.md` v1.4.
+
+#### 2026-07-31 — Persona cards, measured: the per-segment behavioural signatures that make the taxonomy legible (and three that indict it)
+**Domain:** Data & Features
+Built data-backed persona cards for all ten segments from `pal_features_booking.parquet` (median lead
+days, round-trip / international / premium / connecting rates, median *and* mean revenue, top-3 dest
+regions, modal channel + issue country). Five signatures are strong enough to quote as the segment's
+identity, and they were **not** designed in — they fell out of the rules:
+- **Balikbayan/VFR books furthest ahead of anyone (median 48 days), has the most complex itinerary
+  (2.61 coupons) and is 100% round-trip.** OFW/Migrant, its contested neighbour, is **5.9% round-trip
+  at median 14 days lead.** So although the *rule* separates them on one bit, their measured behaviour
+  differs on lead time and itinerary complexity too — a genuinely useful argument that the boundary is
+  not purely an artefact, and the first thing to put in front of an SME.
+- **Pilgrimage connects 95.2% of the time** — highest in the field (no direct MNL–JED), which makes
+  connection reliability, not price, its service priority.
+- **Corporate is 50.7% domestic** at median 6 days lead — the "corporate = international" assumption is
+  wrong on this data.
+- **Premium Bleisure earns ₱1,504/booking, 2.4× the next segment, on 2.1% of volume** — headcount share
+  is a bad priority proxy.
+- **Mabuhay Loyalist's median revenue is ₱22** (taxes on an award). The cleanest demonstration in the
+  project that *revenue ≠ value*, and it must be stated whenever that 0.03% share is shown, or the
+  reader concludes the loyalty programme is irrelevant rather than **invisible to us**.
+
+Two cards indict the taxonomy rather than describe it, and both are now written as asks:
+**`Unassigned` is not junk** — ₱360 mean (above OFW/Migrant), 18.6% premium, 81.4% international, i.e.
+2.19M *valuable* bookings falling through the rules, mostly PH-issued outbound economy; and **`Family`
+means "ticketed as a group", not "is a family"** (`Pax Count` is always 1 by design), so it is
+certainly under-counted. **Presentation caution recorded:** persona cards are persuasive, so every
+⚠️/🚨 caveat must travel with its card when reused in a deck.
+**Source:** our analysis — DuckDB aggregation over `data/interim/pal_features_booking.parquet`;
+written up in `docs/stakeholder-report.md` §8.
+
+#### 2026-07-31 — SME constraint asks are now **two typed files**, and the hard/soft split is the useful distinction
+**Domain:** Project Decision
+The SME ask was previously one undifferentiated request for "business rules". Splitting it into two
+files with different semantics is what made it answerable:
+- **`data/constraints/hard_constraints.csv`** — statements of *impossibility*, typed by
+  `verdict ∈ {must_be, cannot_be, narrow_to}` + `confidence ∈ {certain, likely}`. These are the rules
+  SMEs are most confident about, and they shrink the annotator's decision space from 10 segments to 2–3
+  before any judgement call — the mechanism `business-requirements.md` FR-21/FR-24 (Negative Learning)
+  always intended.
+- **`data/constraints/soft_constraints.csv`** — *tendencies*, typed by `leans_toward` /
+  `leans_away_from` / `strength`. Their second job matters as much as their first: they reveal **which
+  boundaries PAL itself considers soft**, i.e. where the deliverable should report ambiguity rather
+  than force a confident label — which is the honest output for a continuum.
+Both ship **pre-filled with our own guesses as worked examples** (7 rows each), because a rule we
+invented and an SME confirmed is worth far more than a rule we invented alone, and a blank template
+gets a blank response. CSV chosen deliberately (opens in Excel, `condition` accepts near-plain
+language); prose in an email is accepted and transcribed by us, so format is never the blocker.
+**Where a soft constraint contradicts the data, that disagreement is the finding** — reported back, not
+silently overridden in either direction. Complementary to `data/labels/sme_sample.csv`: constraints
+encode what SMEs know in general, labels settle the cases where the general rules run out.
+**Source:** project decision, 31 Jul 2026 — `data/constraints/README.md`,
+`docs/stakeholder-report.md` §7.
+
+#### 2026-07-31 — The asymmetric cost matrix needs a *same-accuracy* worked example to land with non-technical stakeholders
+**Domain:** Project Decision
+Explaining the penalty matrix by describing it does not work; explaining it by **holding accuracy
+constant** does. The canonical example now used in stakeholder material: 1,000 bookings at true
+prevalence (44 Corporate, 394 Budget/Adventure), two models **both at exactly 90% accuracy** — Model A
+misses 20 Corporate + 80 Budget, Model B misses 2 Corporate + 98 Budget. Weighted by the FR-28 revenue
+figures (Corporate ₱40k, Budget ₱4k): **₱1,120,000 vs ₱472,000 revenue at risk — a 2.4× business
+difference that plain accuracy cannot see** (Corporate recall 54.5% vs 95.5%, i.e. A fails the NFR-01
+≥91% target and B passes). The pedagogic point is that the *placement* of error, not its rate, is the
+business quantity. Paired framing that carries it: over-serving a budget passenger costs a courtesy
+upgrade; under-serving a Corporate passenger costs ~₱40,000 — the matrix exists because those are not
+the same mistake. **Caveat that must travel with the calc:** the metric is built and tested, but
+"correct" is still defined as "matches our own rules", so it is machinery awaiting an answer key.
+**Source:** our analysis — `docs/stakeholder-report.md` §6; weights from `src/dashboard.py`
+(`PENALTY_10`, `REV_LOSS_10`), targets from `business-requirements.md` FR-28 / NFR-01.
+
+#### 2026-07-30 — **`age_known` was leaking a rule field through its *missingness*, and it inflated most of the construct-validity matrix**
+**Domain:** Clustering / Methodology
+The circularity contract (`src/validation_anchors.py`) declared
+`TIER_A = (age, age_known, dep_month, n_bookings)` **"independent of every rule field — always usable, so a
+TIER_A-only matrix is directly comparable across all pairs."** That claim was false for `age_known`, and the
+error propagated into every number the strict matrix produced.
+
+**The mechanism — a leak no name-based guard can see.** International travel captures passport data;
+domestic travel does not. So on the full non-sea-crew population:
+
+| | bookings | `age_known` |
+|---|---|---|
+| domestic | 12,830,158 | **0.86%** |
+| international | 8,969,039 | **87.62%** |
+
+`age_known` is therefore very nearly a *copy* of **`is_international`**, which **is** a rule field — it gates
+the `OFW/Migrant`, `Balikbayan/VFR` and `Premium Bleisure` branches of the waterfall. And `age` inherits the
+same leak, because a tree model reads *present-vs-NaN* directly and that pattern **is** the rule bit. The
+existing guard checked the three anchors that are *coarsenings of values* (`dest_region`→`is_domestic`,
+`issue_country`→`foreign_issue`, `channel`→`corp_channel`) and missed the one that leaks through **the
+missingness pattern of a field whose values are genuinely innocent**.
+
+**Measured impact — the published positive controls were mostly the leak:**
+
+| pair | published `auc_strict` | age anchors withheld | `age_known` gap |
+|---|---|---|---|
+| Premium Bleisure vs Budget/Adventure | **0.948** | **0.553** | 0.85 |
+| OFW/Migrant vs Budget/Adventure | 0.942 | 0.579 | 0.84 |
+| Unassigned vs Budget/Adventure | 0.890 | 0.556 | 0.71 |
+| Unassigned vs Last-Minute | 0.833 | 0.577 | 0.63 |
+| Corporate vs Budget/Adventure | 0.846 | 0.635 | 0.43 |
+| Pilgrimage vs Balikbayan/VFR | 0.768 | 0.642 | 0.21 (marginal) |
+| **OFW/Migrant vs Balikbayan/VFR** | **0.617** | 0.550 | **0.04 → keeps age** |
+
+**What this does and does not overturn:**
+
+1. **The headline OFW-vs-Balikbayan result stands.** Both sides are foreign-issue international — `age_known`
+   **0.8519 vs 0.8918**, a gap of 4 pp, far inside the 0.20 tolerance — so the age anchors are legitimately
+   admissible there and the 0.608/0.617 figure is unaffected. The weakest-boundary *number* survives.
+2. **But "the weakest boundary of all 45" does not.** After correction, several domestic-vs-international
+   pairs sit *below* 0.617 (0.553, 0.556, 0.579). They are low because **their evidence was withheld**, not
+   because those segments are alike — so they are not comparable to 0.617 either. **The ranked pair table is
+   no longer a league table** and must not be read as one. Compare only cells sharing an
+   `anchors_withheld` set.
+3. **The strict matrix has almost no power left.** Only `dep_month` and `n_bookings` are *unconditionally*
+   independent of the rules, and on those two a pair we are confident genuinely differs (Premium Bleisure vs
+   Budget/Adventure) scores **0.553** against a negative control of 0.50. Per-pair adaptive admissibility is
+   therefore **not a nicety, it is the only version with usable power** — the report now says so, and
+   positive controls are reported on *both* feature sets because one ceiling cannot calibrate both.
+4. **The negative control never would have caught this.** A random half-split *within* one segment has no
+   real difference to find, so it correctly returned 0.485–0.515 the whole time. **A passing negative control
+   bounds harness noise; it says nothing about whether an admitted feature is independent of the labels.**
+   Those are different failure modes and need different tests.
+
+**The transferable lesson: audit missingness, not just values.** A feature can be perfectly innocent in what
+it records and still encode a label-defining field in *whether* it was recorded. The guard is now
+`ANCHOR_LEAKS[age] = ANCHOR_LEAKS[age_known] = ("is_international",)`, and the general rule for this project
+is that **every admissible anchor must be checked for both a value leak and a missingness leak** before it
+is trusted.
+
+**Also found, incidentally:** `Pilgrimage` is only **79.5% international**, not 100%. The `pilgrimage` flag
+fires on `trip_dest IN ('JED','MED')` while `is_domestic = bool_and(dom_coupon)`, so a pilgrimage booking
+whose coupons in this extract are only the *domestic feeder legs* (e.g. CEB→MNL) reads as domestic. That
+0.205 gap is what marginally trips the tolerance for `Pilgrimage vs Balikbayan/VFR`.
+
+**Recommended follow-up (not built):** instead of withholding a leaky anchor outright, **restrict the pair to
+rows where the rule bit is constant** and use the anchor there — the same matched-comparison logic the
+OFW/Balikbayan section already applies within `issue_country`. That recovers power without leaking. Rejected
+for `age` on domestic-vs-international pairs specifically, because matching on `age_known = 1` retains only
+0.86% of the domestic side.
+
+**Source:** our analysis — direct measurement on `data/interim/pal_features_booking.parquet`;
+`src/validation_anchors.py`, `src/validate_construct.py`.
 
 ---
 
@@ -913,7 +1078,7 @@ so the disclosure lives in both the methodology doc and the shareable report. **
 Produced a shareable status report — **`docs/status-report.pdf`** (7pp, A4) + self-contained
 `docs/status-report.html` — covering approach, methodology, EDA and current status for colleagues.
 Key point: the real-data track had **only text summaries, no figures** (all PNGs in `outputs/` were from
-the old `sample-features` baseline and the v3 *synthetic* prototype — misleading to reuse). So
+the old `sample-features` baseline and the superseded prototype — misleading to reuse). So
 `src/report_figures.py` now generates genuine real-data figures from `pal_features_booking.parquet`:
 3 EDA charts (segment volume×value, route region, lead-time×value-tier) + 2 preliminary-cluster panels
 (LCA BIC/ARI curve; PCA projection coloured by LCA class vs. rule segment — visually confirms the
@@ -1046,7 +1211,7 @@ these are refinements, not a redesign. **Source:** our DuckDB verification + pla
 **Domain:** Data & Features
 Client supplied the authoritative **`data/PAL-data/DataDictionary.v1.xlsx`** (sheets `Dictionary` +
 `Farebrand_relationship`) for the real data. It **supersedes the two corrections in the earlier
-"Dictionary reconciliation" and "SME rule" entries below**, which were based on the stale synthetic-set
+"Dictionary reconciliation" and "SME rule" entries below**, which were based on the stale legacy
 `...v2.csv`. Corrections, all **verified against the Parquet**:
 - **`UniqueID` = "Unique customer identifier"**, NOT a PNR. Verified: single IDs span up to **1,162 days
   (~3.2 yr)** and 26% make >1 booking → it tracks a person across bookings. **Customer-level features
@@ -1087,7 +1252,7 @@ growth — it's when the coding began). Feature: `award_ticket` = (`BookingClass
 
 #### 2026-07-22 — Dictionary reconciliation corrects key assumptions (UniqueID = PNR, not passenger)
 **Domain:** Data & Features
-Reconciled the real extract against the data dictionary (`data/raw/PAL_PNR_Synthetic_Data_1000-v2.csv`)
+Reconciled the real extract against the legacy data dictionary
 and found the profiling made wrong inferences — **corrected in `docs/real-data-plan.md`**:
 (1) **`UniqueID` = the PNR (booking), NOT a passenger** (dictionary: "Unique identifier for the PNR").
 The 13.45M distinct IDs are **bookings, not people**; the anonymous data has **no persistent passenger
@@ -1139,7 +1304,7 @@ All four share an **identical 40-column header** (md5 `53318f34…`) and pass `g
 (`TripOD`/`OnlineOD`/`Sector`), flight/carrier details, `is_nonstop`, `Channel Category`,
 `BookingType`, hashed `UniqueID`, `Age`, `Revenues w YQ`, `Net Fare`, `Pax Count`. Format quirks:
 UTF-8 BOM on header, double-quoted text fields, SQL-style `.0000000` timestamps. This is far
-richer than the 1,000-row v3 synthetic prototype and should become the real modelling input.
+richer than any earlier sample and should become the real modelling input.
 The original `data/OneDrive_1_7-22-2026.zip` was a **truncated/incomplete download** (single stored
 entry, no central directory — `unzip`/`bsdtar`/`ditto` all rejected it); the user re-extracted the
 `.gz` files directly into `PAL-data/`. **Source:** our analysis of `data/PAL-data/`.
@@ -1187,22 +1352,6 @@ purity but does not fix the no-structure finding, and under circular validation 
 recall look better without meaning more. Status: open — add as Stage P3b if we continue the rule track.
 **Source:** code audit (grep); [[v3-prototype-data]].
 
-#### 2026-07-17 — DIAGNOSIS: v3 synthetic data has no latent cluster structure
-**Domain:** Clustering / Methodology
-`src/diagnose_v3.py` stress-tested the data with **non-circular** metrics on a cleaned 24-feature space
-(dropped 19 |corr|>0.9 redundancies). Result is conclusive: **DBCV is NEGATIVE** across every config
-(−0.043 to −0.192, incl. PCA-90) — worse-than-random density validity, i.e. no real clusters. KMeans
-silhouette is flat ~0.10 with **no peak** (k4=0.103…k12=0.121, monotonic) → no natural k. **Bootstrap
-ARI is high (0.83–0.99) but that is a TRAP** — it means HDBSCAN is *consistent*, not that clusters are
-*real*; a stable partition of a structureless cloud is still meaningless (stability ≠ validity).
-**Implications:** (1) the shipped recall (53–100%) is circular — it measures rediscovery of the proxy
-rules on the same features, not accuracy; do NOT present it as model quality to PAL. (2) On this data,
-segments are **definitional (rule-driven), not emergent** — ML's role is label propagation/refinement/
-drift-monitoring on top of rules, not unsupervised discovery. (3) Penalty-weighting *lowered* DBCV
-(0.030→0.023) — it bends space toward the rules. **#1 recommendation: real / structure-embedding data.**
-Full write-up: `docs/v3-prototype-findings.md`.
-**Source:** `src/diagnose_v3.py`; outputs/diagnose_v3_output/diagnosis.json.
-
 #### 2026-07-17 — Built src/prototype_v3.py (Stages P4–P5); end-to-end prototype runs
 **Domain:** Clustering / Methodology
 `src/prototype_v3.py` runs P4–P5: StandardScaler → penalty-weighted HDBSCAN (min_cluster_size=30,
@@ -1225,7 +1374,7 @@ matrix**, 0 NaNs, all sanity checks pass (lead_time≥0, ancillary≥0). Proxy w
 of rows (vs 76.4% baseline; rest handled later by HDBSCAN + nearest-centroid). Distribution:
 Balikbayan/VFR 11.9%, Corporate 11.1%, Family 7.5%, Digital Nomad 7.2%, Budget 5.5%, Premium
 Bleisure 1.7%, Last-Minute 0.8%; Unassigned 54.3%.
-**Key finding — 3 segments get ~0 proxy seeds on the v3 synthetic data:** OFW/Migrant (its
+**Key finding — 3 segments got ~0 proxy seeds on the prototype data (superseded track):** OFW/Migrant (its
 `pos_mismatch` signal is ~0 — `CountryCodeOfIssue` almost always equals `PointofOrigin` in v3),
 Pilgrimage (few Middle-East routes), Mabuhay Loyalist (no loyalty field, by design). A segment with
 no proxy seed has **no centroid to map clusters to**, so it can't be assigned in the prototype. This
@@ -1257,20 +1406,22 @@ excludes `outputs/reports/assets/scratchpad/docs`. Enable with `pip install -r r
 pre-commit install`. First pass applied across `src/` (all 15 files reformatted; ~60 lint issues fixed:
 unused imports/vars, import sorting, empty f-strings, loop vars renamed to `_`). All hooks now pass.
 **Gotchas learned:** (1) bandit `# nosec` needs **space-separated** IDs, not comma — use `# nosec B605`
-(comma silently breaks suppression); (2) deterministic MD5 for synthetic-data hashing → use
+(comma silently breaks suppression); (2) deterministic MD5 for non-security data hashing → use
 `hashlib.md5(..., usedforsecurity=False)` to clear the B324 HIGH finding legitimately; (3) `zip()`
 strict-check (B905) is ignored — 41 hits in plotting code where lengths are known equal.
 Tools pinned in pre-commit: pre-commit-hooks v6.0.0, ruff v0.15.22, bandit 1.9.4.
 **Source:** our setup + first-pass run; `README.md` §Code quality.
 
-#### 2026-07-17 — methodology.md v0.5 adds the v3 prototype pipeline
+#### 2026-07-17 — methodology.md v0.5 adds an adapted PNR-level prototype pipeline
 **Domain:** Project Decision
 `docs/methodology.md` bumped to **v0.5**: the validated v0.4 pipeline on `sample-features.csv` is kept
-as the baseline/reference; a new **"v3 Prototype Pipeline — PNR-Level Anonymous Segmentation"** section
-documents the adapted stages (P1 clean → P2 features → P3 v3 proxy waterfall → P4 penalty-weighted
-HDBSCAN + mapping → P5 validate), plus the phase→deliverable map. HDBSCAN is recorded as the closed
-algorithm decision (leaderboard re-run is confirmatory only).
-**Source:** our update; `docs/methodology.md` §v3 Prototype Pipeline.
+as the baseline/reference; a new section documented the adapted stages (clean → features → proxy
+waterfall → penalty-weighted HDBSCAN + mapping → validate), plus the phase→deliverable map. HDBSCAN was
+recorded as the closed algorithm decision at that point.
+> **Superseded 2026-07-23 / reduced to a stub 2026-07-31.** HDBSCAN was subsequently dropped for the real
+> data, and this section is now `docs/methodology.md` §Prior Prototype Track — see the 2026-07-31 entry
+> on why prototype results were withdrawn rather than relabelled.
+**Source:** our update; `docs/methodology.md` §Prior Prototype Track.
 
 #### 2026-07-17 — Our PNR-only model is Sabre's "anonymous segmentation" lens
 **Domain:** Airline Industry
@@ -1329,25 +1480,6 @@ methodology already flagged. Consequence: model at the PNR level, not customer-l
 **Source:** RFM airline value studies (ResearchGate); "Estimating travellers' value… auxiliary
 services (RFM)", J. Retailing & Consumer Services 2023; our analysis of v3.
 
-#### 2026-07-17 — v3 dataset profile, quirks, and buildable features
-**Domain:** Data & Features
-`data/raw/PAL_PNR_Synthetic_Data_1000-v3.csv` — PNR/coupon-level, **1,000 rows × 41 fields, 100%
-populated (no nulls)**. `...-v2.csv` is its data dictionary.
-**Cleaning quirks (do NOT reuse sample-features code as-is):** header col 4 malformed `CouponNumber] `;
-`NetRevenue`/`NetFare` are strings with a **`$` suffix** (`574$`); dates are US-style **`M/D/YY`**
-(`dayfirst=False` — opposite of the sample-features pipeline); `Group/Individual` is text
-(`Individual`/`Group`, 62/38); `PaxCount` is **always 1**; `OperatingCabinClass` is combined
-`Economy/X`; `Unique Identifier` is unique per row (no multi-coupon grouping).
-**Buildable features:** value — net_fare, net_revenue, **ancillary = Rev−Fare** (100% positive,
-median $77, max $1,012), fare_tier (19 RBDs); timing — **lead_time** (1–180 d, med 93), dep_hour /
-red-eye, dep_dow / is_weekend, booking_month / peak-season, changed_itinerary (Exchanged status);
-route — cabin_ord (Econ 790/PremEcon 104/Bus 106), is_domestic/haul_type, is_codeshare (45%),
-n_connections/is_connecting (83% nonstop), **pos_mismatch** (CountryCodeOfIssue≠PointofOrigin → OFW/VFR);
-party/channel — age_band (2–85; child age 2 present), is_group, gender, is_direct vs is_gds (GDS 10%).
-**Not derivable from v3:** ❌ length-of-stay / Saturday-night-stay (no return-leg pairing);
-❌ RFM Recency/Frequency (no passenger key); ❌ loyalty tier.
-**Source:** our profiling script (`scratchpad/profile_v3.py`) on the v3 file.
-
 #### 2026-07-17 — Stage-3 proxy waterfall must be re-derived per schema (v3 variant)
 **Domain:** Clustering / Methodology
 The proxy-label rules in §8 are written for `sample-features.csv` columns and **do not translate 1:1
@@ -1388,4 +1520,4 @@ is now `src/dashboard.py`. See `README.md`.
 ---
 
 *Knowledge base maintained by CPT 3 — PAL Customer Segmentation*
-*Last updated: 29 July 2026*
+*Last updated: 31 July 2026*

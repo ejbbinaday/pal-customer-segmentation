@@ -1,9 +1,24 @@
 # PAL Customer Segmentation — ML Pipeline Methodology
 
 **Client:** Philippine Airlines (PAL)
-**Version:** v1.3 — 29 July 2026
+**Version:** v1.4 — 31 July 2026
 
 > **Changelog**
+> - **v1.4 (31 Jul 2026):** **Stage X now ships a persona dimension.** `src/export_powerbi.py` emits
+>   `model/dim_segment.csv` — one row per segment (11), joined on `CustomerSegment` = `Segment` — so
+>   **persona cards render natively in Power BI** and cross-filter with every other visual, instead of the
+>   segment narrative living only in prose. Columns are deliberately split into three kinds so a reader can
+>   tell evidence from assertion: **measured** (lead days, round-trip/international/premium/connecting rates,
+>   median+mean revenue, coupons per booking, top-3 regions, modal channel/country, bookings, share) —
+>   **recomputed from `pal_features_booking.parquet` on every build, at booking grain** so multi-coupon
+>   segments are not over-weighted; **editorial** (`PersonaName`, `WhyTheyFly`, `WhatTheyWant`,
+>   `WhatNotToDo`) — informed inference, never to be presented as a finding; and **governance**
+>   (`Trust`, `DataCaveat`, `IsModelledSegment`, `PenaltyWeight`, `RevenueAtRiskPerError`,
+>   `SegmentColorHex`). The governance columns exist because **persona cards persuade**: a card reading
+>   *"Mabuhay Loyalist · 0.03% of bookings"* invites the conclusion that the loyalty programme is
+>   irrelevant, when the truth is that we cannot see it — so the caveat ships as a column rather than a
+>   croppable footnote. No modelling logic changed. Stakeholder-facing write-up:
+>   `docs/stakeholder-report.md` (§8 persona cards); deck: `assets/tuesday-slides/josh-slides.html`.
 > - **v1.3 (29 Jul 2026):** **Out-of-time stability tested.** Added
 >   [Stage V4 — out-of-time stability](#stage-v4--out-of-time-stability-srcvalidate_temporalpy)
 >   (`src/validate_temporal.py`): two adjacent 12-month issuance windows, and every stability question
@@ -20,7 +35,7 @@
 >   are excluded throughout as right-censored. Full detail: `outputs/validate_temporal/summary.md`.
 > - **v1.2 (29 Jul 2026):** **The null result is now falsifiable.** Added
 >   [Stage V3 — detection power](#stage-v3--detection-power-srcdetection_powerpy)
->   (`src/detection_power.py`): synthetic segments of known prevalence and distinctness are *appended* to the
+>   (`src/detection_power.py`): **planted** segments of known prevalence and distinctness are *appended* to the
 >   real population and the deployable panel is re-fitted at k=10 to see whether they come back out. Every
 >   prior diagnostic returned "no natural clusters"; that finding could not answer **"or are your methods
 >   blind?"** until now. Detection thresholds are **pre-registered and derived from `w=0` negative controls**.
@@ -65,7 +80,9 @@
 >   diagnostic cross-check. Balikbayan/VFR sub-types flagged provisional (low stability).
 > - **v0.7 (23 Jul 2026):** Added the [Tools & Libraries disclosure](#tools--libraries-disclosure); reconciled the header version with the footer (was drifting at v0.5 vs v0.6).
 > - **v0.6 (23 Jul 2026):** Real-data track pivot — rule-based purpose×value segmentation is primary, LCA refines/validates; HDBSCAN dropped for the real data. Added the real-data at-a-glance summary.
-> - **v0.5 (17 Jul 2026):** Added the [v3 Prototype Pipeline](#v3-prototype-pipeline--pnr-level-anonymous-segmentation) — the adapted pipeline for the new PNR-level `PAL_PNR_Synthetic_Data_1000-v3.csv` schema. Baseline (v0.4) pipeline on `sample-features.csv` retained unchanged below as the reference implementation.
+> - **v0.5 (17 Jul 2026):** Added an adapted PNR/coupon-level prototype pipeline — since **superseded** and
+>   reduced to a stub, see [Prior Prototype Track](#prior-prototype-track-superseded). Baseline (v0.4)
+>   pipeline on `sample-features.csv` retained unchanged below as the reference implementation.
 > - **v0.4 (11 May 2026):** Baseline 8-stage pipeline on `sample-features.csv`.
 
 ---
@@ -73,16 +90,87 @@
 ## Current Methodology at a Glance
 
 **Active track — the Real-Data Pipeline** (real 38M-coupon extract, 2024–2027; anonymous
-trip-purpose × value segmentation at the **booking** grain, rolled up to **customer**):
+trip-purpose × value segmentation at the **booking** grain, rolled up to **customer**).
 
+### The pipeline, end to end
+
+The load-bearing idea in one picture: **the rules label, and ML checks the labels.** Clustering is a
+validator and a refiner in this design, never the labeller — see the approach decision below for why.
+
+```mermaid
+flowchart TB
+  classDef stage    fill:#0B1220,stroke:#38BDF8,stroke-width:1px,color:#E8ECF4
+  classDef primary  fill:#1C1708,stroke:#C9A84C,stroke-width:2.5px,color:#FFFFFF
+  classDef ml       fill:#150C22,stroke:#A78BFA,stroke-width:1px,color:#E8ECF4
+  classDef out      fill:#07160E,stroke:#22C55E,stroke-width:1px,color:#E8ECF4
+  classDef gap      fill:#1A0A0E,stroke:#FF4D6D,stroke-width:1px,stroke-dasharray:5 3,color:#E8ECF4
+
+  RAW["<b>Raw extract</b> · 38.1M coupons<br/>4 gzipped CSVs · 2024–2027"]:::stage
+  B["<b>Stage B</b> · typed Parquet"]:::stage
+  C["<b>Stage C</b> · clean + flag<br/>farebrand value tier 1-7"]:::stage
+  F["<b>Stage F</b> · features + grain change<br/>coupon → booking → customer"]:::stage
+  BK["<b>22.9M bookings</b> — the modelling row<br/><i>one purchase decision = one purpose</i>"]:::stage
+  CU["<b>13.4M customers</b> — rollup<br/><i>only 26% book more than once</i>"]:::stage
+
+  RULE["<b>RULE WATERFALL — THE DELIVERABLE</b><br/>priority order, first match wins<br/>10 named segments + Unassigned"]:::primary
+
+  X["<b>Stage X</b> · export to coupon grain"]:::out
+  BI["<b>Power BI star schema</b><br/>facts + <code>dim_date</code> + <code>dim_segment</code><br/>38,116,259 rows in = out"]:::out
+
+  LCA["<b>Refine</b> · LCA<br/>sub-segment oversized parents<br/><i>informs, never relabels</i>"]:::ml
+  VAL["<b>Test</b> · Stages V1-V4<br/>are the boundaries real?<br/><i>can re-open the rules</i>"]:::ml
+  MON["<b>Monitor</b> · PSI · ARI<br/>has the world drifted?"]:::ml
+
+  GAP["<b>Open gaps, stated not hidden</b><br/>9.6% Unassigned needs a PAL definition<br/>no loyalty tier → Mabuhay invisible<br/>SME ground truth outstanding"]:::gap
+
+  RAW --> B --> C --> F --> BK --> CU --> RULE
+  RULE ==> X ==> BI
+  RULE -.->|"ML job 1"| LCA
+  RULE -.->|"ML job 2"| VAL
+  BI -.->|"ML job 3"| MON
+  RULE -.-> GAP
 ```
-gz → typed Parquet → Stage C clean+flag (coupon grain)
-→ Stage F features: coupon → booking (customer_id, issue_date) → customer  (+ airport→region join)
-→ RULE-BASED purpose×value proxy segmentation  ← PRIMARY deliverable (the 10 segments)
-→ LCA refinement (sub-segment oversized groups; validate axes)  ← ML's role
-→ Stage X export: segment joined back down to coupon grain  → Power BI fact table
-→ pending SME ground-truth for non-circular validation
+
+**Reading it:** blue = data preparation · **gold = the deliverable** · violet = ML's three real jobs ·
+green = delivery · dashed red = known gaps. Dashed arrows are checks and feedback, not data flow.
+Stage detail: [Stage C](#stage-1--data-ingestion--cleaning) onward below; scripts in
+[Scripts Reference](#scripts-reference).
+
+### The validation ladder — and why circularity is the crux
+
+Every agreement number this project produces is measured against `proxy_segment`, which is the rule
+waterfall's own output. That is **circular** by construction. Two independent routes out, both live:
+
+```mermaid
+flowchart LR
+  classDef circ fill:#1A0A0E,stroke:#FF4D6D,stroke-width:1px,color:#E8ECF4
+  classDef planb fill:#0B1220,stroke:#38BDF8,stroke-width:1px,color:#E8ECF4
+  classDef plana fill:#07160E,stroke:#22C55E,stroke-width:2px,color:#E8ECF4
+  classDef seg fill:#1C1708,stroke:#C9A84C,stroke-width:2px,color:#FFFFFF
+
+  SEG["<b>10 rule-based segments</b>"]:::seg
+
+  CIRC["<b>Circular — unavoidable today</b><br/>per-segment recall + weighted cost<br/>measured against our own rules<br/><i>machinery built and tested;<br/>it is awaiting an answer key</i>"]:::circ
+
+  V1["<b>V1 · construct validity</b><br/>do the segments differ on evidence<br/>the rules never saw?<br/><code>validate_construct.py</code>"]:::planb
+  V2["<b>V2 · criterion validity</b><br/>do they predict outcomes no rule reads<br/>— refunds, rebooking?<br/><code>validate_criterion.py</code>"]:::planb
+  V3["<b>V3 · detection power</b><br/>plant groups of known size in the real data<br/>— would we even find them?<br/><code>detection_power.py</code>"]:::planb
+  V4["<b>V4 · out-of-time stability</b><br/>does it survive a 12-month step?<br/><code>validate_temporal.py</code>"]:::planb
+
+  ANCH["<b>Circularity contract</b><br/><code>validation_anchors.py</code><br/>which fields may validate, and why<br/><i>enforced, not assumed</i>"]:::planb
+
+  SME["<b>Plan A · SME ground truth</b><br/>~1,000 hand-labelled bookings<br/>+ inter-rater kappa<br/><i>the strongest evidence — outstanding</i>"]:::plana
+
+  SEG --> CIRC
+  SEG --> ANCH
+  ANCH --> V1 & V2 & V3 & V4
+  SEG --> SME
+  SME -.->|"replaces the circular metric"| CIRC
 ```
+
+**Plan B answers "is there real structure here?" without any labels. Plan A answers "are these the
+*right* labels for PAL?" and nothing else can.** They are complements, not substitutes — which is why
+the SME ask is the critical path even though Plan B is complete.
 
 - **Approach decision (2026-07-23, evidence-based):** a mixed-type clustering diagnostic
   (`src/cluster_diagnostic.py`: LCA + k-prototypes) showed the customer base is a **continuum**
@@ -166,7 +254,10 @@ gz → typed Parquet → Stage C clean+flag (coupon grain)
 - **Delivery (Stage X, 2026-07-27):** `src/export_powerbi.py` joins the booking-grain `proxy_segment` back
   down onto the cleaned coupons and emits a Power BI **star schema** → `outputs/powerbi_export/`: `coupons/`
   (38.1M, drill-through), `agg/` (flight-level detail), `agg_dashboard.parquet` (~1.7M, headline visuals),
-  `dim_date.csv` (time intelligence) + QA sample + `summary.md`. Row-preserving (38,116,259 in = out); 99.95%
+  `dim_date.csv` (time intelligence), **`dim_segment.csv` (the persona dimension — 11 rows, added v1.4;
+  measured behaviour recomputed per build + editorial persona text + `Trust`/`DataCaveat` governance
+  columns, so persona cards render in BI and carry their caveats)** + QA sample + `summary.md`.
+  Row-preserving (38,116,259 in = out); 99.95%
   segment match, the remainder being the all-non-revenue customers Stage F excludes, labelled
   `Excluded (non-revenue)` so BI totals still tie. **`CustomerSegment` ships as the rule-based proxy label** —
   preliminary, and explicitly flagged as such in the export summary until SME ground truth lands.
@@ -190,12 +281,13 @@ gz → typed Parquet → Stage C clean+flag (coupon grain)
   `src/kproto_compare.py` (method re-test) · `src/model_zoo.py` + `src/model_stress_test.py`
   (ten-method / eight-axis benchmark) · `src/export_powerbi.py` (X, BI delivery). Full plan:
   `docs/real-data-plan.md`; data dictionary: `docs/data-dictionary.md`.
-- **Prior tracks (kept for reference, superseded for real data):** the **v3 prototype**
-  (synthetic 1k, HDBSCAN — see below) and the **Stages 1–8** `sample-features.csv` baseline. On the v3
-  synthetic data HDBSCAN also found no density structure (DBCV ≈ 0), which pre-figured this pivot.
+- **Prior track (superseded for real data):** the **Stages 1–8** `sample-features.csv` baseline —
+  the real Jan-2025 snapshot, retained below as the reference implementation. An earlier prototype
+  track also preceded this work; see [Prior Prototype Track](#prior-prototype-track-superseded).
+  **The continuum finding rests entirely on the real extract** — ten methods across six families,
+  separation ceiling 0.381, plus the detection-power bound in Stage V3.
 
-Full detail: [v3 Prototype Pipeline](#v3-prototype-pipeline--pnr-level-anonymous-segmentation) (prior);
-real-data methodology → `docs/real-data-plan.md`.
+Real-data methodology → `docs/real-data-plan.md`.
 
 ---
 
@@ -275,9 +367,10 @@ one that makes the project's repeated null result falsifiable: **if a segment ex
 would this pipeline see it?** Ten methods agreeing on "no clusters" is only evidence if the methods can
 detect a cluster when one is present.
 
-Synthetic segments of known prevalence (0.5 · 1 · 2 · 5 · 10%) and known distinctness are **appended** to
+**Planted** segments of known prevalence (0.5 · 1 · 2 · 5 · 10%) and known distinctness are **appended** to
 the real population — never substituted in, so the counterfactual is *"if PAL's book also contained this
-group"* rather than *"if part of the book were replaced"*. Distinctness is one knob, `w`: each planted row
+group"* rather than *"if part of the book were replaced"*. (These are *injected test signals* used to
+measure our own detection sensitivity on the real extract — not a substitute dataset.) Distinctness is one knob, `w`: each planted row
 starts as a real booking and moves a fraction `w` toward a fixed archetype (numerics interpolate; binary
 flags and `dest_region` flip toward it with probability `w`). `w=0` is an unmodified random subset, `w=1`
 collapses the group onto a single point.
@@ -424,7 +517,7 @@ governs every field's meaning and the farebrand value ladder, and is mirrored to
 
 This document describes the end-to-end machine learning pipeline for the PAL Customer Segmentation project. The objective is to produce a baseline segmentation model over PNR booking data, assigning each booking record to one of ten commercially meaningful customer segments. The pipeline combines rule-based proxy labelling, density-based clustering, penalty-weighted feature scaling, and direct nearest-centroid assignment for ambiguous records.
 
-**Two tracks.** The **baseline pipeline** (Stages 1–8, below) is validated on the real Jan-2025 `sample-features.csv` snapshot. The **[v3 prototype pipeline](#v3-prototype-pipeline--pnr-level-anonymous-segmentation)** adapts that same architecture to the richer PNR/coupon-level `PAL_PNR_Synthetic_Data_1000-v3.csv` schema and frames the work explicitly as **anonymous trip-purpose × value segmentation** at the booking level (Sabre's "anonymous" lens — no loyalty/CRM join). It is the current active track.
+**Scope of this section.** The **baseline pipeline** (Stages 1–8, below) is validated on the real Jan-2025 `sample-features.csv` snapshot and is retained as the reference implementation. The **active track is the real-data pipeline** on the 38M-coupon extract — see [Current Methodology at a Glance](#current-methodology-at-a-glance). Both frame the work as **anonymous trip-purpose × value segmentation** at the booking level (Sabre's "anonymous" lens — no loyalty/CRM join).
 
 ---
 
@@ -692,142 +785,17 @@ sample-features.csv
 
 ---
 
-## v3 Prototype Pipeline — PNR-Level Anonymous Segmentation
+## Prior Prototype Track (superseded)
 
-**Added v0.5 (17 Jul 2026).** This section adapts the baseline architecture (Stages 1–8) to the new
-PNR/coupon-level dataset. It reuses the winning method — proxy waterfall → penalty-weighted HDBSCAN →
-nearest-centroid mapping + noise auto-assignment → cost-matrix validation — but re-derives every
-schema-dependent step for the v3 columns.
+An earlier PNR/coupon-level prototype track preceded the real-data pipeline and is **superseded**. It
+is noted here only as an audit trail that something came before: **no result from it is quoted anywhere
+in this document**, and every conclusion in the active methodology rests on the real 38M-coupon extract
+(see [Current Methodology at a Glance](#current-methodology-at-a-glance) and Stages V1–V4).
 
-### Framing
-
-Because v3 has **no loyalty/CRM join**, this model is Sabre's **"anonymous segmentation" lens**:
-each *booking* is segmented by **trip purpose × value** from observable attributes alone. This is a
-named, defensible industry approach — not a limitation to apologise for. It is *booking-level*, not
-customer-lifetime, segmentation. (See `knowledge-base.md` §15, 2026-07-17 entries, for sources.)
-
-### Source Data (v3)
-
-| Property | Value |
-|----------|-------|
-| File | `data/raw/PAL_PNR_Synthetic_Data_1000-v3.csv` |
-| Dictionary | `data/raw/PAL_PNR_Synthetic_Data_1000-v2.csv` (`Field, Description`) |
-| Rows | 1,000 (coupon-level; one coupon per `Unique Identifier`) |
-| Columns | 41 — **100% populated (no nulls)** |
-| Scope | Validates the *approach*, not production-grade metrics (n is small) |
-
-### Stage P1 — Ingest & Clean (v3 quirks)
-
-The v3 schema differs from `sample-features.csv`; **do not reuse the baseline cleaning code**:
-
-| Quirk | Handling |
-|-------|----------|
-| Header col 4 malformed: `CouponNumber] ` | strip `]` and whitespace from all headers |
-| `NetRevenue` / `NetFare` are strings with a **`$` suffix** (`574$`) | strip trailing `$`, cast to float |
-| Dates are US-style **`M/D/YY`** | parse with `dayfirst=False` (**opposite** of baseline) |
-| `Group/Individual` is text (`Individual`/`Group`) | map to binary `is_group` |
-| `OperatingCabinClass` is combined `Economy/X` | split into cabin + booking class |
-| `PaxCount` is always `1` | do **not** use party size; use `is_group` + child age instead |
-
-### Stage P2 — Feature Engineering (v3)
-
-Framed on the industry's highest-signal booking attributes (advance purchase, cabin/fare class,
-channel, yield + ancillary). All features below are derivable and fully populated in v3.
-
-| Group | Features | Segment signal |
-|-------|----------|----------------|
-| **Value / Monetary** | `net_fare`, `net_revenue`, **`ancillary = net_revenue − net_fare`** (100% > 0, median $77), `ancillary_ratio`, `fare_tier` (from 19 RBDs) | value tier; premium/leisure add-on propensity |
-| **Timing** | **`lead_time`** = Departure − Issuance (1–180 d), `dep_hour` / `red_eye`, `dep_dow` / `is_weekend`, `booking_month` / `is_peak_season`, `changed_itinerary` (Exchanged status) | business (short lead, red-eye, weekday) vs leisure |
-| **Product / route** | `cabin_ord` (Econ 0 / PremEcon 1 / Bus 2), `is_domestic` / `haul_type`, `is_codeshare` (`TripOD≠OnlineOD`), `n_connections` / `is_connecting`, **`pos_mismatch`** (`CountryCodeOfIssue≠PointofOrigin`) | premium vs budget; OFW/VFR diaspora |
-| **Party / demo / channel** | `age_band` (child<12 … senior 60+), `is_group`, `gender`, `is_direct` vs **`is_gds`** | family/pilgrimage; corporate (GDS) |
-
-Normalisation: `StandardScaler`, then penalty re-weighting (Stage P4).
-
-**Not derivable from v3 (documented gaps):**
-
-| Gap | Reason |
-|-----|--------|
-| Length-of-stay / Saturday-night-stay | no return-leg pairing (each row is a single unique coupon) |
-| RFM **Recency & Frequency** | no passenger key linking bookings across time (only **Monetary** available) |
-| Loyalty tier | absent → **Mabuhay Loyalist** remains un-proxyable (same as baseline) |
-
-### Stage P3 — Proxy Label Waterfall (v3 rules)
-
-The baseline §Stage-3 rules are re-mapped to v3 columns. Rules that depended on PAX count or
-Farebrand (absent/constant in v3) are substituted with the `Group/Individual` flag and RBD/fare tiers.
-Applied low → high priority; higher overwrites lower.
-
-| Priority | Segment | v3 Rule |
-|:--------:|---------|---------|
-| 1 (lowest) | Budget/Adventure | deep-discount RBD (O/X/T/Q/V/S/L) + Economy + OTA channel |
-| 2 | Digital Nomad | solo `Individual` + regional/ASEAN O&D + digital channel (Website/App) + long lead |
-| 3 | Last-Minute | `lead_time` ≤ 3–7 days |
-| 4 | Family | `is_group` + leisure timing (weekend) + Economy |
-| 5 | Pilgrimage | `is_group` + Gulf/pilgrimage destination + peak season |
-| 6 | Balikbayan/VFR | destination PH + foreign origin + long-haul + Economy |
-| 7 | OFW/Migrant | `pos_mismatch` (issued abroad) + Gulf/diaspora origin + one-way/long-haul |
-| 8 | Premium Bleisure | Premium-Economy/Business cabin + weekend + high ancillary |
-| 9 (highest) | Corporate | Business cabin **or** full-fare Y + GDS channel + short lead + weekday early-AM |
-| — | Mabuhay Loyalist | *no rule — loyalty field absent* |
-
-### Stage P3b — Negative Learning (impossibility filters)
-
-Applied after the waterfall to send contradictory assignments back to `Unassigned` (baseline KB §9,
-re-mapped to v3 fields since loyalty/bags/income are absent). Implemented in `features_v3.apply_negative_learning`:
-
-| Assigned segment | Contradiction → Unassigned |
-|---|---|
-| Corporate | `lead_time` > 60 **and** Economy cabin (booked far ahead in economy) |
-| Corporate | booked via **OTA** (corporate flows through GDS / direct) |
-| Digital Nomad | `is_group` (nomad is solo by definition) |
-| Premium Bleisure | bottom-quartile ancillary (contradicts the premium-spend signal) |
-
-### Stage P4 — HDBSCAN Discovery + Inductive Labelling (improved)
-
-The first pass penalty-weighted the feature space before clustering; diagnostics showed this *lowered*
-DBCV (it bends space toward the proxy rules). The improved design **decouples discovery from priorities**:
-
-1. **Compact features (Tier-3):** cluster the 24-feature subspace (`build_compact_matrix`), dropping the
-   19 collinear/duplicate columns. **Mixed-type scaling:** StandardScaler on continuous columns only;
-   binary flags stay `{0,1}`.
-2. **Hold-out split:** fit everything on train; score a held-out test set inductively.
-3. **Unweighted HDBSCAN discovery** (`min_cluster_size` scaled to N — ~30–50 @1k, 150 @30k,
-   500–1,000 @6M) — used only to *assess whether density structure exists* (DBCV / silhouette).
-4. **Inductive labelling:** compute proxy-seed segment centroids on **train**; assign any row (train,
-   noise, or held-out) to its nearest centroid. **Penalties enter only in the P5 cost metric**, not the
-   distance.
-5. **Unassigned bucket:** rows past the 95th-percentile train distance are left low-confidence rather
-   than force-assigned. The deployable scorer = `(scaler + centroids + threshold)`.
-
-### Stage P5 — Validate & Cross-Check
-
-- **Primary:** asymmetric cost matrix + **per-segment recall**, reported on the **held-out** set
-  (out-of-sample), optimising Corporate ×10 / OFW ×5.
-- **Cluster quality:** DBCV (primary for HDBSCAN), Silhouette, bootstrap ARI (`diagnose_v3.py`).
-- **Ground truth:** drop `data/labels/sme_sample.csv` (`Unique Identifier`,`true_segment`) and P5 adds a
-  **non-circular** SME hold-out recall automatically. Until then, recall is proxy-referenced (circular).
-- **Cross-check:** profile segments against the industry taxonomy (`knowledge-base.md` §15) and flag the
-  structural gaps (3 unseeded segments; no latent density structure in the v3 synthetic data).
-
-### Phase → Deliverable mapping
-
-| Phase | Baseline stage | Deliverable |
-|-------|----------------|-------------|
-| P0 Loader/clean | Stage 1 | `src/features_v3.py` |
-| P1 Feature engineering | Stage 2 | `src/features_v3.py` |
-| P2 Proxy waterfall | Stage 3 | `src/features_v3.py` (v3 rules) |
-| P3 Cluster + map | Stages 5–6 | prototype clustering script (e.g. `src/prototype_v3.py`) |
-| P4 Validate | Stage 7 | cost-matrix + per-segment recall report |
-| P5 Profile/cross-check | — | segment profiles vs industry taxonomy |
-
-> **Algorithm decision is closed:** HDBSCAN is the plan of record (Stage 4). Re-running the
-> 7-algorithm leaderboard on v3 is *confirmatory only*, not a re-opening of the choice.
->
-> **⚠️ Superseded for the real-data track (2026-07-23).** On the real 38M-coupon data, the mixed-type
-> diagnostic showed a continuum with no natural *k* and only moderate cluster–taxonomy agreement, so
-> **HDBSCAN is dropped there**: the rule-based purpose×value segmentation is primary and **LCA** refines/
-> validates (see the at-a-glance and `docs/real-data-plan.md`). This note applies to the v3/synthetic and
-> `sample-features` tracks only.
+The one architectural idea it contributed, which the real pipeline kept, is the **anonymous
+trip-purpose × value lens**: segment a *booking* from observable attributes alone, with no loyalty/CRM
+join. That is a named, defensible industry approach — Sabre's anonymous segmentation — and its sources
+are recorded in `knowledge-base.md` §15. It is *booking-level*, not customer-lifetime, segmentation.
 
 ---
 
@@ -900,4 +868,5 @@ These rules are not implemented in the current pipeline because the required fie
 ---
 
 *Document prepared for Philippine Airlines internal use.*
+*v1.4 — 31 July 2026 (Stage X ships `dim_segment.csv`, the persona dimension: measured behaviour recomputed per build, editorial persona text, and `Trust`/`DataCaveat` governance columns kept separate so evidence is distinguishable from assertion — no modelling change)*
 *v1.3 — 29 July 2026 (out-of-time stability: segment shares hold across a 12-month issuance step (TVD 1.93 pp, full population) and a model fitted a year earlier transfers for free (ratio 1.02 vs a within-window ceiling); revenue mix is the weaker leg (TVD 3.21 pp); the extract is departure-filtered, so calendar-year windows are invalid — plus v1.2 detection power: the null is bounded at ≥2% prevalence and we are blind below ~1%)*

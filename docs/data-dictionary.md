@@ -4,8 +4,8 @@
 Faithful mirror of the client's `data/PAL-data/DataDictionary.v1.xlsx` (git-ignored with the bulk data),
 kept here so it is version-controlled and available on clone.
 
-> This V1 dictionary supersedes the legacy `data/raw/PAL_PNR_Synthetic_Data_1000-v2.csv`, which describes
-> the 1,000-row **synthetic** prototype and is stale for the real data (it mislabels `UniqueID` as a PNR
+> This V1 dictionary is **authoritative for the real extract** and supersedes the legacy dictionary that
+> shipped with the superseded prototype track — that one is stale here (it mislabels `UniqueID` as a PNR
 > and `CurrentCouponStatus` as "ticketed/unticketed"). See `docs/real-data-plan.md` for the reconciled
 > plan and `docs/knowledge-base.md` §15 for verification notes.
 

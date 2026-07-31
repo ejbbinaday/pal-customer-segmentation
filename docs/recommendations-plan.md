@@ -274,7 +274,7 @@ highest-value single question, and it needs no SME.
 | B2 | **Construct validity** on the surviving anchors, with an explicit missingness model for age | `src/validate_construct.py` | ✅ **done 2026-07-28** |
 | B3 | **Seasonality vs the known calendar** — pre-register predictions (Balikbayan→Dec, Pilgrimage→Hajj/Umrah window, OFW→deployment rhythm), then test, base-rate normalised | part of B2 | ✅ **done 2026-07-28** |
 | B4 | **Out-of-time stability** — two adjacent 12-month *issuance* windows (the extract is departure-filtered, so calendar-year splits are invalid); do sizes, profiles and revenue mix hold? | `src/validate_temporal.py` | ✅ **done 2026-07-29** |
-| B5 | **Detection power by injection** — plant synthetic segments of known prevalence and separation, find the detection floor | `src/detection_power.py` | ✅ **done 2026-07-29** |
+| B5 | **Detection power by injection** — plant segments of known prevalence and separation into the real population, find the detection floor | `src/detection_power.py` | ✅ **done 2026-07-29** |
 | B6 | **Weak supervision** — 3+ *independent* labelling functions per segment from disjoint feature families, combined with a Dawid–Skene label model → accuracy estimate with no gold labels. Also: characterise the **2.19M Unassigned** — one coherent missing segment, or a grab bag? | `src/weak_labels.py` |
 
 **B1's framing matters.** A segmentation is a *compression*, so it will never beat the raw features. The

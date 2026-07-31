@@ -3,26 +3,30 @@
 ML framework to auto-classify Philippine Airlines PNRs into actionable revenue segments —
 **10 named segments** (see `docs/methodology.md` and `docs/knowledge-base.md`).
 
-Two tracks, two winning approaches:
-- **Real 38M-coupon data (active):** the customer base is a **continuum**, not natural clusters — so the
-  **rule-based purpose×value segmentation is primary** and model-based clustering *refines and validates* it.
-  HDBSCAN is dropped here (categorical-heavy, not density-separable). Confirmed by a ten-method benchmark
-  (2026-07-28); the refinement layer (LCA vs GMM) is under review.
-- **Prototype tracks (`sample-features.csv`, v3 synthetic):** **HDBSCAN** on penalty-weighted features →
-  nearest-centroid mapping to the 10 segments. Retained as the reference implementation.
+**The active track is the real 38M-coupon extract.** The customer base is a **continuum**, not a set of
+natural clusters — so the **rule-based purpose×value segmentation is primary** and model-based clustering
+*refines and validates* it. HDBSCAN is dropped here (categorical-heavy, not density-separable). Confirmed
+by a ten-method benchmark across six families (2026-07-28) and bounded by a detection-power test
+(2026-07-29); the refinement layer (LCA vs GMM) is under review.
+
+The **`sample-features.csv` baseline** (HDBSCAN on penalty-weighted features → nearest-centroid mapping)
+is retained as the reference implementation.
 
 ## Repository layout
 
 ```
 data/raw/      Source datasets (not all tracked — see .gitignore)
-                 sample-features.csv                  real Jan-2025 PAL snapshot (29,999 rows, 27 cols)
-                 PAL_PNR_Synthetic_Data_1000-v3.csv   NEW PNR-level prototype data (1,000 rows, 41 cols)
-                 PAL_PNR_Synthetic_Data_1000-v2.csv   data dictionary for the v3 schema
-                 synthetic_flight_passenger_data.csv  generic synthetic set used by the POC
+                 sample-features.csv   real Jan-2025 PAL snapshot (29,999 rows, 27 cols) — baseline
+                 (also holds legacy inputs for the superseded prototype track; not part of any deliverable)
 data/PAL-data/ REAL PAL coupon-level extract — 4 gzipped CSVs, ~38M rows, 40 cols, 2024–2027
                  (git-ignored, local only). newQuery2024 / 2025 / 2026Jan_to_May / 2026Jun_to_2027May
 data/interim/  Derived Parquet built from the raw gz (git-ignored):
                  pal_parquet/   typed, zstd, partitioned by iss_year — the fast pipeline input
+data/constraints/ SME business constraints (tracked): hard_constraints.csv (impossibility rules) +
+                 soft_constraints.csv (tendencies) + README.md (column guide). Pre-filled with our
+                 own guesses as examples — SMEs correct/extend them. See docs/stakeholder-report.md §7
+data/labels/   SME ground-truth labels (tracked template): sme_sample_TEMPLATE.csv + README.md.
+                 Drop sme_sample.csv here to unlock non-circular validation
 src/           All Python (analysis pipeline + report/slide generators + shared palette)
 docs/          Business + methodology + EDA + monitoring docs, onboarding guide
 reports/       Tracked deliverables: HTML EDA report, exported slide PNGs, POC figures
@@ -53,40 +57,30 @@ so they can be run from anywhere (e.g. `python src/hdbscan_final.py`).
 `src/generate_report.py` (HTML EDA report), `src/poc_synthetic.py` + `src/generate_dark_slides.py`
 (POC figures), `src/capture_slides.py` (deck → PNGs), `src/dashboard.py` (Streamlit executive dashboard).
 
+**Decks** (1600×900 HTML, self-contained — open in a browser, or export to PNG):
+
+| Deck | Source | PNGs |
+|---|---|---|
+| Kick-off executive deck | `assets/kick-off-call/pal_executive_deck.html` | `python src/capture_slides.py` |
+| **Stakeholder deck** — current methodology · business-rule waterfall · success metrics + worked cost calc · SME constraint asks · persona cards | `assets/tuesday-slides/josh-slides.html` | `python src/capture_slides.py --deck tuesday` → `reports/tuesday_slides/` |
+
+`capture_slides.py` takes `--deck <name\|path>` and `--out <dir>`; it screenshots every `.slide`
+element. Needs `playwright` + chromium (it installs both on first run).
+
 > **Streamlit Cloud:** the dashboard entrypoint is now `src/dashboard.py` — update the deployment config.
 
-## v3 prototype (active track)
+## Prior prototype track (superseded)
 
-`src/features_v3.py` implements Stages **P1–P3** of the PNR-level prototype — clean → engineer →
-proxy-label waterfall — on `data/raw/PAL_PNR_Synthetic_Data_1000-v3.csv` (see
-`docs/methodology.md` §v3 Prototype Pipeline). It exposes `build()` (enriched frame) and
-`build_matrix()` (unscaled model matrix), and profiles the features when run:
-
-```bash
-python src/features_v3.py     # P1–P3 → outputs/features_v3_output/
-python src/prototype_v3.py    # P4–P5 → outputs/prototype_v3_output/
-python src/diagnose_v3.py     # structure check (DBCV/ARI/silhouette) → outputs/diagnose_v3_output/
-```
-
-`src/prototype_v3.py` runs Stages **P4–P5** (improved): **hold-out split** → compact 24-feature matrix
-(mixed-type scaling) → **unweighted** HDBSCAN discovery → inductive nearest-centroid labelling with an
-**Unassigned bucket** → cost-matrix + DBCV validation on the **held-out** set. Penalties are used only in
-the cost metric (not the feature space); negative learning (P3b) runs in `features_v3.build()`.
-
-> **SME ground truth:** drop `data/labels/sme_sample.csv` (`Unique Identifier`,`true_segment`) and the
-> script reports a **non-circular** hold-out recall automatically — see `data/labels/README.md`.
-
-> **Known gap (v3 data):** OFW/Migrant, Pilgrimage, and Mabuhay Loyalist have no proxy seed in the
-> v3 synthetic set, so they are not assignable in this prototype (see `docs/knowledge-base.md` §15).
->
-> **Honest verdict:** diagnostics (negative DBCV, flat KMeans silhouette) show the v3 synthetic data has
-> **no latent cluster structure** — this validates the *approach*, not a result, and the recall numbers
-> are circular. Full analysis + recommendations: **`docs/v3-prototype-findings.md`**.
+An earlier PNR/coupon-level prototype preceded the real-data pipeline and is **superseded** — kept only
+as an audit trail. Its scripts (`src/features_v3.py`, `src/prototype_v3.py`, `src/diagnose_v3.py`) remain
+in the tree and still run, but **no result from them is quoted in any deliverable**; every current
+conclusion rests on the real 38M-coupon extract below. See `docs/methodology.md`
+§Prior Prototype Track.
 
 ## Real PAL data (38M coupon rows — active)
 
 The real extract in `data/PAL-data/` is coupon/segment-grained (avg ~2.8 coupons per passenger),
-far larger than the synthetic prototype. Processing goes through DuckDB / Parquet rather than
+far larger than any earlier sample. Processing goes through DuckDB / Parquet rather than
 in-memory pandas:
 
 ```bash
@@ -160,7 +154,7 @@ outcomes no rule consumes (`flown_any`, `refund_any`, `rebook_180d`), reporting 
 Rare-event outcomes are **reported as infeasible rather than fitted**, and `rebook_180d` excludes
 right-censored bookings near the extract boundary.
 `detection_power.py` answers the one challenge the continuum finding could not: **"or are your methods
-blind?"** It **appends** synthetic segments of known prevalence (0.5–10%) and known distinctness to the real
+blind?"** It **appends planted** segments of known prevalence (0.5–10%) and known distinctness to the real
 population — each planted row moved a fraction `w` toward a business-plausible archetype, plus a
 **random-direction control** so the result can't be an artefact of a lucky guess — then re-fits the
 deployable panel (GMM(full) · LCA · KMeans · SVD+KMeans) at k=10 and measures whether the group comes back
@@ -209,8 +203,9 @@ The folder is laid out as a **self-contained handoff** — zip it and send it:
 outputs/powerbi_export/
 ├── START-HERE.md                 5-min starter guide (copy of docs/powerbi-guide.md)
 ├── summary.md                    field dictionary, reconciliation, caveats
-├── model/                        ← the three things Power BI actually loads
+├── model/                        ← what Power BI actually loads
 │   ├── dim_date.csv                 1.8k rows — mark as the Date table
+│   ├── dim_segment.csv                11 rows — persona dimension (see below)
 │   ├── fact_flight/                20.6M rows — full dashboard (flight no., O&D, lead time)
 │   └── fact_dashboard.parquet       2.1M rows — fast summary-only alternative
 ├── qa/sample_100k.csv             100k rows — build + validate DAX before moving GBs
@@ -224,12 +219,29 @@ for booking-level measures and `BookingID` to dedupe the per-leg `Route` repetit
 the **rule-based proxy** label; `PaxCount` is sectoral (≈always 1, *not* party size); `Age` is 57% NULL by
 design (filter `AgeKnown`); and **`DaysBeforeMonthEnd` cannot drive LY-vs-CY pickup** (one value per
 departure month — use `LeadTimeDays`).
+
+**`model/dim_segment.csv` — the persona dimension.** One row per segment, related to the fact table on
+`Segment` = `CustomerSegment`, so a card visual bound to it **cross-filters with every other visual**
+(persona cards that respond to a route or quarter slicer). Columns split three ways on purpose:
+**measured** behaviour (lead days, round-trip / international / premium / connecting rates, median+mean
+revenue, coupons per booking, top-3 regions, modal channel & issue country) — recomputed from
+`pal_features_booking.parquet` on **every build**, at **booking grain** so multi-coupon segments are not
+over-weighted; **editorial** persona text (`PersonaName`, `WhyTheyFly`, `WhatTheyWant`, `WhatNotToDo`) —
+informed inference, not findings; and **governance** (`Trust`, `DataCaveat`, `IsModelledSegment`,
+`PenaltyWeight`, `RevenueAtRiskPerError`, `SegmentColorHex` from `pal_colors.py`). **Put `Trust` and
+`DataCaveat` on the card** — persona cards persuade, and a cropped caveat is how "Mabuhay 0.03%" becomes
+"the loyalty programme doesn't matter". Filter `IsModelledSegment = FALSE` out of commercial visuals.
+Full guide: `docs/powerbi-guide.md` §3b.
 `report_figures.py` draws the real-data EDA + preliminary-cluster (LCA/PCA) figures used in the
 shareable status report; `build_report.py` embeds them into a self-contained
 **`docs/status-report.html`** and renders **`docs/status-report.pdf`** (a colleague-facing summary of
 the approach, methodology, EDA and current status) from the `docs/_status-report.template.html` template.
 
 Key references:
+- **`docs/stakeholder-report.md`** — the **non-technical stakeholder report**: plain-language
+  methodology, the full rule waterfall as implemented, ten data-backed **persona cards**, the success
+  metrics with a worked peso cost calculation, and the SME asks (hard/soft constraints + labelled
+  sample) with exact file formats. Written for PAL commercial stakeholders, not for engineers.
 - **`docs/recommendations-plan.md`** — the sequenced plan acting on the 2026-07-28 stress-test findings
   (SME ground truth first, feature-contract gate, GMM confidence layer, pre-registered decision rules,
   and the one gated customer-grain experiment).

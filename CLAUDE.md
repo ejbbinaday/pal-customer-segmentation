@@ -35,7 +35,8 @@ at a Glance" summary and the footer date) in the same turn**, and keep the other
   HDBSCAN → 10 named segments, penalty-weighted, validated by asymmetric cost matrix + per-segment recall.
 - Code: `src/` (flat, shares `from pal_colors import`); data: `data/raw/`; artifacts: `outputs/` (git-ignored).
 - Scripts resolve paths via `ROOT = Path(__file__).resolve().parents[1]` — runnable from anywhere.
-- Active work: prototyping the clustering model on the v3 PNR dataset (`data/raw/PAL_PNR_Synthetic_Data_1000-v3.csv`).
+- Active work: the **real-data pipeline** on the 38M-coupon extract (`data/PAL-data/*.txt.gz` →
+  `data/interim/`). An earlier prototype track is superseded — do not quote results from it.
 
 ## Commits
 

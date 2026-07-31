@@ -8,9 +8,9 @@ tracked **`docs/data-dictionary.md`**. Companion to `docs/methodology.md` (the a
 these stages are implemented in `src/`).
 
 > **Dictionary provenance.** `DataDictionary.v1.xlsx` (V1) describes the **real** data and wins on every
-> conflict. The older `data/raw/PAL_PNR_Synthetic_Data_1000-v2.csv` describes the 1,000-row **synthetic**
-> set and is stale for the real extract — it wrongly called `UniqueID` a PNR and `CurrentCouponStatus`
-> "ticketed/unticketed". Both are corrected below and verified against the data.
+> conflict. The older dictionary from the superseded prototype track is stale for the real extract — it
+> wrongly called `UniqueID` a PNR and `CurrentCouponStatus` "ticketed/unticketed". Both are corrected
+> below and verified against the data.
 
 Toolchain: **DuckDB** for the heavy out-of-core work (the 38M rows never fully enter pandas);
 **Parquet** (`data/interim/pal_parquet/`) as the fast intermediate; **pandas/sklearn** only on the
@@ -70,7 +70,7 @@ replaces the hand-rolled `FARE_TIER` in `features_v3.py`:
 - Pre-Apr-2026 `F` (94) = economy non-revenue, **not** award.
 - Applies to both `BookingClass` (flown) and `SoldBookingClass` (issued).
 
-### 0b. Column renames vs the legacy synthetic dictionary (`...v2.csv`)
+### 0b. Column renames vs the legacy dictionary
 
 `Unique Identifier`→`UniqueID` (**customer**, per V1 — v2 wrongly said PNR); `PointofOrigin`→`POO`
 (airport); `PaxCount`→`Pax Count`; `NetRevenue`→`Revenues w YQ`; `NetFare`→`Net Fare`;
