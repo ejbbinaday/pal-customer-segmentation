@@ -1,0 +1,8 @@
+rule_id,condition,leans_toward,leans_away_from,strength,owner,notes
+S01,dest_region = 'Middle East' AND max_tier <= 3,OFW/Migrant,Premium Bleisure,strong,RM International,Corridor is labour-driven but not exclusively
+S02,dep_month IN (4,5,12),Balikbayan/VFR,Corporate,moderate,RM Domestic,Peak season skews to visiting family
+S03,lead_days <= 3 AND max_tier >= 6,Corporate,Last-Minute,strong,RM International,Premium urgency reads as business not emergency
+S04,is_domestic AND n_bookings >= 6,Corporate,Budget/Adventure,weak,RM Domestic,Frequent domestic repeat booking hints at business travel
+S05,connecting AND NOT round_trip AND foreign_issue,OFW/Migrant,Family,moderate,RM International,Connecting one-ways from abroad fit relocation
+S06,issue_country = 'PH' AND is_international AND max_tier <= 3,Budget/Adventure,OFW/Migrant,moderate,RM International,Candidate rule for the 9.6% Unassigned bucket -- needs a PAL decision
+S07,is_group AND dest_region = 'Middle East',Pilgrimage,Family,moderate,RM International,Group travel to the Gulf is often religious rather than familial

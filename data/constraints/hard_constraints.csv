@@ -1,0 +1,8 @@
+rule_id,condition,verdict,segments,owner,confidence,notes
+H01,lead_days >= 60 AND max_tier <= 4 AND NOT corp_channel,cannot_be,Corporate,RM Domestic,certain,Corporate travel is booked late and in premium cabins
+H02,channel = 'Sea Crew',must_be,OFW/Migrant,RM International,certain,Maritime crew channel is definitive
+H03,is_award,must_be,Mabuhay Loyalist,FF Product Owner,certain,Award redemption proves programme engagement
+H04,any_business AND lead_days <= 1 AND round_trip,narrow_to,Corporate|Premium Bleisure,RM International,likely,Same-day business return is one of these two only
+H05,pilgrimage_dest AND max_tier <= 2,cannot_be,Premium Bleisure,RM International,certain,Pilgrimage traffic is not a bleisure product
+H06,is_domestic AND NOT any_premium,cannot_be,Premium Bleisure,RM Domestic,certain,Premium Bleisure requires a premium cabin on an international route
+H07,foreign_issue AND is_international AND max_tier <= 2,cannot_be,Corporate,RM International,likely,Cheapest economy issued abroad is not company-paid travel
