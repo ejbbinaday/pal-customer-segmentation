@@ -293,6 +293,10 @@ Key references:
   methodology, the full rule waterfall as implemented, ten data-backed **persona cards**, the success
   metrics with a worked peso cost calculation, and the SME asks (hard/soft constraints + labelled
   sample) with exact file formats. Written for PAL commercial stakeholders, not for engineers.
+- **`docs/pal-questions.md`** — **the consolidated ask list for PAL: 24 open items in four groups**
+  (7 blocking decisions · 5 data requests · 8 changes-to-their-rules needing confirmation · 4 still
+  unanswered from the original workbook). Each row carries our recommendation, so most can be answered
+  "agreed". Group A gates the waterfall change; A1 (misclassification cost weights) gates scoring entirely.
 - **`docs/waterfall-v2-design.md`** — **the taxonomy change, designed and simulated but NOT built.**
   Adds MICE / Ultra Wealthy Leisure / Intl. Student / Outbound International Leisure, turns Last-Minute
   into a flag, and ships fare tier as a value band. Full before/after on all 22.9M bookings (21.8% of

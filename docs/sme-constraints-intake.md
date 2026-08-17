@@ -542,6 +542,9 @@ this population, on axes that cost nothing. **`n_bookings` stays an anchor.**
 
 ### Go back to the SME
 
+> **All open asks are consolidated in `docs/pal-questions.md`** — 24 items in four groups, each with our
+> recommendation. That is the sendable version; the notes below are the working list it was built from.
+
 - **Row 46 is unimplementable** — no PNR party size. (§4)
 - **The Power BI wishlist sheet is empty.** That was half the ask and nobody filled it in.
 - **Four segments got no input:** Mabuhay Loyalist, Family, Budget/Adventure, Digital Nomad.
