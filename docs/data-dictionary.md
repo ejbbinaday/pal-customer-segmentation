@@ -102,4 +102,29 @@ Authoritative value ladder (used instead of any ad-hoc fare-tier map).
 Non-revenue (A, R, P — and `F` when issued < 2026-04-01), Groups (`G` when issued ≥ 2026-04-01),
 Award redemption (`F` when issued ≥ 2026-04-01, or `G` when issued < 2026-04-01).
 
-*Last updated: 22 July 2026 — mirror of DataDictionary.v1.xlsx*
+---
+
+## Sheet 3 — Derived booking-grain fields (added 17 Aug 2026)
+
+Not in PAL's dictionary — engineered by `src/features_real.py` at **booking** grain
+(`customer_id`, `issue_date`) into `data/interim/pal_features_booking.parquet`. Added in response to
+the RM-Domestic SME constraint sheet (`docs/sme-constraints-intake.md`). **All four are descriptive:
+no proxy-waterfall branch reads them**, which is what keeps them usable as validation anchors.
+
+| Field | Definition | Coverage / caveat |
+|---|---|---|
+| `stay_nights` | Nights at the destination — the **largest gap between consecutive coupon departures** within a booking. Max-gap rather than last-minus-first because connections inflate the naive span (the two disagree on 9.60% of round trips). Multi-city trips report the longest single stop. | **9,785,597 bookings = 100% of round trips, 42.71% of the book.** Median 5 nights. ⚠️ **NULL on one-ways by definition** — there is no stay to measure, so this is not missingness. That definedness pattern **is** the `round_trip` rule bit, so the field is a *conditional* validation anchor and can never validate the OFW ↔ Balikbayan boundary. Build-time enforced by `assert_stay_contract()`. |
+| `dep_dow` | Day of week of the first departure. **0 = Sunday … 6 = Saturday** (DuckDB `dayofweek`). First/last coupon is resolved on `(departure_dt, coupon_number)` — `departure_dt` alone ties on 8,014 bookings. | Full coverage. No rule reads any day-of-week; Tier-A anchor *candidate* pending measurement. |
+| `turn_dest` | Outbound destination — `trip_dest` of the earliest coupon. Distinct from `dest_last`, which for a round trip is the home airport. | Full coverage. ⚠️ Route rules must pick a direction deliberately: **Gulf round trips start in the Gulf 260,216 times vs Manila 26,195 (9.9×)**, so a worker flying home is `RUHMNL`, not `MNLRUH`. |
+| `route_theme` | Trip-purpose theme of the outbound endpoint, from `data/reference/route_theme.csv` (8 themes, 32 airports). | 28.7% of bookings tagged. Keyed on **trip** endpoints, so OAL codeshare beyond-points resolve. ⚠️ One theme per airport is a simplification and dual-identity airports exist (SYD/MEL are premium-holiday *and* diaspora hubs) — see `src/build_airport_ref.py`. |
+
+**Route themes and volumes** (bookings, from `outputs/features_real/summary.md`):
+`domestic_leisure` 1,810,988 · `asian_tourist_hub` 1,750,790 · `diaspora_north_america` 1,255,815 ·
+`east_asia_hub` 762,555 · `gulf_labour` 497,602 · `premium_holiday` 424,499 ·
+`islamic_pilgrimage` 44,077 · `catholic_pilgrimage` 19,215 · untagged 16,345,909.
+
+⚠️ **`catholic_pilgrimage` is tiny and its airports are outside the PR network** — FCO, TLV, CDG and
+LIS appear in `TripOD` via codeshare but are not sector endpoints, so they are absent from
+`airport_region.csv` by design. Rules built on them cannot do meaningful work.
+
+*Last updated: 17 August 2026 — Sheet 3 (derived booking-grain fields) added; Sheets 1–2 mirror DataDictionary.v1.xlsx*

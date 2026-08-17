@@ -1,9 +1,31 @@
 # PAL Customer Segmentation — ML Pipeline Methodology
 
 **Client:** Philippine Airlines (PAL)
-**Version:** v1.6 — 12 August 2026
+**Version:** v1.7 — 17 August 2026
 
 > **Changelog**
+> - **v1.7 (17 Aug 2026):** **Four descriptive fields added to Stage F; the waterfall is untouched.**
+>   In response to the RM-Domestic SME constraint sheet (`docs/sme-constraints-intake.md`),
+>   `src/features_real.py` now emits **`stay_nights`** (nights at the destination, from the largest
+>   inter-coupon gap — robust to connections, which inflate a naive last-minus-first span on 9.60% of
+>   round trips), **`dep_dow`**, **`turn_dest`** (outbound destination) and **`route_theme`**. The last
+>   joins a new tracked reference, `data/reference/route_theme.csv` (`src/build_airport_ref.py`) —
+>   32 airports across 8 trip-purpose themes, kept **separate from `airport_region.csv`** because it is
+>   keyed on *trip* endpoints (so OAL codeshare beyond-points FCO/TLV/CDG/LIS resolve, none of which is
+>   a PR sector endpoint) and because `is_domestic` is load-bearing while themes are experimental.
+>   `airport_region.csv` is byte-identical. **No modelling logic changed and no proxy label moved** —
+>   segment counts and the 9.58% Unassigned share are unchanged. `stay_nights` coverage: **9,785,597
+>   bookings = 100% of round trips, 42.71% of the book, median 5 nights**; it is NULL on one-ways *by
+>   definition*, and `assert_stay_contract()` now fails the build if that ever stops being true, because
+>   the missingness pattern **is** the `round_trip` rule bit. All four are registered in
+>   `CANDIDATE_ANCHORS` (not `ANCHORS`) with their declared leaks — see the corrected anchor tier table,
+>   which also **fixes doc-vs-code drift**: `age`/`age_known` were still listed as Tier-A months after
+>   the leak audit moved them out. **Also fixes a pre-existing reproducibility defect:** coupons were
+>   ordered by `departure_dt` alone, which ties on 8,014 bookings (3,205 with differing `trip_origin`),
+>   so `arg_min`/`arg_max` picked arbitrarily and **`round_trip` flipped on ~20 bookings between
+>   identical runs** — tiny, but it meant two runs of the same code emitted different Parquet.
+>   Ordering is now `(departure_dt, coupon_number)`; consecutive runs are byte-stable. `round_trip`
+>   settles at **9,785,666**; segment shares move by at most one booking.
 > - **v1.6 (12 Aug 2026):** **Rule-confidence diagnostics added; no modelling logic changed.**
 >   `src/rule_confidence.py` measures *internal* confidence on the full 22.9M-booking population —
 >   **rule competition** (how many of the 10 branch predicates a booking satisfies), **runner-up label**
@@ -125,7 +147,8 @@ validator and a refiner in this design, never the labeller — see the approach 
 
 ```text
 gz → typed Parquet → Stage C clean+flag (coupon grain; farebrand → value tier 1-7)
-→ Stage F features: coupon → BOOKING (customer_id, issue_date) → customer  (+ airport→region join)
+→ Stage F features: coupon → BOOKING (customer_id, issue_date) → customer  (+ airport→region
+     and airport→route-theme joins; stay_nights / dep_dow / turn_dest / route_theme are descriptive only)
 → RULE WATERFALL: purpose×value proxy segmentation   ← PRIMARY DELIVERABLE (the 10 segments)
 → Stage X export: segment joined back down to coupon grain → Power BI star schema
    ├── LCA refinement       sub-segments oversized parents   ← ML's job 1
@@ -431,8 +454,31 @@ a booking whose channel says Sea Crew is identified *by definition*.
 |---|---|---|
 | Rule inputs | the 13 above | circular — never usable |
 | Trip-type proxies | `rev_pos`, `n_coupons`, `connecting`, `n_directions`, `min_tier` | leak `round_trip` — excluded |
-| **Tier-A anchors** | `age`, `age_known`, `dep_month`, `n_bookings` | independent of every rule field — always usable |
-| Conditional anchors | `issue_country`, `channel`, `dest_region` | usable only where their encoded bit is constant across the pair |
+| **Tier-A anchors** | `dep_month`, `n_bookings` | independent of every rule field — always usable |
+| Conditional anchors | `issue_country`, `channel`, `dest_region`, `age`, `age_known` | usable only where their encoded bit is constant across the pair |
+| **Candidate anchors** *(v1.7)* | `stay_nights`, `dep_dow`, `route_theme`, `turn_dest` | in the feature table, **not yet loaded** — see below |
+
+> ⚠️ **Corrected v1.7 — this table listed `age` and `age_known` as Tier-A.** The 2026-07-30 leak audit
+> moved both to conditional (`age_known` is 0.86% domestic vs 87.62% international, i.e. a near-copy of
+> `is_international`), and `src/validation_anchors.py` has read `TIER_A = ("dep_month", "n_bookings")`
+> ever since. The table had not been updated. **Only two anchors are unconditionally admissible.**
+
+**Candidate anchors (added v1.7, 17 Aug 2026).** Four descriptive fields now exist in
+`pal_features_booking.parquet` but are deliberately **not** registered in `ANCHORS` and **not** loaded by
+`load_anchors`, so no validator's behaviour changes. They are declared in `CANDIDATE_ANCHORS` together
+with the leaks each would carry, because promoting one has a cost that must be paid consciously:
+
+- **`stay_nights` is conditional, never Tier-A** — its *definedness* is `round_trip` (NULL on one-ways
+  because there is no stay, not because a value is missing). It therefore **cannot validate the
+  OFW/Migrant ↔ Balikbayan/VFR boundary**, which is precisely the split `round_trip` defines: the feature
+  would be wholly present on one side and wholly absent on the other, scoring AUC 1.0 while proving only
+  that the rule was applied. Its value is pairs that *agree* on `round_trip` — Corporate vs Premium
+  Bleisure above all.
+- Promoting `stay_nights` also requires adding **`round_trip` to `AUDIT_BITS`**, which it is not in
+  today; `src/audit_leaks.py` fails its self-consistency assertion otherwise, by design.
+- **The RM-Domestic constraint sheet wants to spend two of these as rule inputs.** A field cannot be both
+  a rule input and an anchor. That trade-off — not the fields — is the scarce resource:
+  `docs/sme-constraints-intake.md` §6.
 
 ### Stage V1 — construct validity (`src/validate_construct.py`)
 
@@ -974,6 +1020,7 @@ These rules are not implemented in the current pipeline because the required fie
 ---
 
 *Document prepared for Philippine Airlines internal use.*
+*v1.7 — 17 August 2026 (Stage F emits `stay_nights`, `dep_dow`, `turn_dest`, `route_theme` plus a new `route_theme.csv` reference, in response to the RM-Domestic SME constraint sheet; all four are descriptive — the waterfall is untouched and no proxy label moved. `stay_nights` is NULL on one-ways by definition and build-time asserted, because that missingness pattern IS the `round_trip` rule bit. Anchor tier table corrected: only `dep_month` and `n_bookings` are Tier-A — no modelling change)*
 *v1.6 — 12 August 2026 (rule-confidence diagnostics: internal confidence measured on the full population — 66.5% of bookings match exactly one rule, Corporate is the most contested segment at 6.4% uncontested despite its ×10 penalty, and the Last-Minute 3-day cut is the most consequential arbitrary constant in the model; `DaysBeforeMonthEnd` figures corrected — no modelling change)*
 *v1.5 — 31 July 2026 (birds-eye view: pipeline + validation-ladder diagrams, the model of record, and a technique inventory statused in-pipeline / candidate / diagnostic / dropped; Stage X adds `scorecard_segment_month.csv` for per-segment scorecards, asserted to reconcile)*
 *v1.4 — 31 July 2026 (Stage X ships `dim_segment.csv`, the persona dimension: measured behaviour recomputed per build, editorial persona text, and `Trust`/`DataCaveat` governance columns kept separate so evidence is distinguishable from assertion — no modelling change)*

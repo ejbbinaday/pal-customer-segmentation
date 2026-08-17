@@ -24,6 +24,7 @@ import duckdb
 ROOT = Path(__file__).resolve().parents[1]
 CLEAN = ROOT / "data" / "interim" / "pal_clean"
 AIRPORTS = ROOT / "data" / "reference" / "airport_region.csv"
+ROUTE_THEMES = ROOT / "data" / "reference" / "route_theme.csv"
 BOOKING_OUT = ROOT / "data" / "interim" / "pal_features_booking.parquet"
 CUSTOMER_OUT = ROOT / "data" / "interim" / "pal_features_customer.parquet"
 REPORT = ROOT / "outputs" / "features_real"
@@ -45,6 +46,7 @@ def connect() -> duckdb.DuckDBPyConnection:
         con.execute(f"SET temp_directory='{TMP}'")
     con.execute(f"CREATE VIEW clean AS SELECT * FROM read_parquet('{CLEAN}/**/*.parquet')")
     con.execute(f"CREATE TABLE ref AS SELECT * FROM read_csv_auto('{AIRPORTS}')")
+    con.execute(f"CREATE TABLE theme AS SELECT * FROM read_csv_auto('{ROUTE_THEMES}')")
     return con
 
 
@@ -90,6 +92,32 @@ def guards(con: duckdb.DuckDBPyConnection) -> list[str]:
     return notes
 
 
+def assert_stay_contract(con: duckdb.DuckDBPyConnection) -> None:
+    """`stay_nights` is defined exactly when `round_trip` — enforce it, don't assume it.
+
+    This invariant is the whole reason `stay_nights` is a *conditional* validation anchor rather
+    than an unconditional one: its definedness IS `round_trip`, which is the sole bit separating
+    OFW/Migrant from Balikbayan/VFR. If a future edit lets it take a value on one-ways (e.g. by
+    reading the raw max gap, which on a one-way is a connection layover), a validator could
+    silently recover that rule bit from the missingness pattern and score a fake AUC of 1.0.
+    """
+    bad_oneway, bad_rt, negative = con.execute("""
+        SELECT sum((NOT round_trip AND stay_nights IS NOT NULL)::INT),
+               sum((round_trip AND n_coupons > 1 AND stay_nights IS NULL)::INT),
+               sum((stay_nights < 0)::INT)
+        FROM bk
+    """).fetchone()
+    problems = []
+    if bad_oneway:
+        problems.append(f"{bad_oneway:,} one-way bookings carry a stay_nights value")
+    if bad_rt:
+        problems.append(f"{bad_rt:,} multi-coupon round trips have NULL stay_nights")
+    if negative:
+        problems.append(f"{negative:,} bookings have a negative stay_nights")
+    if problems:
+        raise AssertionError("stay_nights contract violated — " + "; ".join(problems))
+
+
 def build_booking(con: duckdb.DuckDBPyConnection) -> None:
     """coupon → booking, join route ref, exclude all-non-rev customers, engineer + proxy-label."""
     # customers to exclude: every coupon non-revenue (settled 2026-07-23)
@@ -105,10 +133,14 @@ def build_booking(con: duckdb.DuckDBPyConnection) -> None:
                (o.is_domestic = 1 AND d.is_domestic = 1)                    AS dom_coupon,
                CASE WHEN d.is_domestic = 0 THEN d.region
                     WHEN o.is_domestic = 0 THEN o.region END                AS intl_region,
-               (c.sector_dest IN ('JED','MED') OR c.trip_dest IN ('JED','MED')) AS pilgrimage_dest
+               (c.sector_dest IN ('JED','MED') OR c.trip_dest IN ('JED','MED')) AS pilgrimage_dest,
+               -- trip-purpose theme, keyed on the *trip* endpoint so OAL codeshare beyond-points
+               -- (FCO/TLV/CDG/LIS) resolve. Descriptive only — no waterfall branch reads it.
+               t.theme                                                          AS dest_theme
         FROM clean c
         LEFT JOIN ref o ON c.sector_origin = o.airport
         LEFT JOIN ref d ON c.sector_dest   = d.airport
+        LEFT JOIN theme t ON c.trip_dest   = t.airport
         WHERE c.customer_id NOT IN (SELECT customer_id FROM excluded)
     """)
 
@@ -117,13 +149,32 @@ def build_booking(con: duckdb.DuckDBPyConnection) -> None:
     # (34 GB) over 22.9M groups; max() is equivalent here and cheap.
     con.execute("""
         CREATE TABLE bk AS
+        WITH g AS (
+            -- ⚠️ `ord_key` fixes a pre-existing non-determinism (found 2026-08-17). Ordering coupons
+            -- by `departure_dt` alone leaves ties: 8,014 bookings have two coupons departing at the
+            -- same timestamp, and on 3,205 of them the two coupons have *different* trip_origins.
+            -- arg_min/arg_max then pick arbitrarily, so `round_trip` — the sole bit splitting
+            -- OFW/Migrant from Balikbayan/VFR — flipped on ~20 bookings between identical runs.
+            -- Immaterial in size, fatal to reproducibility: two runs of the same code produced
+            -- different Parquet. `coupon_number` orders legs within a ticket and breaks every tie.
+            SELECT *, (departure_dt, coupon_number) AS ord_key,
+                   -- Gap to the previous coupon, in departure order. For a round trip the largest
+                   -- gap IS the stay; max-gap (rather than last-minus-first) is robust to
+                   -- outbound/inbound connections, which inflate the naive span — the two disagree
+                   -- on 9.60% of round trips. See src/probe_stay_length.py §0.
+                   date_diff('day', lag(departure_date) OVER (
+                       PARTITION BY customer_id, issue_date
+                       ORDER BY departure_dt, coupon_number
+                   ), departure_date) AS gap_days
+            FROM coup
+        )
         SELECT
             customer_id, issue_date,
             count(*)                                   AS n_coupons,
             count(DISTINCT trip_od)                    AS n_directions,
-            arg_min(trip_origin, departure_dt)         AS origin_first,
-            arg_max(trip_dest,   departure_dt)         AS dest_last,
-            (arg_min(trip_origin, departure_dt) = arg_max(trip_dest, departure_dt)) AS round_trip,
+            arg_min(trip_origin, ord_key)              AS origin_first,
+            arg_max(trip_dest,   ord_key)              AS dest_last,
+            (arg_min(trip_origin, ord_key) = arg_max(trip_dest, ord_key)) AS round_trip,
             greatest(min(lead_time_days), 0)           AS lead_days,
             max((NOT dom_coupon)::INT) = 1             AS is_international,
             bool_and(dom_coupon)                       AS is_domestic,
@@ -132,6 +183,9 @@ def build_booking(con: duckdb.DuckDBPyConnection) -> None:
             max(value_tier)                            AS max_tier,
             min(value_tier)                            AS min_tier,
             max((cabin IN ('J','W'))::INT) = 1         AS any_premium,
+            -- business *cabin*, distinct from `any_business` which is a business *fare*
+            -- (value_tier >= 6). SME rows 24/33 turn on cabin 'J' specifically.
+            max((cabin = 'J')::INT) = 1                AS any_cabin_j,
             max((value_tier >= 6)::INT) = 1            AS any_business,
             max(is_award::INT) = 1                     AS is_award,
             max((is_group_booking OR is_group_fare)::INT) = 1 AS is_group,
@@ -146,11 +200,29 @@ def build_booking(con: duckdb.DuckDBPyConnection) -> None:
             max(flown::INT) = 1                        AS flown_any,
             max(age)                                   AS age,
             max(age_known::INT) = 1                    AS age_known,
-            month(arg_min(departure_date, departure_dt)) AS dep_month
-        FROM coup GROUP BY customer_id, issue_date
+            month(arg_min(departure_date, ord_key))    AS dep_month,
+            -- ── added 2026-08-17 for the RM-Domestic constraint sheet. Descriptive fields only:
+            -- no waterfall branch reads any of them, which is what keeps them admissible as
+            -- validation anchors. See docs/sme-constraints-intake.md §6 before wiring any in.
+            dayofweek(arg_min(departure_date, ord_key)) AS dep_dow,        -- 0=Sun … 6=Sat
+            arg_min(trip_dest, ord_key)                AS turn_dest,       -- outbound destination
+            -- Theme of the outbound endpoint. max() picks the sole non-NULL: the return leg lands
+            -- back at an untagged home airport, so there is only ever one themed endpoint.
+            max(dest_theme)                            AS route_theme,
+            -- Nights at the destination. NULL for one-ways *by definition*, not by missingness —
+            -- there is no stay to measure. Multi-city trips report the longest single stop.
+            CASE WHEN arg_min(trip_origin, ord_key) = arg_max(trip_dest, ord_key)
+                 THEN max(gap_days) END               AS stay_nights
+        FROM g GROUP BY customer_id, issue_date
     """)
 
+    assert_stay_contract(con)
+
     # prioritized proxy-label waterfall (first match wins) — seeds, not final labels
+    # ⚠️ UNCHANGED by the 2026-08-17 feature addition. `stay_nights`, `dep_dow` and `route_theme`
+    # are deliberately NOT read here: the moment a branch consumes one, it becomes a rule input and
+    # stops being usable to validate the rules (see src/validation_anchors.py). Adding one is a
+    # methodology decision, not a refactor — docs/sme-constraints-intake.md §6.
     con.execute("""
         CREATE TABLE booking AS
         SELECT *,
@@ -238,6 +310,25 @@ def profile(con: duckdb.DuckDBPyConnection, guard_notes: list[str]) -> None:
         FROM booking GROUP BY 1 ORDER BY bookings DESC
     """).fetchdf()
 
+    # descriptive fields added 2026-08-17 — reported so their coverage is visible, not assumed
+    # formatted server-side: pandas renders large BIGINT counts in scientific notation otherwise
+    stay = con.execute("""
+        SELECT format('{:,}', count(*) FILTER (WHERE round_trip))              AS round_trips,
+               format('{:,}', count(*) FILTER (WHERE stay_nights IS NOT NULL)) AS with_stay,
+               round(100.0*count(*) FILTER (WHERE stay_nights IS NOT NULL)
+                     / nullif(count(*) FILTER (WHERE round_trip), 0), 2)       AS pct_of_rt,
+               round(100.0*count(*) FILTER (WHERE stay_nights IS NOT NULL)
+                     / count(*), 2)                                            AS pct_of_book,
+               median(stay_nights)                                             AS median_nights,
+               count(*) FILTER (WHERE stay_nights > 365)                       AS over_365
+        FROM booking
+    """).fetchdf()
+    theme = con.execute("""
+        SELECT coalesce(route_theme, '(untagged)') theme, count(*) bookings,
+               round(100.0*count(*)/sum(count(*)) OVER (), 2) pct
+        FROM booking GROUP BY 1 ORDER BY bookings DESC
+    """).fetchdf()
+
     lines = [
         "# Stage F — feature + proxy-label profile\n",
         f"- Excluded all-non-revenue customers: **{n_excl:,}**",
@@ -250,6 +341,12 @@ def profile(con: duckdb.DuckDBPyConnection, guard_notes: list[str]) -> None:
         seg_cust.to_markdown(index=False),
         "\n## Route region — bookings\n",
         route.to_markdown(index=False),
+        "\n## Descriptive fields added 2026-08-17 (not read by the waterfall)\n",
+        "`stay_nights` — NULL on one-ways by definition, so its coverage ceiling is the round-trip",
+        "share. Any rule or anchor built on it is silent on the rest of the book.\n",
+        stay.to_markdown(index=False),
+        "\n### Route theme — bookings\n",
+        theme.to_markdown(index=False),
         "",
     ]
     (REPORT / "summary.md").write_text("\n".join(lines) + "\n")

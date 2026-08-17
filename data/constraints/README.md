@@ -1,10 +1,38 @@
 # SME business constraints
 
-Two files, both CSV so they open in Excel with no tooling. **The rows currently in them are *our*
-guesses, pre-filled as worked examples** — the point of the ask is for SMEs to correct, delete and
-extend them. A rule we invented and an SME confirmed is worth far more than a rule we invented alone.
+Two files, both CSV so they open in Excel with no tooling.
 
-Business context and the plain-language version of this ask: `docs/stakeholder-report.md` §7.
+**Updated 17 August 2026.** The first filled-in workbook came back from **RM Domestic**
+(`wishlist/PALxMAIDA_Constraints&Wishlist.xlsx` — 39 new rules). Those rules are now transcribed here,
+so these files are no longer only our guesses: **15 hard + 42 soft rules**, each tagged with where it
+came from and whether it can actually be used. Full intake analysis, including the five decisions still
+blocking enforcement: `docs/sme-constraints-intake.md`.
+
+Business context and the plain-language version of the ask: `docs/stakeholder-report.md` §7.
+
+## ⚠️ Nothing here is wired into the pipeline yet
+
+No code reads these files. They are (a) the artifact we hand back to an SME to confirm we understood
+them, and (b) the eventual input to the labelling stage. **Enforcing them is a separate, deliberate
+step** — because the moment a rule consumes a field, that field can no longer validate the rule
+(`src/validation_anchors.py`). Two of the new rules would spend the last of our validation anchors;
+that trade-off is the subject of `docs/sme-constraints-intake.md` §6.
+
+## Validate before committing an edit
+
+```bash
+python src/check_constraints.py     # 0 errors expected
+```
+
+It checks every row against `data/interim/pal_features_booking.parquet`: that the `condition` names
+real columns, that DuckDB can evaluate it, that the recorded `fires` count still matches the live
+count, and that `status` is consistent with the volume. **A rule that silently stopped matching
+anything is worse than a missing rule — it reads as covered.** The check caught exactly that during
+transcription (a stale count, a mis-parsed condition, and a rule 2.3× larger than recorded).
+
+⚠️ **If you edit by hand, mind the commas.** Several conditions contain them (`dep_month IN (4,5,12)`,
+`turn_dest IN ('DXB','RUH')`) and so do many notes. Excel quotes correctly on save; a plain text editor
+will not, and an unquoted comma silently shifts every later column. The checker catches it.
 
 ## `hard_constraints.csv` — rules that must never be broken
 
@@ -14,15 +42,16 @@ instead of choosing among 10 segments, an annotator picks among 2 or 3.
 | column | meaning |
 |---|---|
 | `rule_id` | `H01`, `H02`, … — stable id so a rule can be discussed and revised by name |
-| `condition` | the situation, in field terms or near-plain language |
+| `condition` | the situation, in the field names listed below |
 | `verdict` | `must_be` (definitively this segment) · `cannot_be` (rule out) · `narrow_to` (restrict to a shortlist) |
 | `segments` | one canonical segment name, or several `\|`-separated for `narrow_to` |
 | `owner` | which SME group asserted it (RM Domestic / RM International / Network Planning / FF Product Owner) |
-| `confidence` | `certain` or `likely` |
+| `confidence` | `certain` · `likely` — the only two levels a hard verdict may carry |
+| `status` | see the table below |
+| `scope` | the sub-population the rule can even be evaluated on |
+| `fires` | bookings matching the condition, out of 22,911,450 — **kept live by the checker** |
+| `sme_row` | row number in the source workbook, for traceability |
 | `notes` | free text — the *why*, which is the part that survives when the rule is revised |
-
-Only `certain` rules are enforced automatically. `likely` rules are tested against the data first and
-brought back to the owner if they contradict it.
 
 ## `soft_constraints.csv` — tendencies, not laws
 
@@ -30,18 +59,43 @@ A lean rather than a rule. "Middle East bookings *tend* to be OFW rather than le
 Manila–Dubai holiday is perfectly possible." These tilt ambiguous cases, and they tell us **which
 boundaries PAL considers soft** — where we should report ambiguity instead of forcing a confident label.
 
-| column | meaning |
-|---|---|
-| `rule_id` | `S01`, `S02`, … |
-| `condition` | the situation |
-| `leans_toward` | the more likely segment |
-| `leans_away_from` | the segment it argues against |
-| `strength` | `weak` · `moderate` · `strong` |
-| `owner` | asserting SME group |
-| `notes` | the reasoning |
+Same columns, except `verdict`/`segments`/`confidence` are replaced by `leans_toward`,
+`leans_away_from` and `strength` (`weak` · `moderate` · `strong`).
 
 Where a soft constraint contradicts what the data shows, **that disagreement is the finding** — it gets
 reported back, not silently overridden in either direction.
+
+## `status` — can we actually use this rule?
+
+| status | meaning | hard | soft |
+|---|---|---|---|
+| `enforce` | `certain`, evaluable, fires on real volume — ready to auto-enforce | 4 | — |
+| `prior` | soft tilt, usable now | — | 15 |
+| `confirmed` | our seeded guess, and the SME agreed | 4 | 3 |
+| `unconfirmed` | our seeded guess; the SME did not respond either way | 3 | 4 |
+| `test` | `likely` — check against the data, return to the owner if contradicted | 0 | — |
+| `query` | blocked on an SME or PAL decision (usually an unmapped/new segment) | 2 | 7 |
+| `too_thin` | evaluable, but fires on under ~11k bookings (0.05%) — not worth acting on | 1 | 7 |
+| `partial` | transcribed with part of the condition dropped as unevaluable | — | 1 |
+| `contested` | several segments claim the same predicate | — | 1 |
+| `demoted` / `demoted_from_hard` | a `cannot_be` at only `moderate` confidence, moved to soft | 2 | 2 |
+| `blocked` | not evaluable at all — a field we do not have | 1 | — |
+| `unanswered` | placeholder; the SME ask came back empty | — | 2 |
+
+Only `enforce` rules would be applied automatically. `test` rules are checked against the data first
+and brought back to the owner if the data contradicts them.
+
+## Three things to know before reading the conditions
+
+1. **Route direction is not obvious, and the workbook got it backwards.** The SME wrote OFW routes as
+   `TripOD IN ('MNLDXB', …)`, but **Gulf round trips start in the Gulf 260,216 times against Manila's
+   26,195** — a worker based in Riyadh flying home is `RUHMNL`. Read literally, their best rule matched
+   5,166 bookings instead of 118,841. Rules here therefore use `turn_dest` (outbound airport) where the
+   direction is deliberate, and `route_theme` where it is not.
+2. **`stay_nights` is NULL on one-ways by definition** — there is no stay to measure. 26 of the 39 new
+   rules cite it, so they are structurally silent on the 57% of the book that is not a round trip.
+3. **`age` is populated on only 0.98% of domestic bookings.** It is an international-only field, so
+   every age rule is dead for domestic travel — which is what the ask was for.
 
 ## Field names available in `condition`
 
@@ -50,10 +104,21 @@ written in prose — transcription is our job, not the SME's.
 
 `lead_days` · `round_trip` · `is_domestic` · `is_international` · `dest_region` · `issue_country` ·
 `foreign_issue` · `channel` · `corp_channel` · `sea_crew` · `max_tier` / `min_tier` (1–7 farebrand
-ladder) · `any_premium` · `any_business` · `is_award` · `is_group` · `pilgrimage` · `connecting` ·
-`n_coupons` · `dep_month` · `rev_pos` · `age` / `age_known` · `n_bookings` (customer grain)
+ladder: 1 Supersaver · 2 Saver · 3 Value · 4 Economy Flex · 5 Premium Economy · 6 Business Value ·
+7 Business Flex) · `any_premium` (cabin J or W) · `any_cabin_j` (cabin J only) · `any_business`
+(business *fare*, tier ≥ 6) · `is_award` · `is_group` · `pilgrimage` · `connecting` · `n_coupons` ·
+`dep_month` · `rev_pos` · `age` / `age_known`
 
-Canonical segment names are in `src/pal_colors.py`.
+**Added 17 Aug 2026** (`docs/methodology.md` v1.7): `stay_nights` · `dep_dow` (0 = Sunday … 6 = Saturday) ·
+`turn_dest` (outbound destination airport) · `route_theme` (one of `gulf_labour`, `east_asia_hub`,
+`asian_tourist_hub`, `islamic_pilgrimage`, `catholic_pilgrimage`, `domestic_leisure`, `premium_holiday`,
+`diaspora_north_america` — see `data/reference/route_theme.csv`).
+
+`n_bookings` is on the **customer** rollup, not the booking table; the checker joins for it.
+
+Canonical segment names are in `src/pal_colors.py`. Segments written as `Leisure (unmapped)`,
+`MICE (new)`, `Ultra Wealthy Leisure (new)` and `Intl. Student (new)` are **not** canonical — they are
+the SME's proposals awaiting a taxonomy decision, and are marked so they cannot be enforced by accident.
 
 ## Related ask
 

@@ -22,11 +22,23 @@ data/PAL-data/ REAL PAL coupon-level extract — 4 gzipped CSVs, ~38M rows, 40 c
                  (git-ignored, local only). newQuery2024 / 2025 / 2026Jan_to_May / 2026Jun_to_2027May
 data/interim/  Derived Parquet built from the raw gz (git-ignored):
                  pal_parquet/   typed, zstd, partitioned by iss_year — the fast pipeline input
-data/constraints/ SME business constraints (tracked): hard_constraints.csv (impossibility rules) +
-                 soft_constraints.csv (tendencies) + README.md (column guide). Pre-filled with our
-                 own guesses as examples — SMEs correct/extend them. See docs/stakeholder-report.md §7
+data/constraints/ SME business constraints (tracked): hard_constraints.csv (15 impossibility rules) +
+                 soft_constraints.csv (42 tendencies) + README.md (column + status guide). Now holds the
+                 RM-Domestic workbook response, not just our guesses; each row tagged with provenance,
+                 scope and live firing count. NOT wired into the pipeline — enforcing a rule spends a
+                 validation anchor. Validate edits: python src/check_constraints.py
+                 See docs/sme-constraints-intake.md and docs/stakeholder-report.md §7
 data/labels/   SME ground-truth labels (tracked template): sme_sample_TEMPLATE.csv + README.md.
                  Drop sme_sample.csv here to unlock non-circular validation
+data/reference/ Curated lookups (tracked, rebuilt by src/build_airport_ref.py):
+                 airport_region.csv — 97 PR sector endpoints → country/region/is_domestic (load-bearing:
+                   Stage F's domestic/international split joins it)
+                 route_theme.csv    — 32 airports → 8 trip-purpose themes (descriptive only; keyed on
+                   TRIP endpoints, so codeshare beyond-points FCO/TLV/CDG/LIS resolve). Kept separate
+                   from airport_region.csv on purpose — see that script's docstring
+wishlist/      Filled-in SME workbooks returned by PAL (tracked, read-only inputs).
+                 PALxMAIDA_Constraints&Wishlist.xlsx — 39 new rules from RM Domestic; analysed in
+                 docs/sme-constraints-intake.md, transcribed into data/constraints/ (not yet enforced)
 src/           All Python (analysis pipeline + report/slide generators + shared palette)
 docs/          Business + methodology + EDA + monitoring docs, onboarding guide
 reports/       Tracked deliverables: HTML EDA report, exported slide PNGs, POC figures
@@ -104,7 +116,7 @@ python src/build_parquet.py   # gz → data/interim/pal_parquet/ (one pass, ~90s
 python src/profile_raw.py     # profile → outputs/profile_raw/{summary.md, column_profile.csv}
 python src/clean_real.py      # Stage C: clean+flag → data/interim/pal_clean/ + outputs/clean_report/
 python src/eda_real.py        # Stage E confirmations → outputs/eda_real/confirmations.md
-python src/build_airport_ref.py  # airport→country/region lookup → data/reference/airport_region.csv
+python src/build_airport_ref.py  # airport lookups → data/reference/{airport_region,route_theme}.csv
 python src/features_real.py   # Stage F: booking + customer features + proxy labels → data/interim/pal_features_*
 python src/cluster_diagnostic.py  # mixed-type clustering diagnostic (LCA + k-prototypes) → outputs/cluster_diagnostic/
 python src/kproto_compare.py  # k-prototypes vs k-modes vs LCA head-to-head (~4 min) → outputs/kproto_compare/
@@ -119,6 +131,9 @@ python src/validate_temporal.py --quick  # same, ~1 min, directional only
 python src/build_pbip.py      # Power BI project reproducing the revenue/PAX mock-up → outputs/pbip/
 python src/sub_segment.py     # LCA sub-types within large rule segments → outputs/sub_segments/
 python src/rule_confidence.py # how *determined* is each rule label? (~1 min) → outputs/rule_confidence/
+python src/check_constraints.py       # validate data/constraints/*.csv against the feature table (~1 min)
+python src/probe_stay_length.py       # SME claim: does stay length split OFW from Balikbayan? (~30 s) → outputs/stay_length/
+(cd src && python probe_constraint_coverage.py)  # all 39 SME rules: evaluable? fires? (~1 min) → outputs/constraint_coverage/
 python src/export_powerbi.py  # Power BI fact table (coupon + agg grain, ~2 min) → outputs/powerbi_export/
 python src/report_figures.py  # real-data EDA + preliminary-cluster figures → outputs/report_real/figs/
 python src/manuscript_figures.py  # manuscript Ch.4 figures from saved CSVs → outputs/report_real/figs/ms_fig*.png
@@ -273,6 +288,16 @@ Key references:
   methodology, the full rule waterfall as implemented, ten data-backed **persona cards**, the success
   metrics with a worked peso cost calculation, and the SME asks (hard/soft constraints + labelled
   sample) with exact file formats. Written for PAL commercial stakeholders, not for engineers.
+- **`docs/sme-constraints-intake.md`** — **intake analysis of the first filled-in SME constraint
+  workbook** (`wishlist/PALxMAIDA_Constraints&Wishlist.xlsx`, RM Domestic, 39 new rules). Maps every rule
+  onto our hard/soft schema and feature table, flags the three fields we must build (`stay_nights`,
+  `dep_dow`, a route-theme lookup), the rule conflicts needing an SME decision, and — the item most
+  likely to be missed — **the validation-anchor budget these rules spend**. Five blocking decisions,
+  a suggested order, and what to send back. §3 and §4a carry the probe results below.
+  Probes: `python src/probe_stay_length.py` (does stay length actually separate OFW from Balikbayan?
+  → `outputs/stay_length/`) and `python src/probe_constraint_coverage.py` (all 39 rules: evaluable?
+  on how much of the book? fires on enough volume? → `outputs/constraint_coverage/`). The second
+  imports `build`/`connect` from the first, so run it from `src/` or with `src/` on `PYTHONPATH`.
 - **`docs/continuum-levers-plan.md`** — **can we find structure the current setup missed?** Seven levers
   (stay length · strip atypical populations · per-market · learned embedding · longitudinal · **coarser
   taxonomy** · continuum-native output), each with a **pre-registered decision rule**, an out-of-time

@@ -34,3 +34,6 @@ docs/status-report.pdf
 
 # macOS
 .DS_Store
+
+# Office lock/temp files (created while a workbook is open; never meaningful to track)
+~$*

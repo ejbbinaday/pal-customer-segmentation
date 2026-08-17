@@ -86,6 +86,44 @@ ANCHORS: dict[str, str] = {
 CATEGORICAL = ("issue_country", "channel", "dep_month", "dest_region")
 NUMERIC = ("age", "age_known", "n_bookings")
 
+# ── candidate anchors: in the feature table, deliberately NOT yet in ANCHORS ──────
+# Added to `pal_features_booking.parquet` on 2026-08-17 for the RM-Domestic constraint sheet. They
+# are registered here rather than in `ANCHORS` because promoting one is a decision with a cost, and
+# this block is where the cost is written down. Nothing loads them yet, so behaviour is unchanged.
+#
+# Whoever promotes one must, in the same change:
+#   1. add it to `ANCHORS` **and** to the SELECT list in `load_anchors` (which is explicit — adding
+#      it to `ANCHORS` alone silently does nothing), plus `CATEGORICAL`/`NUMERIC` as appropriate;
+#   2. add its declared leaks to `ANCHOR_LEAKS`, and every named bit to `AUDIT_BITS` — note
+#      `round_trip` is **not** currently in `AUDIT_BITS`, so promoting `stay_nights` requires
+#      adding it or `audit_leaks.py` will fail its self-consistency assertion (by design);
+#   3. run `src/audit_leaks.py` and let it *measure* independence rather than asserting it. The
+#      `age_known` correction of 2026-07-30 is what happens when a TIER_A claim goes unmeasured.
+#
+# ⚠️ And the constraint sheet wants to spend two of these as *rule inputs*. A field cannot be both
+# a rule input and an anchor. See `docs/sme-constraints-intake.md` §6 — the anchor budget is the
+# scarce resource, not the field.
+CANDIDATE_ANCHORS: dict[str, str] = {
+    # Its *definedness* is `round_trip` — NULL on one-ways because there is no stay, not because the
+    # value is missing. So it is conditional, never TIER_A, and specifically **cannot validate the
+    # OFW/Migrant ↔ Balikbayan/VFR boundary**, which is exactly the split `round_trip` defines: the
+    # feature would be 100% present on one side and 100% absent on the other, scoring AUC 1.0 while
+    # proving only that the rule was applied. Its real value is pairs that agree on round_trip —
+    # Corporate vs Premium Bleisure being the one Lever A flagged as under-served.
+    # Declared leak when promoted: ("round_trip",)
+    "stay_nights": "nights at the destination — no rule reads it, but definedness IS round_trip",
+    # No rule reads any day-of-week, and `dep_month` (a coarser sibling) is already an anchor.
+    # TIER_A *candidate*, but do not assert that without measuring it — see (3) above.
+    "dep_dow": "departure day of week — no rule reads it; TIER_A candidate pending measurement",
+    # A finer-grained `dest_region`, so it inherits that anchor's leaks and adds one: the
+    # `islamic_pilgrimage` theme is JED/MED, which is *exactly* the `pilgrimage` rule bit.
+    # Declared leak when promoted: ("is_domestic", "is_international", "pilgrimage")
+    "route_theme": "trip-purpose theme of the outbound endpoint — coarsens to the pilgrimage bit",
+    # Airport identity, so it encodes everything `dest_region` does, only more sharply.
+    # Declared leak when promoted: ("is_domestic", "is_international", "pilgrimage")
+    "turn_dest": "outbound destination airport — a finer dest_region; same leaks, stronger",
+}
+
 # ── the subtle leak: *semantic* overlap that a name-based guard cannot see ────────
 # Some anchors are finer-grained versions of fields the rules DO use, so coarsening them recovers a
 # rule bit exactly. `dest_region == 'Domestic'` **is** `is_domestic`; `issue_country != 'PH'` **is**

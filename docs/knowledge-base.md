@@ -454,6 +454,180 @@ Dashboard Wireframe → Requirements Checklist → [Appendix] Literature
 
 ---
 
+#### 2026-08-17 — 57 constraints transcribed, and the checker that validates them caught three errors in my own transcription
+**Domain:** Project Decision
+The SME sheet is now typed into `data/constraints/` — **15 hard + 42 soft rules**, each carrying `status`,
+`scope`, `fires` and `sme_row` so provenance and usability are legible per row rather than in prose.
+**Nothing is wired into the pipeline**, deliberately: these files are the artifact we hand back to the SME
+plus the eventual labelling input, and enforcement is the step that spends an anchor.
+**The judgement calls applied, all of them visible in the files rather than silent:** row 21 narrowed to
+the Gulf and made direction-agnostic (23× the volume); rows 34 and 38 **demoted from `cannot_be` to soft**
+because a `moderate`-confidence veto covering 63.1% and 33.5% of the book cannot be a law; row 9 demoted
+from `must_be` because six segments claim `is_group`; the nine thin rules kept with `status=too_thin`
+rather than deleted, so the SME can see *why* we are querying them.
+**The real lesson is `src/check_constraints.py`.** It validates every condition against the live feature
+table — columns exist, DuckDB can evaluate it, the recorded `fires` still matches, `status` agrees with
+the volume — and **it found three errors in a transcription I had just written by hand**:
+① **stale counts.** Every `fires` figure was 2–23 bookings off, because I had rebuilt the parquet with the
+determinism fix *after* running the coverage probe. Invisible to inspection, caught instantly by
+recomputation. ② **CSV comma corruption.** Conditions like `dep_month IN (4,5,12)` and notes containing
+commas were written unquoted, silently shifting every later column on 16 rows. My first repair then made
+it *worse*, because I assumed only the condition over-split when unquoted notes did too — the fix was to
+stop hand-authoring and regenerate through `csv.writer`. ③ **A rule 2.3× larger than recorded** — S21
+fired on 23,254 not 9,979, because `route_theme` matches a themed endpoint in **either** direction while
+our probe had matched only the outbound one. **We had just written up the direction trap in the SME's
+work and then committed the same class of error in our own.**
+*Generalises: for any hand-maintained data file that something downstream will trust, the check script is
+not optional scaffolding — it is the only thing standing between "looks right" and "is right". And a rule
+that silently stops matching is worse than a missing rule, because it reads as covered.*
+**Two schema notes:** `n_bookings` lives on the customer rollup, so one rule (S04) needs a join — the
+vocabulary spans two grains, which the checker now handles explicitly. And `any_cabin_j` was added to
+Stage F because rows 24/33 turn on cabin `J` specifically, which `any_business` (a business *fare*,
+tier ≥ 6) does not capture; writing a condition against a field that did not exist would have been
+precisely the sloppiness we flagged in the workbook.
+**Source:** our change — `data/constraints/{hard,soft}_constraints.csv` + `README.md`,
+`src/check_constraints.py`; `docs/sme-constraints-intake.md` §8.
+
+#### 2026-08-17 — Stage F gains four descriptive fields; the waterfall is untouched, and that is the point
+**Domain:** Data & Features
+Acting on the SME constraint sheet, `src/features_real.py` now emits **`stay_nights`**, **`dep_dow`**,
+**`turn_dest`** and **`route_theme`**, plus a new tracked reference `data/reference/route_theme.csv`
+(8 trip-purpose themes over 32 airports, built by `src/build_airport_ref.py`). Methodology v1.7.
+**The discipline that made this safe: build the field, do not wire it in.** No waterfall branch reads any
+of the four, so proxy labels are bit-identical (Unassigned still 9.58%; every segment count unchanged) —
+**and the fields stay admissible as validation anchors.** The moment a rule consumes one it stops being
+able to check that rule. Adding the column is reversible; spending it is not. They are registered in a new
+`CANDIDATE_ANCHORS` block in `validation_anchors.py` — *not* in `ANCHORS`, and not loaded by
+`load_anchors` — with the leaks each would carry written down in advance.
+**`stay_nights` coverage: 9,785,597 = 100% of round trips, 42.71% of the book, median 5 nights.** It is
+**NULL on one-ways by definition** — there is no stay to measure — and that is not a detail:
+*definedness IS `round_trip`*, the sole bit separating OFW/Migrant from Balikbayan/VFR. So a validator
+handed this field on that pair sees it wholly present on one side and wholly absent on the other and
+scores **AUC 1.0 while proving nothing.** ⚠️ **`stay_nights` therefore cannot validate the very boundary
+it was fetched to improve.** Its anchor value is pairs that *agree* on round_trip — Corporate vs Premium
+Bleisure, the gap Lever A flagged. New build-time guard `assert_stay_contract()` fails the run if a
+one-way ever acquires a value, because the natural bug (reading the raw max gap, which on a one-way is a
+connection layover) would leak the rule bit through the missingness pattern silently.
+**Two implementation notes worth keeping.** ① **Max-gap, not last-minus-first.** Connections inflate the
+naive span — the two disagree on **9.60% of round trips**. ② **Route themes went in a *separate* file
+from `airport_region.csv`**, which is byte-identical after the change, because the theme lookup is keyed
+on **trip** endpoints (so codeshare beyond-points FCO/TLV/CDG/LIS resolve — none is a PR sector endpoint)
+while `is_domestic` is load-bearing in the model. Mixing an experimental SME taxonomy into a load-bearing
+join is how a descriptive field quietly becomes a modelling change.
+**Doc-vs-code drift found and fixed:** `methodology.md` still listed `age`/`age_known` as **Tier-A**
+anchors — the 2026-07-30 leak audit moved both to conditional and the code has read
+`TIER_A = ("dep_month", "n_bookings")` ever since. The table was ~3 weeks stale. *Generalises: the leak
+audit updated the code and the learning log but not the spec table; a correction is not landed until
+every place that states the old fact is changed.*
+**Bonus defect found by accident, and worth the habit that found it: the build was not reproducible.**
+Running Stage F twice gave `round_trip` = 9,785,597 then 9,785,584. Cause: coupons were ordered by
+`departure_dt` alone, but **8,014 bookings have two coupons departing at the same timestamp, and on
+3,205 of them the coupons have different `trip_origin`** — so `arg_min`/`arg_max` picked arbitrarily,
+flipping `round_trip` on ~20 bookings per run. Pre-existing, not introduced here; `stay_nights` merely
+made it visible because its definedness tracks `round_trip`. Fixed by ordering on
+`(departure_dt, coupon_number)`; two consecutive runs now agree exactly (`round_trip` = **9,785,666**).
+*Generalises: `arg_min`/`arg_max`/`first` over a non-unique ordering key is silently non-deterministic.
+The only reason it surfaced is that a number was read twice and compared — do that.*
+**Source:** our change — `src/features_real.py`, `src/build_airport_ref.py`, `src/validation_anchors.py`;
+`outputs/features_real/summary.md`; `docs/methodology.md` v1.7; `docs/data-dictionary.md` Sheet 3.
+
+#### 2026-08-17 — Gulf travel runs on a one-month clock: the SME's stay-length claim is half true, and the sheet's route notation is backwards
+**Domain:** Data & Features
+Two probes over the full 22.9M-booking population (`src/probe_stay_length.py`,
+`src/probe_constraint_coverage.py`) testing the RM-Domestic constraint sheet. Design point that made the
+result trustworthy: **the test had to be differential.** Humans book round numbers, so 7/14/21/28 spike in
+every corridor; a raw spike at 30 proves nothing. Each corridor was therefore scored against *its own*
+round-number baseline (count at n ÷ median of n±2..±6).
+**① The Gulf corridor has a real one-month rhythm that no other corridor has.** Excess at 30 nights is
+**2.21 vs a 1.58 round-number control (1.40×)**, spread across 29–30–31 (2.07 · 2.21 · 2.15) — a mandated
+month plus travel slop, not a one-day artefact. Decisively: **19.11% of Gulf round trips fall in the 28–32
+night window vs 8.48% in the 12–16 window (ratio 2.25)** — the *only* corridor where a month outweighs a
+fortnight; every other is ≤0.60 (tourist 0.19 · domestic 0.21 · US/CA/AU 0.60). Supporting gradient inside
+the current Balikbayan/VFR bucket: Gulf share **1.96% → 8.72% → 28.09% → 34.49%** across <14/14–27/28–45/46+
+bands while group rate falls 6.74% → 0.25%. **Worth AUC 0.676** on a corridor proxy vs the ~coin-flip the
+current single-`round_trip`-bit rule gives.
+**② "East Asia hubs" is refuted, and pooling it with the Gulf is *worse than useless*.** HKG/TPE show a sharp
+ratio at 30 (2.34) on almost no mass — **1.93% of trips in the 28–32 window**, same as tourist hubs. Combined
+AUC **0.375 — below chance** (short-haul, short-stay), vs **0.676** Gulf-only. *Generalises: an excess ratio
+is not mass. Always report both, or a spike on 2% of a corridor will read like a finding.*
+**③ The "~45 day" half of the claim is null** — Gulf excess at 45 is 1.34 against its own 1.58 control, i.e.
+*below* baseline.
+**④ It is one gradient, not two populations.** Density per night falls monotonically (6.85 → 2.66 → 2.18 →
+1.49 → 0.82 %/night); no valley, so **no cut point splits workers from family visitors.** ⚠️ My own first
+pass mis-read this: on *raw band shares* 28–45 looks like a second mode purely because that bin is 18 nights
+wide against 7. **Unequal-width bins fake bimodality — always divide by band width.**
+**⑤ ⚠️ The sheet's route notation is backwards for its own population.** The SME wrote OFW routes as
+`TripOD IN ('MNLDXB','MNLRUH',…)`, but **Gulf round trips start in the Gulf 260,216 times vs Manila 26,195 —
+9.9× more**: a worker based in Riyadh flying home is `RUHMNL`. Row 21 read literally matches **5,166**
+bookings; direction-agnostic it matches **118,841 — 23×**. **Transcribing the workbook verbatim would have
+silently gutted its single best rule.** Direction is a per-rule intake decision, not a default: row 18 (a
+worker *leaving* for the job, one-way) genuinely is MNL→Gulf and fires on 349,445.
+**⑥ Usability triage of all 39: 29 usable · 9 fire on <0.05% of the book · 1 unimplementable.** All four
+Pilgrimage rules are in the thin group (fires: **29 · 3 · 349 · 656**) — the segment written most
+confidently is the one we can least act on, because conjunctive `AND`s multiply small shares and the routes
+are thin (**Catholic hubs FCO+TLV+CDG+LIS = 28,224 trip endpoints total** vs 70,650 for JED/MED). This
+**corrects an overstatement I made earlier the same day** — "every Catholic pilgrimage is mislabelled" is
+literally true but immaterial. Two rules are unexpectedly huge levers: **row 34 vetoes 63.1% of the book**
+and **row 38 removes 33.5% of round trips**, both at confidence *moderate* — so both belong in `soft`.
+**⑦ Scope ceilings nobody wrote down:** **26 of 39 rules cite stay length**, defined only for round trips
+(**42.7%** of the book) — structurally silent on the other 57%. **Age is populated on just 0.98% of domestic
+bookings** (129,023 of 13.2M), so **every age rule is dead for domestic travel**, which is what was asked for.
+**⑧ One confound survives.** Fares carry maximum-stay conditions, commonly one month. Excess@30 falls with
+value tier (2.01 → 1.19) but so does excess@14 (1.80 → 1.20), so the ratio is flat and tier is not
+manufacturing the spike — yet a **Gulf-specific** one-month fare rule would reproduce it exactly. Closing it
+needs **`FarebasisCode`**, which is in PAL's own data dictionary and which we do not ingest. **Request it.**
+**Decision this settles:** spend `stay_nights` as an anchor (it buys 0.676 on our weakest boundary), keep
+`dep_month`, request `Isupgrade`/`IsTourCode`/`IsFrequentFlyer` as replacements. But encode row 21 as a
+**soft prior narrowed to the Gulf** — per ④ there is no clean boundary to assert, and per Lever A this will
+improve **label quality, not cluster separation.**
+**Source:** our analysis — `outputs/stay_length/summary.md`, `outputs/constraint_coverage/summary.md`,
+`docs/sme-constraints-intake.md` §3/§4a.
+
+#### 2026-08-17 — First SME constraint sheet returned: 39 new rules, and encoding them would cost us both remaining validation anchors
+**Domain:** Project Decision
+`wishlist/PALxMAIDA_Constraints&Wishlist.xlsx` came back from **RM — Domestic**: 51 rows, of which 12 are our
+own seeded examples returned verbatim and **39 are new** (26 *leans toward* · 9 *cannot be* · 3 *leans away* ·
+1 *must be*; 8 `certain` + 1 `likely` are hard, the other 30 soft). Their `Guide` sheet independently arrived at
+our exact hard/soft split and enforcement rule, so **no schema negotiation is needed** — the five constraint
+types map 1:1 onto `data/constraints/*.csv`. Full intake analysis: `docs/sme-constraints-intake.md`.
+**The best contribution:** rows 14/16/17/21 split **OFW vs Balikbayan/VFR on stay length** — the boundary that
+currently splits 6.8M bookings on the single `round_trip` bit and scores our lowest construct-validity AUC
+(**0.608**). Their mechanism is specific and testable: OFWs hold **employer-mandated ~30- or ~45-day leave**,
+balikbayans stay open-ended 14+/21+ over Q4–Q1. That predicts a *distributional spike* at 30 and 45 nights in
+the Gulf corridors, checkable on the 9.79M round-trip bookings where stay length is computable.
+**⚠️ The cost nobody priced.** Plan B's contract is that a rule input cannot validate its own rule, and after
+the leak audit only **two** unconditionally admissible anchors remain (`TIER_A = ("dep_month", "n_bookings")`).
+The sheet spends both reserves: **5 rules condition on `Month(DepartureDate)`** (kills `dep_month`) and
+**23 of 39 condition on `StayPattern`** (burns `stay_nights`, which Lever A had explicitly re-targeted as a
+*candidate Tier-A anchor*). Transcribed as written, construct validity is left with `n_bookings` **alone**.
+**This is a trade-off to decide, not a reason to reject the rules** — recommendation is spend `stay_nights`
+(it fixes the weakest boundary), keep `dep_month` (the seasonality rules are the file's weakest, `moderate` at
+best, and `peak_month` already carries the effect), and request **`Isupgrade` · `IsTourCode` ·
+`IsFrequentFlyer`** as replacement anchors — all three are derivable-or-listed and **no rule in the sheet
+touches any of them.** *Generalises: every SME rule round silently consumes anchor budget. Price it at intake.*
+**Six other things the intake turned up.** ① **`is_group` is over-subscribed six ways** — Family (`must_be`),
+Pilgrimage, Premium Bleisure, MICE, Last-Minute and Ultra-Wealthy all claim it; our waterfall's
+`WHEN is_group THEN 'Family'` at priority 8 pre-empts all five others, so that `must_be` must be demoted.
+② **We only encode Islamic pilgrimage hubs (JED/MED)** — the SME named **FCO/TLV/CDG/LIS**, so *every Catholic
+pilgrimage in the book is currently mislabelled*, on a Philippine carrier. ③ **Three new segments** (MICE,
+Ultra Wealthy Leisure, Intl. Student) and a 4-way sub-typing of Last-Minute — which supports our own finding
+that Last-Minute is an **overlay, not a peer segment** (84.1% would otherwise be Budget/Adventure).
+④ **Row 46 is unimplementable** (needs PNR party size; sectoral pax count is always 1). ⑤ **Booking-class `F`
+needs its Apr-2026 date guard** — the rationale says "post-April 2026" but the condition omits it; transcribe
+as `is_award`, never raw `F`. ⑥ **The ask was for *domestic* constraints; the answer is mostly international** —
+1 row names domestic routes, 14 name international corridors, 24 are route-agnostic — and the two fields
+domestic rules most need are weakest there (`Age` is **international-only**; `stay_nights` is undefined for
+one-ways, i.e. most of the domestic point-to-point book). The **Power BI wishlist sheet came back empty**, and
+four segments got zero input: Mabuhay Loyalist, Family, Budget/Adventure and **Digital Nomad** — the one
+segment in the requirement we have never implemented.
+**Expectation-setting:** Lever A already tested stay length as a *clustering* feature and it was null
+(0.323 → 0.319 vs a 0.45 bar). These are *labelling* rules, where descriptive discrimination is exactly what is
+wanted — so **`stay_nights` will improve label quality, not cluster separation.** Do not tell PAL the continuum
+finding changes because stay length arrived.
+**Source:** `wishlist/PALxMAIDA_Constraints&Wishlist.xlsx`; our analysis in `docs/sme-constraints-intake.md`;
+cross-referenced against `src/validation_anchors.py`, `src/features_real.py` (proxy waterfall) and
+`docs/continuum-levers-plan.md` Lever A.
+
 #### 2026-08-14 — Oversampling tested before and after the rule waterfall: both harmful, and *before* silently rewrites the taxonomy
 **Domain:** Clustering / Methodology
 Random oversampling with replacement, 100k pool → 20k, same 3-method panel, **each condition scored against
@@ -1852,4 +2026,4 @@ is now `src/dashboard.py`. See `README.md`.
 ---
 
 *Knowledge base maintained by CPT 3 — PAL Customer Segmentation*
-*Last updated: 14 August 2026*
+*Last updated: 17 August 2026*
