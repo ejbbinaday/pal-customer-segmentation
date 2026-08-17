@@ -454,6 +454,39 @@ Dashboard Wireframe → Requirements Checklist → [Appendix] Literature
 
 ---
 
+#### 2026-08-17 — The "missing value rung" is mostly a yield-management artifact; the real population is frequency, not fare
+**Domain:** Data & Features
+Same-day revision of the entry below, after testing the two candidate populations on **behaviour** instead
+of price. **The correction matters more than the original finding.**
+**Fare tier is partly an OUTPUT of booking timing, not a customer property.** Domestic economy, budget
+(tier 1–2) vs mid (tier 3–4): **median lead 25 days vs 5 days**, and **39.6% of mid-tier books inside three
+days** against 12.1% of budget. Supersaver/Saver inventory sells out early, so a late booker lands in
+Value/Flex for the same seat. A large part of "pays 2.6× more" is therefore **"booked late"**. Building a
+segment on the fare ladder would **encode a revenue-management mechanism as a customer type** — the exact
+error class as reading a spike at 30 nights without a round-number control.
+**One difference is genuinely customer-level and timing cannot explain it:** **bookings per customer 9.8
+vs 5.4**, and **37.7% vs 20.2%** of bookings from customers with 6+ lifetime bookings. *Inventory does not
+make someone fly twice as often.* So a real population exists — it is just not "mid-value leisure". Profile:
+flies ~10×, books ~5 days out, 15.7% same-day/overnight turnarounds, Mon–Tue departures 31.0% (between
+Budget's 28.9% and Corporate's 33.8%). That reads as **unmanaged business travel** — work trips booked
+outside a TMC or corporate portal, at companies that do not pay for business class. It is precisely our own
+unconfirmed rule **S04** (`is_domestic AND n_bookings >= 6` leans Corporate), and it is **corporate revenue
+we are not recognising as corporate**.
+**Outbound international economy IS distinct on behaviour, not just price:** vs domestic mid-tier —
+round-trip **64% vs 38%**, median stay **6 vs 3** nights, median lead **19 vs 5** days, connecting
+**23.9% vs 5.0%**. Different on every axis. This is taxonomy gap #4 and it earns a segment.
+**Recommendation:** no value rung; build `Outbound International Leisure` (~2.0M, closes the gap); build a
+**frequency-based** domestic segment on `n_bookings`/`lead_days` rather than fare tier (~3.5M), *after*
+testing whether the frequency gap survives controlling for lead time; ship fare tier as a reporting **band**.
+**⚠️ And the cost nobody has priced yet: `n_bookings` is one of the two remaining validation anchors.** A
+frequency-defined segment spends it, leaving `dep_month` alone. That is a *second* anchor decision of the
+same kind as decision 1 and must be taken as deliberately.
+*Generalises: before promoting a price difference to a customer difference, ask what else moves with price.
+In an airline, fare level is downstream of booking lead time by design, so "pays more" and "books later"
+are the same observation until separated. The customer-level metric (frequency) is what survived.*
+**Source:** our analysis, 2026-08-17 — probes over `pal_features_booking.parquet` +
+`pal_features_customer.parquet`; `docs/sme-constraints-intake.md` "REVISED same day".
+
 #### 2026-08-17 — The missing leisure rung is real, is 17.7% of the book, and is two populations rather than one
 **Domain:** Data & Features
 Follow-up to the decision-4 sizing: if `Budget/Adventure` is heading to 50.3% of the book, is there

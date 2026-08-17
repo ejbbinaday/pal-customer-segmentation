@@ -463,8 +463,54 @@ structure we found in the data. The continuum finding stands, and the noise-floo
 if anyone proposes validating this split with a silhouette, it needs a floor measured on this
 population with this feature set.
 
-**Open question for PAL, not for us:** does the middle rung split by *purpose* (mid-tier domestic
-leisure vs outbound international leisure) or stay one value band? Two segments or one.
+### ⚠️ REVISED same day — the "value rung" is partly a revenue-management artifact
+
+Testing the two candidate populations on **behaviour** rather than price changes the answer.
+
+**Domestic economy, budget (tier 1–2) vs mid (tier 3–4)** — leisure-ish bookings only:
+
+| | bookings | mean rev | median lead | lead ≤ 3d | stay ≤ 1 night | bookings per customer | from customers with 6+ |
+|---|---|---|---|---|---|---|---|
+| Budget 1–2 | 7,257,509 | 50 | **25 days** | 12.1% | 7.0% | 5.4 | 20.2% |
+| Mid 3–4 | 3,497,751 | 132 | **5 days** | **39.6%** | **15.7%** | **9.8** | **37.7%** |
+
+**The fare tier is partly an *output* of booking timing, not a customer property.** Supersaver and Saver
+inventory sells out early, so a late booker lands in Value or Flex for the same seat. Median lead of 5
+days against 25, with 39.6% booking inside three days, means a large part of "pays more" is really
+"booked late". **Building a segment on the fare tier would encode a yield-management mechanism as a
+customer type.**
+
+**But one difference is genuinely customer-level and timing cannot explain it:** bookings per customer
+**9.8 vs 5.4**, and **37.7% vs 20.2%** of bookings coming from customers with 6+ lifetime bookings.
+Inventory does not make someone fly twice as often. So there *is* a real population here — it is just
+not "mid-value leisure". Profile: flies ~10×, books ~5 days out, 15.7% same-day or overnight turnarounds,
+Mon–Tue departures 31.0% (between Budget's 28.9% and Corporate's 33.8%). That reads as **unmanaged
+business travel** — work trips booked outside a TMC or corporate portal, on companies that do not pay for
+business class. It is exactly our own unconfirmed rule **S04** (`is_domestic AND n_bookings >= 6` leans
+Corporate), and it is corporate revenue we are not recognising as corporate.
+
+**Outbound international economy is distinct on behaviour, not just price:**
+
+| | bookings | mean rev | median stay | round trip | median lead | connecting |
+|---|---|---|---|---|---|---|
+| Domestic mid | 3,497,751 | 132 | 3 nights | 38% | 5 days | 5.0% |
+| International | 1,997,820 | ~405 | 6 nights | **64%** | **19 days** | **23.9%** |
+
+Different on every axis, not only revenue. This is **taxonomy gap #4** and it deserves a segment.
+
+### Recommendation
+
+1. **Do not build a "middle value rung."** It is the fare ladder reflecting when people booked.
+2. **Build `Outbound International Leisure`** (~2.0M, currently `Unassigned`) — behaviourally distinct
+   and it closes our largest known gap.
+3. **Build a frequency-based domestic segment** (~3.5M) defined on **`n_bookings` and `lead_days`, not
+   fare tier** — the unmanaged-business population. ⚠️ Test first: does the frequency gap survive
+   controlling for lead time? `IsTourCode` / `IsFrequentFlyer` (already requested) would largely settle it.
+4. **Ship fare tier as a reporting *band*, not a segment** — useful on the value axis, must not define a
+   customer type.
+
+⚠️ **`n_bookings` is one of our two remaining validation anchors.** Recommendation 3 spends it. That is a
+second anchor decision and must be taken as deliberately as the first — see §6.
 
 ### Go back to the SME
 
