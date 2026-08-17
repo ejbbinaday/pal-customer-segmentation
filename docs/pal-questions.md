@@ -3,6 +3,10 @@
 **Compiled:** 17 August 2026 · **From:** the RM-Domestic constraint workbook and what we found testing it
 **Sources:** `docs/sme-constraints-intake.md` · `docs/waterfall-v2-design.md` · `data/constraints/*.csv`
 
+**Also exported as `docs/pal-questions.csv`** — same 24 rows, one per question, with blank
+`answer` / `answered_by` / `answered_date` columns so it round-trips like the constraint workbook did.
+Opens in Excel directly (UTF-8 BOM). ⚠️ The two files are maintained by hand — **update both**.
+
 24 items in four groups. **Group A blocks work that is otherwise ready to build.** Everything else
 improves quality or closes a loop. Each row carries our recommendation, so most can be answered "agreed".
 
