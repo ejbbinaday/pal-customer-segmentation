@@ -15,8 +15,11 @@ repos:
       - id: check-merge-conflict
       - id: check-added-large-files
         args: ["--maxkb=1024"]
-        # Tracked deck deliverables / reports are intentionally large.
-        exclude: ^(reports|assets)/
+        # Tracked deck deliverables / reports are intentionally large. `docs/*.html` is the same
+        # class of artifact: self-contained presenter guides that inline their own PNGs so they
+        # open anywhere with no asset directory, which puts them at 1-3 MB by construction.
+        # Narrowed to .html so an accidentally-committed large file elsewhere in docs/ still trips.
+        exclude: ^(reports|assets)/|^docs/.*\.html$
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.15.22

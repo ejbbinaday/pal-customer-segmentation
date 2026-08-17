@@ -556,8 +556,8 @@ reader needs, because they will otherwise misread a chart:
    `IsCompleteTravelYear`) and every trend visual must filter on them. 2024 also starts in May, so an
    unguarded full-year comparison puts 12 months against 8.
 2. **The requested "pickup vs last year" measure cannot be built from this extract.** The field we
-   expected to support it is departure-month accounting metadata, not a booking snapshot — 8 distinct
-   values across all 37 months. Genuine pickup needs lead-time-based measures (shipped) or **repeated
+   expected to support it is departure-month accounting metadata, not a booking snapshot — one single
+   value per departure month, all 37 of them. Genuine pickup needs lead-time-based measures (shipped) or **repeated
    dated extracts of the same departure months**, which is a new data request to PAL.
 
 ---

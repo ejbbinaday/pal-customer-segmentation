@@ -454,6 +454,342 @@ Dashboard Wireframe → Requirements Checklist → [Appendix] Literature
 
 ---
 
+#### 2026-08-14 — Oversampling tested before and after the rule waterfall: both harmful, and *before* silently rewrites the taxonomy
+**Domain:** Clustering / Methodology
+Random oversampling with replacement, 100k pool → 20k, same 3-method panel, **each condition scored against
+its own matched noise floor** (the discipline established earlier today).
+
+| Condition | sil | own floor | **margin** | ARI | mix |
+|---|---:|---:|---:|---:|---|
+| **Natural** (control) | 0.294 | 0.201 | **+0.093** | 0.435 | Budget 39.8% · OFW 17.0% · Balikbayan 12.8% |
+| **BEFORE** — balance by `dest_region`, then apply rules | 0.142 | 0.223 | **−0.081** | 0.300 | **Budget 11.6% · OFW 30.9% · Balikbayan 26.1%** |
+| **AFTER** — apply rules, then balance by segment | 0.208 | 0.149 | **+0.059** | 0.313 | forced 10% each · **33.4% duplicate rows** |
+
+**① Oversampling BEFORE the waterfall rewrites the segmentation — this is the practically important finding.**
+Balancing the input by destination region collapses **Budget/Adventure 39.8% → 11.6%** and nearly doubles
+**OFW/Migrant 17.0% → 30.9%** and **Balikbayan/VFR 12.8% → 26.1%**. Mechanically obvious in hindsight —
+`Budget/Adventure` requires `is_domestic`, and balancing regions cuts domestic from 57.7% to ~1/6 — but the
+consequence is that **any upstream resampling changes the headline segment shares without a single customer
+behaving differently.** If anyone ever resamples before Stage F, every number in the deliverable moves.
+
+**② BEFORE is worse than noise.** Margin **−0.081**: the real data clusters *less* well than its own shuffled
+control. Balancing an input axis leaves a population whose remaining correlations fight the geometry, while
+shuffling breaks them and makes spherical clusters easier to find. A negative margin is as clear a rejection
+as this framework produces.
+
+**③ AFTER degrades both separation and agreement.** Margin falls **+0.093 → +0.059** and ARI falls
+**0.435 → 0.313**, on a sample that is **33.4% duplicated rows**. Note the prediction that balancing would
+*inflate* ARI was wrong — it fell, because duplicated minority rows pull cluster centroids toward replicated
+points rather than toward real ones. **Caveat on this row's floor:** shuffling columns destroys the very
+duplication being tested, so 0.149 is not a perfectly matched control. The direction is unambiguous (both
+score and margin fall), but do not over-read the exact margin.
+
+**Conclusion:** neither placement helps. Combined with the earlier rejection of five resampling strategies in
+`src/resample_compare.py`, resampling is now closed on this project from both the supervised and unsupervised
+side. Imbalance stays handled where it belongs — the **asymmetric cost matrix**, **stratified measurement
+sampling**, and **weighted SME sampling**.
+**Source:** our analysis — probe over `pal_features_booking.parquet` reusing `src/model_zoo.py`.
+
+#### 2026-08-14 — A silhouette is meaningless without its **matched** noise floor: the domestic "structure" and Lever C's live thread both dissolve
+**Domain:** Clustering / Methodology
+Follow-up to the question *"would class-imbalance treatment help, since the data is domestic-dominated?"*
+Two findings, and the second invalidates one of our own pre-registered bars.
+**① Conditioning on domestic/international gives no real gain.** Clustering each separately (20k samples,
+same 3-method panel): **domestic sil 0.469** (ARI 0.160) · **international sil 0.234** (ARI 0.383), against a
+pooled baseline of 0.319. Domestic looked like a breakthrough — **until we measured its own noise floor.**
+Shuffling every column *within the domestic population* scores **0.345 · 0.332 · 0.360, mean 0.346** — versus
+**0.205** for the full population. **Domestic's margin over its own floor is +0.123; the pooled population's
+is +0.114. Statistically the same.** The domestic population is not more structured; it is
+lower-dimensional and more homogeneous, so **random data clusters more easily there**. International is
+*worse* than pooled (+0.029 over floor).
+**② This closes Lever C's remaining live thread.** The three markets that "passed" (DVO-MNL 0.511 · MNL-DVO
+0.496 · CEB-MNL 0.464) are all **domestic point-to-point** routes. Read against a domestic-like floor of
+**~0.35** rather than the global 0.205, they sit at the same margin as everything else. The directional
+pattern was a floor effect, not structure. **No lever remains open.**
+**③ The methodological lesson, and it is the important one.** **Comparing a sub-population's silhouette to a
+global threshold is invalid.** Our pre-registered Lever C bar ("silhouette > 0.45 in a majority of markets")
+was itself flawed — 0.45 means something different in each population. **Every silhouette must be quoted
+against a noise floor measured on the same population with the same feature set.** Corollary already flagged:
+the LCA sub-type silhouettes (0.204–0.264) are scored *within parent segments* and so need matched
+within-parent floors before anyone reads them as weak-but-real; against a plausibly elevated floor they may
+be at or below noise.
+**④ Feature-drop confound quantified.** On the full population, dropping `dest_region` alone moves silhouette
+**0.319 → 0.364 (+0.045) while agreement falls 0.432 → 0.346** — higher separation, less meaning. Dropping
+`round_trip` does nothing (+0.000); dropping `connecting` *hurts* (−0.028). So `Spec.drop()` removing
+constant columns in sub-population runs mechanically inflates their scores, which is part — but not all — of
+what ② explains.
+**On the original question:** class-imbalance treatments (SMOTE/over/under-sampling) are the wrong instrument
+regardless. They are supervised techniques; on unsupervised clustering they *manufacture* density rather
+than reveal it, which is the same failure mode Lever D's control caught. The project already evaluated and
+rejected five of them (`src/resample_compare.py`), and imbalance is correctly handled elsewhere — the
+asymmetric cost matrix, stratified measurement sampling, and weighted SME sampling. Also worth stating: at
+**57.7% domestic / 42.3% international the data is not imbalanced at all** (1.4:1); the real imbalance is
+between *segments* (39.4% vs 0.03%, ~1300:1), which no resampling can fix because it is a detection-floor
+problem, not a sampling problem.
+**Source:** our analysis — probes over `pal_features_booking.parquet` reusing `src/model_zoo.py`.
+
+#### 2026-08-13 — Six continuum levers, all null: and a silhouette **noise floor of 0.205** that recalibrates every separation number we quote
+**Domain:** Clustering / Methodology
+Ran the full lever programme from `docs/continuum-levers-plan.md` as probe-level screens (3-method panel —
+GMM(full) · KMeans · LCA — k=3–8, 20k samples, same `gower`/`gower_sil` as the harness). **Every lever failed
+its pre-registered bar.** Detail below; Lever A has its own entry.
+
+**① The noise floor is the most important result — 0.205.** Shuffling every feature column independently
+(three seeds) and re-running the panel gives best silhouettes of **0.201 · 0.214 · 0.201, mean 0.205**. That
+is what "no structure at all" scores on this data with these methods. **This had never been measured, and it
+changes how every separation number here should be read.** Consequences: the published **0.381 ceiling sits
++0.176 above the floor — comfortably real**, so the continuum finding stands and is now properly calibrated;
+but the conventional bands (>0.5 strong · 0.25–0.5 weak-but-real · <0.25 none) are **wrong for this data** —
+locally, "none" is 0.205, not 0. **⚠️ Flag for review: the LCA sub-type silhouettes (0.204 · 0.215 · 0.264)
+sit at or barely above this floor**, which would make them indistinguishable from noise. Not yet conclusive —
+the floor was measured on the full population with the full spec, while sub-types are scored within a parent
+on a narrower spec — **a matched within-parent shuffled control is needed before acting on it**, but the
+`provisional` flag on those sub-types now looks generous rather than cautious.
+
+**② Lever B — strip atypical populations: NULL, and it closes an explanation.** Removing all sea-crew
+bookings and the 4,896 heavy-tail customers (≥100 coupons) moved silhouette **0.294 → 0.272, i.e. −0.022**
+against a +0.08 bar. Population heterogeneity is **not** masking structure; the "mixed populations" line in
+the ruled-out table moves from *mostly closed* to **closed**.
+
+**③ Lever D — learned representation: NULL, and the control earned its keep.** SVD (MCA-like) 0.304,
+autoencoder 0.294, against a 0.5 bar. The mandatory **shuffled control returned 0.219** — within 0.085 of the
+real-data score — confirming that dimensionality reduction manufactures most of its own apparent structure.
+Had the control been optional we would have reported a spurious improvement.
+
+**④ Lever E — longitudinal, on the repeat cohort: NULL, and this is the big one.** Proper Phase 4 features on
+**1,317,609 customers** (≥3 bookings, >180-day span): inter-trip interval and its variance, recency, route
+entropy (Shannon over destination regions), seasonality spread, lead-time variance, revenue variance, tier
+drift, round-trip/international/premium rates. Result **silhouette 0.211 · ARI 0.048** against bars of 0.5 and
+0.6 — and **only +0.006 above the noise floor, i.e. indistinguishable from shuffled data.** Behaviour over
+time was the strongest remaining hypothesis and it is now closed at customer grain.
+
+**⑤ Lever G — coarser 4-segment taxonomy: NULL, and it refutes our own proposal.** Merging to a spine
+(Domestic leisure 52.5% · Overseas Filipino 26.7% · Undefined 13.9% · Premium & business 6.9%) leaves the
+weakest pairwise AUC at **0.606** — statistically the *same* weak boundary as OFW-vs-Balikbayan's 0.608, just
+relocated to *Overseas Filipino vs Undefined* — while **signal retained collapses 0.348 → 0.194 (−44%)**
+against a 0.02 tolerance. The pre-registered gate (*"a merge that improves geometry while losing predictive
+signal is a bad trade"*) caught exactly the trade being proposed. **Do not take the coarse taxonomy to PAL.**
+Side-finding worth keeping: the spine's *good* boundaries are strong (Domestic leisure vs Overseas Filipino
+**0.947**), so the weakness is specifically **Undefined** — further evidence it is a **real population sitting
+between the others rather than residue**, and a stronger reason for PAL to define it.
+
+**⑥ Lever C — per-market: FAILS the majority rule, but the pattern is systematic and warrants a new,
+separately pre-registered test.** *(The first run was void — it sampled before filtering, starving 5 of 6
+markets. Fixed.)* **3 of 6 markets cleared 0.45**, and the split is not random: the three **one-way** markets
+passed (DVO-MNL **0.511** · MNL-DVO **0.496** · CEB-MNL **0.464**) while the three **round-trip** markets
+failed (MNL-MNL 0.363 · CEB-CEB 0.435 · DVO-DVO 0.432). **But the passing markets have the *lowest* agreement
+with our taxonomy (ARI 0.16–0.19 vs 0.47–0.53 for the round-trip markets)** — so whatever structure exists
+inside a directional market is *not* what our rules capture. **Confound that must be resolved first:**
+`Spec.drop()` removes constant columns, so one-way markets are clustered in a **lower-dimensional space**,
+where higher silhouettes are easier to obtain. **This is a hypothesis for a new pre-registered test, not a
+result** — retro-fitting a hypothesis to a failed test is exactly what the plan's discipline section forbids.
+
+**Programme-level note:** roughly **14 pre-registered comparisons across six levers, none cleared.** When
+nothing clears there is no multiple-comparison problem to correct for — this is the cleanest possible form of
+a null programme.
+**Source:** our analysis — `outputs/levers/summary.md`, `outputs/levers/round2.md`, probes over
+`pal_features_booking.parquet` reusing `src/model_zoo.py`.
+
+#### 2026-08-13 — Lever A null: stay length adds no separating power, and the rule segments' own silhouette is ~0.009
+**Domain:** Clustering / Methodology
+Feasibility probe run **before** committing to the Stage F change proposed in
+`docs/continuum-levers-plan.md` Lever A. Design: 20k reservoir sample of **round-trip** bookings (stay length
+is undefined for one-ways, and *"is it defined"* is the `round_trip` rule bit, so imputing would leak a rule
+input), 4,000 rows for the O(n²) silhouette, GMM(full) and KMeans at k = 3–8, baseline 11-feature spec vs
+`+stay_nights`. Same `gower`/`gower_sil` code as the main harness, so the numbers are directly comparable.
+**Result — the lever fails, and not narrowly.** Best Gower silhouette **0.323 → 0.319**; best ARI vs proxy
+0.425 → 0.434; **mean deltas −0.007 (silhouette) and −0.022 (ARI)**. The pre-registered bar was 0.45 / 0.55.
+**The reconciliation that matters:** stay length *does* discriminate descriptively — median 3 · 4 · 5 · 10 ·
+13 · 33 nights across segments — but **a difference in medians is not geometric separation.** The
+distributions overlap heavily, and the most distinctive segment (Pilgrimage, 33 nights) is 0.19% of the book,
+far too small to move a global silhouette. **A feature can carry real descriptive signal and still fail to
+make clusters separable** — worth remembering before the next feature proposal.
+**Re-targeted, not discarded:** ship `stay_nights` as a BI/persona field, and test it as a **V1 construct-
+validity anchor**, where descriptive discrimination on a field no rule consumes is exactly what is wanted. Do
+**not** spend the 1.5 days on the clustering change.
+**Bonus finding — the rule segments' own Gower silhouette is 0.009**, essentially zero, and as far as we can
+tell had never been computed (the harness scores *fitted* labels, never the proxy partition). It says the
+rules cut **across** the density rather than along its seams. Coherent rather than damaging: near-zero
+separation alongside V1 AUCs of 0.608–0.965 means **the segments differ in ways that matter commercially
+without being separable blobs.** Confirm on the full population before quoting it externally.
+**Implementation gotcha:** `to_codes()` in `src/model_zoo.py` hardcodes each numeric by name, so a feature
+added to `NUMERIC` is **silently dropped from the LCA input**. Any future feature needs a branch there too —
+the Lever A task list was incomplete as written.
+**Source:** our analysis — probe over `pal_clean` + `pal_features_booking.parquet`, reusing `src/model_zoo.py`.
+
+#### 2026-08-13 — External benchmarks: our 0.381 separation ceiling **is** the published aviation figure, and Dolnicar & Leisch give the continuum finding its citation
+**Domain:** Clustering / Methodology
+Every metric in this project has been quoted against its own null and its own control, which answers *"is
+this signal?"* but never *"is this good?"* A literature sweep of aviation and tourism segmentation studies
+supplies the second answer, and it substantially changes how the continuum finding should be **presented**
+without changing the finding itself.
+
+1. **Our separation ceiling is at the field benchmark, not below it.** Published silhouettes: **0.37**
+   (Manhattan) / 0.59 (Euclidean) for a fuzzy-c-means segmentation of European air passengers at k=5;
+   **0.145** for K-Means on airline customer data vs 0.68 for DBSCAN on the same. Published aviation range
+   **≈0.14–0.68**. Our ten-method Gower-silhouette ceiling of **0.381** sits essentially *on* the
+   air-passenger figure and comfortably above the airline K-Means case. **Stop presenting 0.381 as a
+   limitation to apologise for.** Sub-segments (0.204–0.264) are below the air-passenger figure but still
+   above the K-Means case — so the honest sub-layer read is "weaker than published segments", which is a
+   sharper statement than the previous "weak-but-real".
+2. **Dolnicar & Leisch (*Marketing Letters* 21(1) 83–101) is the citation the continuum finding has been
+   missing.** Their framework classifies data into three regimes — **natural clusters → reproducible
+   clusters → constructive segmentation** — and states that naturally occurring clusters are **rare** in
+   tourism data. Our result (weak separation, high reproducibility, transfer ARI at its own ceiling) is
+   textbook **reproducible/constructive**. This converts "we found no clusters" from a negative result into
+   a named, cited, field-normal classification, and it explicitly licenses a business-constructed taxonomy
+   as the correct response to a continuum. **This should be the framing in every deliverable.**
+3. **V1 construct validity beats the aviation predictive benchmark; V2 criterion validity does not.** Best
+   published airline no-show prediction is **AUC 0.78** (KNN, best of six algorithms). Our median pairwise
+   construct AUC across the 36 segment pairs is **0.796** — above it, on evidence the rules never saw. But
+   V2's segment-only AUC of 0.632 with **+0.002** incremental value is below it. Both are true
+   simultaneously and both must be said: **the segments are distinguishable but carry no new signal.**
+4. **Sample adequacy is settled, and generously.** Dolnicar, Grün, Leisch & Schmidt give **70× the number
+   of segmentation variables** (2014), revised to **100×** (2016). At 11 features that is **1,100 rows
+   required**; the pipeline fits on **20,000** — **18× the requirement**, and 3.4× the n=5,800 of the
+   canonical airline segmentation study (Teichert, Shehu & von Wartburg, *Transp. Res. A* 42(1) 227–242).
+   The 20k sampling cap is no longer a defensible line of attack.
+5. **We are over-segmented relative to the literature.** Teichert et al. reach **5 segments** by latent
+   class on 5,800 frequent flyers. We deliver **9 named + Unassigned** on weaker separation. Defensible
+   *only* via item 2 — the taxonomy is business-constructed, not discovered — so that framing is now
+   load-bearing rather than merely honest.
+6. **Several of our headline metrics have NO published aviation or tourism benchmark.** Total-variation
+   distance, adversarial drift AUC, detection-power floors, rule-competition/boundary-fragility, and
+   signal-retained/incremental-value returned nothing. Notably there is **no numeric ARI threshold** in the
+   tourism literature — B4's framework is qualitative, so our 0.90/0.75 bands are an MLOps convention, not
+   a field standard. There is also **no published minimum viable segment size**, so the ~1% detection floor
+   has no comparator. **Every "ideal" figure for these is a logical target and must be labelled as one** —
+   implying a standard exists where none does is the failure mode to avoid.
+7. **The one benchmark we cannot answer at all is commercial value.** Airline cancellation forecasting and
+   overbooking is documented at **1.15–4.16% revenue gain** (a second study: 0.4–3.2%). Nothing in
+   `outputs/` estimates what this segmentation is worth. That is the number a client asks for, and it is
+   the largest remaining gap in the deliverable — larger than any methodological one.
+8. **Comparability caveat that must travel with all of the above.** The published silhouettes are
+   **Euclidean, on survey attitude data, n in the thousands**. Ours is **Gower, on mixed-type behavioural
+   data, n = 22.9M**. Same word, different measurement — these are order-of-magnitude sanity checks, not a
+   like-for-like league table. Two of the sources (the MDPI air-passenger paper and the SAGE sample-size
+   paper) returned **HTTP 403** and were read from indexed summaries rather than the publisher PDFs;
+   **verify both before either figure enters a client deliverable.**
+
+**Source:** external literature — Dolnicar & Leisch, *Marketing Letters* 21(1) 83–101; Dolnicar, Grün,
+Leisch & Schmidt, *Journal of Travel Research* (sample sizes); Teichert, Shehu & von Wartburg,
+*Transportation Research Part A* 42(1) 227–242; MDPI *Tourism & Hospitality* 6(1):27; *Black Sea Journal of
+Engineering and Science* (K-Means/DBSCAN airline comparison); *No-Show Passenger Prediction for Flights*;
+*Airline passenger cancellations: modeling, forecasting and impacts on revenue management*. Written up as
+`docs/pipeline-study-guide.md` §6.4 (benchmarks B1–B8) and mirrored in the HTML edition.
+
+#### 2026-08-13 — Stay length and upgrade are both derivable; Digital Nomad is absent and blocked on the wrong field
+**Domain:** Data & Features
+Checking three features against the code and raw extract ahead of a stakeholder session turned up two
+recoverable capabilities and one documentation error.
+1. **`round_trip` is in the model and load-bearing** — it is the sole discriminator between waterfall rules
+   ⑤ and ⑥ (OFW/Migrant vs Balikbayan/VFR), and therefore owns the weakest boundary in the taxonomy
+   (construct-validity AUC 0.608 over 6.8M bookings).
+2. **Length of stay is NOT blocked — it is derivable.** `methodology.md` lists it under *Known Data Gaps
+   (Blocking)*, which is true of the raw field but false of the quantity: for a round-trip booking it is
+   outbound departure → return departure, from coupon dates we already hold. **9,787,386 round-trip
+   bookings (42.7% of all), computable on 98.8% of them; median 5 nights (IQR 3–12).** Distribution:
+   1–3 nights 31.5% · 4–7 33.7% · 8–14 14.1% · 15–30 13.3% · 31–90 6.7% · 90+ 0.8%. **It already
+   discriminates on a field no rule consumes** — median stay by segment: Last-Minute/OFW 3 · Family,
+   Budget, Corporate 4 · Mabuhay, Unassigned 5 · **Premium Bleisure 10 · Balikbayan/VFR 13 ·
+   Pilgrimage 33** — exactly the persona ordering, with nothing in the waterfall putting it there. Two
+   uses: a **candidate Tier-A validation anchor** (strengthens Plan B), and the missing input for
+   Corporate-vs-Bleisure separation. Caveat: available only for round trips, itself a rule bit, so it needs
+   the same per-pair admissibility treatment as `dest_region`/`issue_country`/`channel`.
+3. **Upgrade is derivable and unused.** `SoldOperatingCabinClass` is **0% null** across all 38.1M coupons.
+   Sold ≠ operated cabin on **1.022%** of coupons: Y→W 210,968 · Y→J 133,819 · W→J 24,274 (**~369k
+   upgrades**) against **~20.4k downgrades** — roughly **18:1**. `SoldBookingClass` ≠ `BookingClass` on
+   0.825%. **Caveat that must travel with it: we cannot separate a paid/bid upgrade from an involuntary
+   operational one**, so it measures "flew better than they bought", not willingness to pay.
+4. **Digital Nomad is absent from the real-data waterfall, and our recorded reason is wrong.** The
+   delivered taxonomy is **9 named segments + Unassigned**, not 10 — Digital Nomad exists only in the
+   superseded 30k prototype. `src/export_powerbi.py` records it as "blocked on the missing `Loyalty status`
+   field"; that is incorrect — the prototype rule never used loyalty, and `methodology.md`'s own gap table
+   attributes it to **length of stay**, which item 2 shows is derivable. Sizing the candidate population:
+   **725,748 round-trip bookings with 31+ night stays (3.2% of the book)**, of which 66.3% currently sit in
+   Balikbayan/VFR, 11.1% Budget/Adventure, 10.7% Unassigned. A narrower definition (long-stay +
+   international + economy + non-group + web/OTA) gives **207,512 (0.91%)** — **right at the ~1% detection
+   floor from Stage V3**, which explains why clustering was never going to surface it and why a rule or an
+   SME definition is the correct instrument. **Recommendation: do not add the rule unilaterally** — take
+   the sizing to the SMEs alongside the Unassigned question.
+**Source:** our analysis — DuckDB probes over `data/interim/pal_clean/`, `pal_parquet/` and
+`pal_features_booking.parquet`; written up in `docs/pipeline-study-guide.md` §5.1.
+
+#### 2026-08-12 — Internal confidence of a deterministic labeller is measurable, and Corporate is the weakest cell
+**Domain:** Clustering / Methodology
+"How strong are the clusters?" has **two** answers for a rule-based labeller, and conflating them is the
+error to avoid. **External validity** (is the label *correct*?) needs evidence outside the rules — that is
+Stages V1–V4, and ultimately SME ground truth. **Internal confidence** (how *determined* is the label by
+the rule set itself?) is computable today, exactly, on the full 22.9M bookings. Three measures, all run on
+`data/interim/pal_features_booking.parquet` with no sampling:
+1. **Rule competition** — how many of the 10 branch predicates a booking satisfies. Overall **66.5% match
+   exactly one rule · 24.0% match two or more · 9.6% match none** (that last is `Unassigned`, by
+   definition). Per segment the spread is large: Budget/Adventure 100% uncontested (but it is the terminal
+   catch-all, so this is near-tautological), Premium Bleisure 95.5%, Balikbayan/VFR 89.2% — versus
+   **Corporate at 6.4% uncontested with 25.6% matching three or more rules, mean 2.20**. **The segment
+   with the highest misclassification penalty (×10) is the one whose label depends most on our chosen
+   priority order** — so it is the first boundary to put to the SMEs.
+2. **Runner-up label** — what the booking would be called one priority step lower. **84.1% of Last-Minute
+   would be Budget/Adventure**, which says Last-Minute is a *behavioural overlay cutting across* the
+   taxonomy rather than a peer of the other nine; worth deciding with PAL whether it is a segment or a
+   flag. Also: Corporate → Budget/Adventure 28.0%, Corporate → OFW/Migrant 19.7%.
+3. **Boundary fragility** — label flips when one threshold moves one notch. **The Corporate `lead_days<=7`
+   cut is nearly irrelevant (0.15–0.17% of the book flips)** — the `corp_channel` branch carries that
+   segment, which is reassuring since channel is an identity, not an arbitrary number. By contrast the
+   **Last-Minute 3-day cut is the most consequential arbitrary number in the model**: widening it to 7 days
+   relabels **8.57% (1.96M bookings)**. **Premium Bleisure is the most fragile segment** — moving the value
+   cut from tier ≤4 to ≤5 loses 18.6% of it to the OFW/Balikbayan branches, because Premium Economy then
+   counts as "economy" there.
+**Two implications.** (a) Ship a **`SegmentConfidence`** column (High = 1 rule and not near a threshold ·
+Medium = 1 rule near a threshold or 2 rules · Low = 3+ rules · None = Unassigned) through `features_real.py`
+into the fact table, so BI can restrict campaign lists to high-confidence members. (b) It is a **sampling
+frame for the SME ask** — spend the ~1,000 labels on Low/Medium bookings at contested boundaries
+(Corporate ↔ Budget/Adventure, OFW ↔ Balikbayan) rather than uniformly at random.
+**Caveat that must travel with these numbers:** they measure how determined a label is, **not whether it is
+right**. A booking can be 100% uncontested and still be in the wrong segment if the rule itself is wrong.
+**Source:** our analysis — full-population DuckDB probe over `pal_features_booking.parquet`; written up in
+`docs/pipeline-study-guide.md` §8.2.
+
+#### 2026-08-12 — Correction: `DaysBeforeMonthEnd` has 12 distinct values at 91.45% `-7`, not 8 at 99.7%
+**Domain:** Data & Features
+Re-verifying the 2026-07-27 entry ahead of a stakeholder presentation found two wrong figures that had
+propagated into four documents (`methodology.md` v0.9 changelog, `knowledge-base.md`,
+`stakeholder-report.md`, `tuesday-punchlist.md`). Measured on all **38,116,260** raw Parquet rows: the field
+takes **12 distinct values** (`-7, 11, 42, 72, 103, 133, 164, 195, 223, 254, 284, 315`) and **91.45%** of
+rows carry `-7` — not "8 distinct values, 99.7%". The original entry's own enumeration listed 12 values, so
+the "8" contradicted its own text. **The conclusion is unchanged and the load-bearing check re-confirms
+cleanly: every one of the 37 departure months carries exactly one distinct value (max = min = 1), while each
+departure month is sold across 12.9 issue months on average.** The field remains departure-month metadata
+against a single extract date, carries zero booking-timing information, and cannot anchor LY-vs-CY pickup;
+use `LeadTimeDays`, or request repeated dated extracts. **Lesson:** derived summary statistics quoted in prose
+drift from the data they describe — re-run the probe before quoting a number in a deliverable.
+**Source:** our analysis — DuckDB probe over `data/interim/pal_parquet/` and `data/interim/pal_clean/`.
+
+#### 2026-07-31 — Per-segment scorecard table for BI: the three traps that make a handoff silently wrong
+**Domain:** Data & Features
+Added `model/scorecard_segment_month.csv` to Stage X (segment × travel month, 1,835 rows, 127 KB) so a
+per-segment scorecard never aggregates 20M rows. Three design decisions, each fixing a failure mode that
+produces a *plausible but wrong* report rather than a visible error:
+1. **No stored percentages, ever.** A `share_of_bookings` column is correct only for the filter context
+   that computed it — slice the report to one region and it is silently wrong with nothing broken on
+   screen. Shares must be DAX measures over additive columns. Same reason `Bookings` stays
+   `sum(IsPrimaryCoupon)` and never a stored `DISTINCTCOUNT`: a pre-aggregated distinct count is not
+   re-aggregatable.
+2. **NULL booleans are a data-loss trap in BI filter columns.** `IsRefund` and `IsInternational` were
+   NULL on a small number of coupons (167 scorecard rows / ~542 bookings, all revenue-missing). In Power
+   BI, `IsRefund = FALSE` treats NULL as *not matching*, so those rows vanish from the scorecard and
+   totals quietly stop reconciling. All flags are now **coalesced to FALSE on write**, with `RevMissing`
+   carried explicitly so the affected rows stay identifiable instead of disguised as clean.
+3. **The export now asserts the scorecard reconciles** (coupons + bookings vs the fact table) and fails
+   the build otherwise. A scorecard that does not tie is worse than no scorecard, and the BI developer
+   should not be the one to discover it.
+**Also recorded:** the export ships **no accuracy or recall KPI on purpose**, and the guide says *do not
+build an accuracy gauge* — per-segment recall needs SME ground truth, and every figure computable today
+is circular. `PenaltyWeight` / `RevenueAtRiskPerError` support a legitimate *cost-weighted risk* tile
+instead.
+**Source:** our analysis — `src/export_powerbi.py` `build_scorecard()`, `docs/powerbi-guide.md` §3a,
+`docs/methodology.md` v1.5.
+
 #### 2026-07-31 — Prototype-track references removed from the docs; results **withdrawn, not relabelled**
 **Domain:** Project Decision
 All references to prototyping on a synthetic dataset were removed from the documentation surface
@@ -1004,8 +1340,10 @@ carries exactly one distinct value**, even though each month is sold across **13
 months**. So the field is a deterministic function of the *departure month* alone, measured against a
 single extract date (~2026-07-20): it is a constant **`-7`** for every departure month through Jun-2026,
 then steps by month length (11, 42, 72, 103, 133, 164, 195, 223, 254, 284, 315) for future months. Only
-**8 distinct values exist across the whole extract**, 99.7% of them `-7`. It therefore carries **zero
-booking-timing information** and cannot distinguish "booked 60 days out" from "booked 3 days out".
+**12 distinct values exist across the whole extract**, 91.45% of them `-7` *(figures corrected
+2026-08-12 — this entry originally said 8 / 99.7%, which was wrong; see the 2026-08-12 entry)*. It
+therefore carries **zero booking-timing information** and cannot distinguish "booked 60 days out" from
+"booked 3 days out".
 **Implication:** pickup/booking-curve analysis needs either (a) `LeadTimeDays` (departure − issuance,
 genuine per-coupon, already exported), or (b) **repeated dated extracts of the same departure months** —
 a data request to PAL, since this is a single snapshot. This supersedes the earlier note that the field was
@@ -1331,10 +1669,7 @@ metric (was lowering DBCV before);
 (4) **negative learning P3b** in `features_v3.apply_negative_learning`;
 (5) **Unassigned bucket** — rows past the 95th-pctl train distance are left low-confidence (test 8%),
 no more forcing 42% noise into Family.
-**Results:** train discovery 2 clusters, 53.4% noise, DBCV −0.072 (structure still absent — data
-unchanged, as expected). HOLD-OUT recall vs proxy: Last-Minute/Premium Bleisure 100%, Family 67%,
-Digital Nomad/Budget 64%, Corporate 61%, Balikbayan 58% (cost 114, 1.31/record, n=87). Out-of-sample ≈
-in-sample → the labeller generalises; the ceiling is set by rules/data, not memorisation. **Recall stays
+**Results: withdrawn** — these were prototype-track measurements; see the 2026-07-31 entry on why such figures are withdrawn rather than relabelled. The one *structural* observation that survived, because it is about the method rather than the data: out-of-sample ≈ in-sample, i.e. the labeller generalises and the ceiling is set by the rules and the data, not by memorisation. **Recall stays
 proxy-referenced (circular) until SME labels arrive** — added an auto-detected hook at
 `data/labels/sme_sample.csv` (+ template/README) for non-circular validation.
 **Source:** `src/features_v3.py`, `src/prototype_v3.py`; outputs/prototype_v3_output/.
@@ -1356,12 +1691,7 @@ recall look better without meaning more. Status: open — add as Stage P3b if we
 **Domain:** Clustering / Methodology
 `src/prototype_v3.py` runs P4–P5: StandardScaler → penalty-weighted HDBSCAN (min_cluster_size=30,
 min_samples=5) → nearest-centroid cluster→segment mapping + noise auto-assignment → cost-matrix +
-DBCV validation. Reuses `monitor_metrics.dbcv` and `pal_colors`. **Results on v3 (1k rows):**
-8 micro-clusters, 42.1% noise; DBCV 0.023, silhouette 0.235, Davies-Bouldin 1.465; per-segment recall
-vs proxy seeds — Balikbayan/VFR 100%, Digital Nomad 100%, Budget 87%, Last-Minute 75%, Family 63%,
-Corporate 61%, Premium Bleisure 53% (weighted cost 527, 1.15/labelled record). **Read as prototype
-validation of the *approach*, not production metrics** — 1k rows is small, noise is high, and Corporate
-(×10) at 61% is below the 91% target. 3 segments unassignable (no seed): Mabuhay Loyalist, OFW/Migrant,
+DBCV validation. Reuses `monitor_metrics.dbcv` and `pal_colors`. **Results: withdrawn** — prototype-track measurements (cluster counts, noise rate, DBCV, silhouette and per-segment recall against proxy seeds). They do not describe real-data performance; see the 2026-07-31 entry. Do not quote them. 3 segments unassignable (no seed): Mabuhay Loyalist, OFW/Migrant,
 Pilgrimage. Next iterations: tune min_cluster_size/min_samples, richer or larger data, revisit the OFW
 seed (v3 `pos_mismatch`≈0). Recall here measures agreement with proxy seeds (partly circular, per the
 methodology's own note).
@@ -1473,7 +1803,9 @@ and diaspora-route flags are secondary but useful.
 **Domain:** Clustering / Methodology
 RFM is the backbone of airline customer-value/CLV work, extended in recent research to **ancillary
 spend** (not just fare). **Recency & Frequency require a passenger key that links bookings across
-time** — which our v3 data lacks (every `Unique Identifier` is a unique single coupon). So we have a
+time**, which the prototype data lacked. *(Superseded 2026-07-22: the real extract's `UniqueID` **is** a
+customer key — it spans up to 1,162 days and 26% of customers book more than once, so R and F **are**
+computable there. See the 2026-07-22 profiling entries.)* On the prototype data we had a
 strong **Monetary** axis (NetRevenue, NetFare, ancillary) but **cannot compute R or F** without
 stitching bookings via name+DOB or a frequent-flyer number. This is the same "No RFM history" gap the
 methodology already flagged. Consequence: model at the PNR level, not customer-lifetime.
@@ -1520,4 +1852,4 @@ is now `src/dashboard.py`. See `README.md`.
 ---
 
 *Knowledge base maintained by CPT 3 — PAL Customer Segmentation*
-*Last updated: 31 July 2026*
+*Last updated: 14 August 2026*

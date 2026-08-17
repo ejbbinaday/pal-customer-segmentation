@@ -1,5 +1,8 @@
 # EDA Report: PAL Sample Features (`sample-features.csv`)
 
+> **Superseded (2026-08-05):** this report profiles the 30k-row prototype sample. The active
+> real-data EDA is `docs/eda-report-real-data.md` (38M-coupon extract) — quote results from that.
+
 **Date:** 19 April 2026
 **Rows:** 29,999 | **Columns:** 27
 

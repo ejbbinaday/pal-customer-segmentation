@@ -119,7 +119,9 @@ Present it as a hypothesis that was tested and rejected, then acted on. Three li
 
 **If they stop you on a metric, define it in one breath** (full glossary below):
 
-- **DBCV** — "does this data actually have dense clumps?" Negative = no. Ours was negative everywhere.
+- **DBCV** — "does this data actually have dense clumps?" Negative = no. Not computed on the real
+  extract: the features are categorical-heavy, so density separation does not apply — which is *why*
+  HDBSCAN was dropped there. Quote the separation ceiling (**0.381**) instead.
 - **Silhouette** — "how cleanly separated are the groups?" ~1 tight, ~0 no separation. Ours: 0.10.
 - **BIC** — model-fit score where lower is better; we use it to *choose k*. It never bottomed out.
 - **Elbow** — the point where adding another cluster stops helping. **No elbow = no natural k.**
@@ -213,7 +215,7 @@ is what matters live: the number is only useful if you can say what it *means fo
 
 | Term | In one line | What our number says |
 |---|---|---|
-| **DBCV** *(Density-Based Clustering Validation)* | Scores whether density-based clusters are real. Range −1 to 1; **negative = worse than no clustering**. | **−0.04 to −0.19** on v3 → no density clumps exist. This is what killed HDBSCAN. |
+| **DBCV** *(Density-Based Clustering Validation)* | Scores whether density-based clusters are real. Range −1 to 1; **negative = worse than no clustering**. | **Never measured on the real extract** — the data is categorical-heavy, so density-based clustering does not apply. HDBSCAN was dropped for that reason, corroborated by the ten-method benchmark's **0.381** separation ceiling. Do not quote a DBCV figure. |
 | **Silhouette** | Per-point: how much closer am I to my own group than the next one? ~1 = tight and separated, ~0 = no separation. | **Flat ~0.10** across k=4–12 with no peak → groups barely separated, and no k is better than another. |
 | **BIC** *(Bayesian Information Criterion)* | Model fit penalized for complexity — lower is better. Standard way to **pick the number of classes**. | Falls **monotonically 3→9** and picks the boundary → the data always wants "one more cluster," i.e. a continuum. |
 | **Elbow** | The k where the fit curve bends and extra clusters stop paying off. The classic "how many clusters?" test. | **No elbow, in any method.** The single most important negative result in the project. |
@@ -283,8 +285,9 @@ save the rest for Q&A. Stacked analogies start to sound like you're avoiding the
 - End on the two asks (SME access, defense priorities) so they have something concrete to respond to.
 
 **Don't:**
-- Don't call the 53–100% proxy recall "model accuracy." It isn't, and it's the one claim that can
-  unravel the whole session.
+- Don't call any proxy-referenced recall "model accuracy." It isn't — it is agreement with our own
+  rules, and it's the one claim that can unravel the whole session. **There is no ground-truth accuracy
+  figure yet**; it needs the SME labels.
 - Don't stack analogies. Three in the talk, max — the rainbow at beat 4, jeans at beat 3, restaurant at
   beat 5. Past that, they read as a substitute for evidence instead of a way into it.
 - Don't defend HDBSCAN. You dropped it with evidence; that's a strength, so say so plainly and move on.

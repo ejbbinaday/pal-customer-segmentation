@@ -67,6 +67,22 @@ so they can be run from anywhere (e.g. `python src/hdbscan_final.py`).
 `capture_slides.py` takes `--deck <name\|path>` and `--out <dir>`; it screenshots every `.slide`
 element. Needs `playwright` + chromium (it installs both on first run).
 
+**Word version of the briefing pack** (`docs/tuesday-punchlist.docx`, for sending to non-technical
+readers) — regenerate with **pandoc** after editing the markdown:
+
+```bash
+tail -n +3 docs/tuesday-punchlist.md | pandoc -f markdown -o docs/tuesday-punchlist.docx \
+  --toc --toc-depth=2 \
+  -M title="Tuesday Briefing Pack — PAL Customer Segmentation" \
+  -M subtitle="Source content for the 4 August 2026 presentation"
+```
+
+`tail -n +3` drops the markdown H1 so it doesn't duplicate the generated title page. The markdown is the
+source of truth — edit it, never the `.docx`. The step-flow diagram in that doc is deliberately
+**plain-text inside a code fence** rather than Mermaid: pandoc maps it to Consolas with
+`xml:space="preserve"`, so the alignment survives in Word, whereas a Mermaid block would have arrived as
+raw code.
+
 > **Streamlit Cloud:** the dashboard entrypoint is now `src/dashboard.py` — update the deployment config.
 
 ## Prior prototype track (superseded)
@@ -102,8 +118,10 @@ python src/validate_temporal.py  # out-of-time stability: do the segments hold a
 python src/validate_temporal.py --quick  # same, ~1 min, directional only
 python src/build_pbip.py      # Power BI project reproducing the revenue/PAX mock-up → outputs/pbip/
 python src/sub_segment.py     # LCA sub-types within large rule segments → outputs/sub_segments/
+python src/rule_confidence.py # how *determined* is each rule label? (~1 min) → outputs/rule_confidence/
 python src/export_powerbi.py  # Power BI fact table (coupon + agg grain, ~2 min) → outputs/powerbi_export/
 python src/report_figures.py  # real-data EDA + preliminary-cluster figures → outputs/report_real/figs/
+python src/manuscript_figures.py  # manuscript Ch.4 figures from saved CSVs → outputs/report_real/figs/ms_fig*.png
 python src/build_report.py    # embed figures + render → docs/status-report.{html,pdf}
 ```
 
@@ -206,6 +224,7 @@ outputs/powerbi_export/
 ├── model/                        ← what Power BI actually loads
 │   ├── dim_date.csv                 1.8k rows — mark as the Date table
 │   ├── dim_segment.csv                11 rows — persona dimension (see below)
+│   ├── scorecard_segment_month.csv  1,835 rows — per-segment scorecards (see below)
 │   ├── fact_flight/                20.6M rows — full dashboard (flight no., O&D, lead time)
 │   └── fact_dashboard.parquet       2.1M rows — fast summary-only alternative
 ├── qa/sample_100k.csv             100k rows — build + validate DAX before moving GBs
@@ -219,6 +238,18 @@ for booking-level measures and `BookingID` to dedupe the per-leg `Route` repetit
 the **rule-based proxy** label; `PaxCount` is sectoral (≈always 1, *not* party size); `Age` is 57% NULL by
 design (filter `AgeKnown`); and **`DaysBeforeMonthEnd` cannot drive LY-vs-CY pickup** (one value per
 departure month — use `LeadTimeDays`).
+
+**`model/scorecard_segment_month.csv` — the per-segment scorecard source.** Grain is segment × travel
+month plus only the flags a scorecard must filter on (`IsInternational`, the two completeness flags, and
+the `IsRefund` / `IsAward` / `IsNonRev` / `RevMissing` exclusions). **1,835 rows / 127 KB**, so a KPI tile
+never aggregates 20M rows and the BI developer can check totals in Excel first. Every numeric column is
+**additive** (`Coupons`, `Bookings`, `PaxCount`, `NetRevenue`, `NetFare`). **No stored percentages —
+deliberately:** a share is valid only in the filter context that computed it, so shares must be DAX
+measures (starter DAX in `docs/powerbi-guide.md` §3a). All flags are **coalesced non-NULL**, because a
+NULL makes `IsRefund = FALSE` silently drop rows and break reconciliation; the ~542 bookings with genuinely
+unknown refund status carry `RevMissing = TRUE`. The build **asserts this table ties to the fact table**
+(coupons + bookings) and fails the export otherwise. **No accuracy/recall KPI ships** — that needs SME
+ground truth, and any figure computable today is circular.
 
 **`model/dim_segment.csv` — the persona dimension.** One row per segment, related to the fact table on
 `Segment` = `CustomerSegment`, so a card visual bound to it **cross-filters with every other visual**
@@ -242,21 +273,72 @@ Key references:
   methodology, the full rule waterfall as implemented, ten data-backed **persona cards**, the success
   metrics with a worked peso cost calculation, and the SME asks (hard/soft constraints + labelled
   sample) with exact file formats. Written for PAL commercial stakeholders, not for engineers.
+- **`docs/continuum-levers-plan.md`** — **can we find structure the current setup missed?** Seven levers
+  (stay length · strip atypical populations · per-market · learned embedding · longitudinal · **coarser
+  taxonomy** · continuum-native output), each with a **pre-registered decision rule**, an out-of-time
+  replication gate, and a hard stop rule.
+  Records which four of the six explanations for "no clusters" are already closed, so they are not re-run.
+  Also corrects one kill criterion in `recommendations-plan.md` Phase 4 that relied on the retired H0 detector.
 - **`docs/recommendations-plan.md`** — the sequenced plan acting on the 2026-07-28 stress-test findings
   (SME ground truth first, feature-contract gate, GMM confidence layer, pre-registered decision rules,
   and the one gated customer-grain experiment).
 - **`docs/mentor-presentation-guide.md`** — talk track for presenting initial findings + next steps
   (TL;DR, 6-beat arc, per-beat script, term explainers, analogy cheat sheet, anticipated Q&A,
   what not to claim).
+- **`docs/eda-results-slide-guide.html`** — the same talk track as a **self-contained presenter guide**:
+  each slide a card with its chart embedded, the spoken script styled as a script block, and a **live
+  timing rail** (start/pause clock that tells you which slide you should be on). Prints to PDF. Rebuild
+  with the generator noted in the file footer after editing the markdown.
+- **`docs/eda-results-slide-guide.md`** — **slide-by-slide talk track for a 30-minute EDA + initial-results
+  session** (19 min talk / 11 min Q&A, 13 slides + 5 backup). Per-slide: what goes on it, which figure from
+  `reports/study_guide/`, a spoken script, and the objection it pre-empts. Includes a timing budget with a
+  cut-list, Q&A prep, a "what not to claim" list, and a pre-flight checklist.
+- **`docs/pipeline-study-guide.md`** — **end-to-end walkthrough for presenters**: raw gzip → cleaned
+  coupons → bookings → the rule waterfall → Power BI, with the grain changes, the four BI traps, a
+  numbers cheat sheet, and likely-questions/answers. Also carries the **rule-confidence diagnostics**
+  (rule competition · runner-up label · boundary fragility) that quantify how *determined* each
+  deterministic label is — see §10.2. Also carries the **EDA findings and the decision trail** (§1, §3),
+  the **metrics map** (§6.1 — which metric scores which layer, and why the rule layer needs external
+  validity rather than BIC/silhouette), **every metric explained in plain words** (§6.2 — the four
+  questions any segmentation must answer, an analogy and a null value per metric, and one number read
+  end to end), **where GMM fits** (§6.3 — benchmark winner, measurement instrument, candidate; not in
+  the pipeline), the **Layer-2 validation logic** (§7 — why a rulebook cannot grade itself, and the four
+  ways a segmentation can be worthless with one test each), department-grouped Q&A (Commercial/RM,
+  Marketing & Loyalty, Finance, IT/Data, mentors), a plain-language glossary, **strategic recommendations
+  for PAL** (§13 — commercial plays, early-warning signals, repeat-purchase behaviour, taxonomy decisions,
+  ranked data investments, and how *not* to use the segmentation), and the prioritised asks.
+- **`docs/pipeline-study-guide.html`** — the same guide as a **self-contained presentation-grade report**
+  for a mixed-seniority, cross-functional room. Open in any browser; no build step, no dependencies.
+  Carries an **audience switcher** (Everyone / Business / Technical) that filters detail depth, and
+  prints to PDF with every section expanded. **11 figures are embedded as base64**, so the file stays
+  self-contained (~2.4 MB). Keep in sync with the markdown, which is the source.
+- **`reports/study_guide/`** — the 11 figures used by both guides (copied from
+  `outputs/report_real/figs/`, regenerate with `python src/report_figures.py` +
+  `python src/manuscript_figures.py`). Tracked, because `outputs/` is git-ignored and the markdown
+  references them.
 - **`docs/powerbi-guide.md`** — the colleague-facing Power BI starter guide (star schema, load steps,
   starter DAX, the four gotchas). **Canonical copy** — `export_powerbi.py` copies it into the export
   folder as `START-HERE.md` on every build, since `outputs/` is git-ignored. Edit it here, not there.
 - **`docs/data-dictionary.md`** — authoritative field reference (mirror of the client's
   `DataDictionary.v1.xlsx`), incl. the farebrand → value-tier ladder.
 - **`docs/real-data-plan.md`** — the cleaning → EDA → feature-engineering plan (grain, decisions).
+- **`docs/manuscript-ch4-draft.md`** — first draft of manuscript Chapter 4 (Results, Analysis,
+  Discussion): §4.1 empirical clustering results, §4.2 segment interpretation + validation,
+  §4.3 strategic implications for PAL. All numbers traceable to `outputs/` stage summaries.
+- **`docs/eda-report-real-data.md`** — consolidated EDA report on the real 38M-coupon extract
+  (raw profile, cleaning, grain confirmations, proxy-segment magnitudes, modelling implications).
+  Supersedes `docs/eda-report.md` (prototype sample).
 - **`docs/knowledge-base.md`** §15 — profile findings + dictionary-reconciliation notes.
+- **`docs/exec-methodology-flowchart.drawio`** / **`.mmd`** — the stakeholder methodology flowchart in
+  two Lucidchart-importable formats (File → Import Diagram → draw.io, or Insert → Diagram as code →
+  Mermaid). Six cards; each carries a plain-language caption naming its colour's meaning (prepare /
+  deliverable / prove / in your hands / what we need from you), a business headline, and a muted italic
+  method line. Legend included. Same content in both; for exec buy-in decks.
 
 ## Setup
+
+Full annotated list of every package/tool + version (incl. beyond-pip tools like pandoc and
+the Playwright Chromium browser): **`docs/installation.md`**.
 
 Three dependency files, by purpose:
 

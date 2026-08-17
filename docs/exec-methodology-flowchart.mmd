@@ -1,0 +1,27 @@
+%% Executive methodology flowchart — business headline first, one muted method line
+%% baked into each box. Colours carry meaning and each box's small caption states it:
+%%   blue = prepare the data · gold = the deliverable · violet = prove it works ·
+%%   green = in your hands · dashed red = what we need from PAL
+%% Import into Lucidchart: Insert > Diagram as code > Mermaid (paste the flowchart below),
+%% or use docs/exec-methodology-flowchart.drawio via File > Import Data > draw.io
+%% (the .drawio version has the polished styling + legend — prefer it for slides).
+%% Headline to place above the diagram in the slide/canvas:
+%%   "How we segment PAL's customers — business logic decides, machine learning verifies"
+
+flowchart LR
+  A["<b>PREPARE THE DATA</b><br/><b>1 · Start with every ticket</b><br/>38 million ticket records, May 2024 – May 2027<br/>no personal or loyalty data required<br/><i>streamed at full scale with open-source tools;<br/>typed, cleaned, quality-flagged</i>"]
+  B["<b>PREPARE THE DATA</b><br/><b>2 · Organise into trips and customers</b><br/>22.9M bookings across 13.4M customers<br/>one booking = one travel decision<br/><i>behaviour measured per booking: lead time,<br/>trip shape, routes, a 7-tier fare-value ladder</i>"]
+  C["<b>THE DELIVERABLE</b><br/><b>3 · Sort every booking into<br/>10 customer segments</b><br/>transparent business rules — every assignment<br/>explainable in one sentence<br/>e.g. Corporate · Overseas Workers · Family Visits<br/><i>rules won on evidence: 10 clustering algorithms<br/>found no natural clusters — so rules assign,<br/>machine learning verifies</i>"]
+  D["<b>PROVE IT WORKS</b><br/><b>4 · Stress-test the segments</b><br/>four independent studies confirm the segments<br/>are real, predictive, and stable<br/><i>distinct on evidence the rules never saw ·<br/>predict refunds &amp; rebooking · hold across<br/>a 12-month step</i>"]
+  E["<b>IN YOUR HANDS</b><br/><b>5 · Deliver live dashboards</b><br/>interactive Power BI — every figure<br/>traceable back to source tickets<br/><i>all 38.1M rows reconciled on every build;<br/>drift monitoring specified</i>"]
+  F["<b>WHAT WE NEED FROM YOU</b><br/><b>6 · PAL expert sign-off</b><br/>your commercial team reviews ~1,000 bookings<br/>to confirm the segment names fit the business<br/><i>scored on the business cost of each<br/>misclassification, not raw accuracy</i>"]
+
+  A --> B --> C --> D --> E
+  E -.-> F
+
+  style A fill:#E8F1FB,stroke:#2E5FA3,stroke-width:2px,color:#1B2A41
+  style B fill:#E8F1FB,stroke:#2E5FA3,stroke-width:2px,color:#1B2A41
+  style C fill:#FFF3D6,stroke:#A87900,stroke-width:3px,color:#3D2E00
+  style D fill:#F0EAFB,stroke:#6B4FA8,stroke-width:2px,color:#2A1B41
+  style E fill:#E6F6EC,stroke:#2E8B57,stroke-width:2px,color:#0F2E1D
+  style F fill:#FFFFFF,stroke:#C0455A,stroke-width:2px,stroke-dasharray:6 4,color:#5A1F2A

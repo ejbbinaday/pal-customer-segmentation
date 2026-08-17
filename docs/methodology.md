@@ -1,9 +1,35 @@
 # PAL Customer Segmentation — ML Pipeline Methodology
 
 **Client:** Philippine Airlines (PAL)
-**Version:** v1.4 — 31 July 2026
+**Version:** v1.6 — 12 August 2026
 
 > **Changelog**
+> - **v1.6 (12 Aug 2026):** **Rule-confidence diagnostics added; no modelling logic changed.**
+>   `src/rule_confidence.py` measures *internal* confidence on the full 22.9M-booking population —
+>   **rule competition** (how many of the 10 branch predicates a booking satisfies), **runner-up label**
+>   (what it would be called one priority step lower) and **boundary fragility** (label flips when a
+>   threshold moves a notch). This is deliberately a **separate axis from Stages V1–V4**: it says how
+>   *determined* a label is by the rule set, never whether it is *correct*. Headline results:
+>   **66.5% of bookings match exactly one rule, 24.0% match two or more, 9.6% match none**;
+>   **Corporate is the most contested segment (6.4% uncontested, 25.6% matching 3+ rules) and carries
+>   the highest penalty weight (×10)**; **84.1% of Last-Minute would otherwise be Budget/Adventure**, so
+>   it behaves as an overlay rather than a peer segment; the **Corporate `lead_days<=7` cut is nearly
+>   inert (0.15–0.17% flips)** while the **Last-Minute 3-day cut is the most consequential arbitrary
+>   number in the model (widening to 7 days relabels 8.57% of the book)**. Also **corrects a stale figure**
+>   propagated across four docs: `DaysBeforeMonthEnd` has **12** distinct values at **91.45%** `-7`, not
+>   8 at 99.7% — the one-value-per-departure-month finding is re-confirmed at 37/37 and the conclusion is
+>   unchanged. Full detail: `outputs/rule_confidence/summary.md`, `docs/pipeline-study-guide.md` §8.2.
+> - **v1.5 (31 Jul 2026):** **Birds-eye view added, and Stage X ships a per-segment scorecard.** Two new
+>   Mermaid diagrams (the end-to-end pipeline; the validation ladder) plus
+>   [The model of record](#the-model-of-record--one-page) and
+>   [Techniques used](#techniques-used--and-the-status-of-each) — the latter statuses every technique as
+>   *in pipeline* / *candidate* / *diagnostic only* / *dropped*, because conflating those three is the
+>   most common way to misread this spec. Stage X adds **`model/scorecard_segment_month.csv`** (segment ×
+>   travel month, 1,835 rows, all columns additive) so per-segment scorecards do not require aggregating
+>   20M rows. **No stored percentages** — a share is only valid in the filter context that produced it.
+>   Every flag in that file is coalesced non-NULL, because a NULL would make `IsRefund = FALSE` silently
+>   drop rows and break reconciliation, and the export now **asserts the scorecard ties to the fact
+>   table** on every build. No modelling logic changed.
 > - **v1.4 (31 Jul 2026):** **Stage X now ships a persona dimension.** `src/export_powerbi.py` emits
 >   `model/dim_segment.csv` — one row per segment (11), joined on `CustomerSegment` = `Segment` — so
 >   **persona cards render natively in Power BI** and cross-filter with every other visual, instead of the
@@ -97,6 +123,21 @@ trip-purpose × value segmentation at the **booking** grain, rolled up to **cust
 The load-bearing idea in one picture: **the rules label, and ML checks the labels.** Clustering is a
 validator and a refiner in this design, never the labeller — see the approach decision below for why.
 
+```text
+gz → typed Parquet → Stage C clean+flag (coupon grain; farebrand → value tier 1-7)
+→ Stage F features: coupon → BOOKING (customer_id, issue_date) → customer  (+ airport→region join)
+→ RULE WATERFALL: purpose×value proxy segmentation   ← PRIMARY DELIVERABLE (the 10 segments)
+→ Stage X export: segment joined back down to coupon grain → Power BI star schema
+   ├── LCA refinement       sub-segments oversized parents   ← ML's job 1
+   ├── Stages V1-V4         test whether the boundaries hold ← ML's job 2
+   └── PSI / ARI monitoring drift on the input distribution  ← ML's job 3
+→ pending SME ground truth for non-circular validation
+```
+
+*(The same pipeline as a diagram — renders on GitHub and in any Mermaid-enabled viewer. If you see raw
+code below instead of a picture, your Markdown preview has no Mermaid support; the text version above is
+authoritative and complete.)*
+
 ```mermaid
 flowchart TB
   classDef stage    fill:#0B1220,stroke:#38BDF8,stroke-width:1px,color:#E8ECF4
@@ -141,6 +182,19 @@ Stage detail: [Stage C](#stage-1--data-ingestion--cleaning) onward below; script
 Every agreement number this project produces is measured against `proxy_segment`, which is the rule
 waterfall's own output. That is **circular** by construction. Two independent routes out, both live:
 
+```text
+10 rule-based segments
+├── CIRCULAR (unavoidable today) ── per-segment recall + weighted cost, measured against our own
+│                                   rules. Machinery built and tested; awaiting an answer key.
+├── PLAN B — no labels needed ──── gated by the circularity contract (validation_anchors.py):
+│     V1 construct validity   do the segments differ on evidence the rules never saw?
+│     V2 criterion validity   do they predict outcomes no rule reads (refunds, rebooking)?
+│     V3 detection power      plant groups of known size — would we even find them?
+│     V4 out-of-time          does it survive a 12-month step?
+└── PLAN A — ground truth ───── ~1,000 SME-labelled bookings + inter-rater agreement.
+                                Replaces the circular metric. Outstanding.
+```
+
 ```mermaid
 flowchart LR
   classDef circ fill:#1A0A0E,stroke:#FF4D6D,stroke-width:1px,color:#E8ECF4
@@ -171,6 +225,57 @@ flowchart LR
 **Plan B answers "is there real structure here?" without any labels. Plan A answers "are these the
 *right* labels for PAL?" and nothing else can.** They are complements, not substitutes — which is why
 the SME ask is the critical path even though Plan B is complete.
+
+### The model of record — one page
+
+| | |
+|---|---|
+| **Problem type** | Started as unsupervised segmentation; **reframed as rule-based labelling with model-based validation** after the data showed no natural clusters |
+| **Unit of analysis** | The **booking** = `(customer_id, issue_date)` — one purchase decision, one trip purpose. 22.9M rows, rolled up to 13.4M customers |
+| **The model** | A **prioritised rule waterfall** ("first match wins") over observable booking attributes → **10 named segments + Unassigned**. Value axis is PAL's authoritative **farebrand ladder** (tiers 1–7) |
+| **What fits/learns** | Nothing, at the top level — the segment assignment is deterministic and auditable. Models are used *below* it (sub-segmentation) and *around* it (validation, drift) |
+| **Lens** | **Anonymous trip-purpose × value** — no loyalty/CRM join required. A named industry approach (Sabre's anonymous segmentation) |
+| **Scoring a new booking** | Apply the same waterfall. No inference, no drift in the labeller itself — drift can only enter through the input distribution, which is what monitoring watches |
+| **Output** | `proxy_segment` at booking grain → joined down to all 38.1M coupons → Power BI star schema |
+| **Headline honest limitation** | Validation is **proxy-referenced (circular)** until SME labels land. There is **no ground-truth accuracy figure yet**, by design rather than by omission |
+
+### Techniques used — and the status of each
+
+The status column is the part that matters: it separates *what is in the pipeline* from *what was run
+once to answer a question* from *what was tested and rejected*. Conflating those three is the most
+common way to misread this document.
+
+| Technique | The job it does | Where | Status |
+|---|---|---|---|
+| **Rule waterfall** (priority CASE) | Assigns the segment | `features_real.py` | ✅ **In pipeline — primary** |
+| **Farebrand value ladder** | Ordinal value axis, tiers 1–7 | `clean_real.py` | ✅ In pipeline |
+| **Negative learning** (impossibility rules) | Rules out invalid segments before labelling | rule design | ✅ Retained as design principle |
+| **LCA** (Latent Class Analysis) | Sub-segments oversized parent segments | `sub_segment.py` | ✅ In pipeline — refinement layer, **under review** |
+| **GMM** (full covariance) | Beat LCA on the top-level benchmark (0.849 vs 0.763) | `model_zoo.py` | ⏸️ **Candidate** — needs a stage-matched re-test before replacing LCA |
+| **PSI · ARI · centroid/volume drift** | Production monitoring, retrain triggers | `monitor_metrics.py` | 📋 Specified, not yet wired |
+| **Asymmetric cost matrix + per-segment recall** | The optimisation target — business cost, not accuracy | Stage 7 | ✅ Built, **awaiting ground truth** |
+| **Gradient-boosted classifiers on held-out anchors** | Construct + criterion validity (V1, V2) | `validate_construct.py`, `validate_criterion.py` | ✅ Run |
+| **Planted-segment injection** | Detection power — bounds the null result (V3) | `detection_power.py` | ✅ Run |
+| **Adversarial AUC + transfer ARI** | Out-of-time stability (V4) | `validate_temporal.py` | ✅ Run |
+| **Circularity contract** | Enforces which fields may validate | `validation_anchors.py` | ✅ Enforced in code |
+| **Rule-confidence diagnostics** (rule competition · runner-up label · boundary fragility) | *Internal* confidence — how determined a label is by the rule set, on the full 22.9M population | `rule_confidence.py` | 🔬 Diagnostic only — **not a correctness measure** |
+| **k-prototypes · k-modes** | Mixed-type cross-check | `kproto_compare.py` | 🔬 Diagnostic only — stable but poorly separated |
+| **KMeans · SVD+KMeans · Spectral (Gower)** | Benchmark floor and comparison | `model_zoo.py` | 🔬 Benchmark only |
+| **Support Vector Clustering · TDA-Mapper · persistent homology (H₀)** | Assumption-free structure tests | `model_zoo.py` | 🔬 Benchmark only — all found no structure |
+| **HDBSCAN** | Was the original plan of record | `hdbscan_final.py` | ❌ **Dropped for real data** — categorical-heavy, not density-separable |
+
+**Evaluation metrics and what each is for:** *Gower silhouette* (mixed-type separation — the honest
+ceiling here is **0.381**) · *ARI* (chance-corrected agreement; also split-half and bootstrap stability)
+· *AUC* (construct/criterion validity, and the adversarial population test) · *TVD* (segment-share drift
+across time windows) · *per-segment recall + weighted cost* (the business target). **DBCV is not used on
+the real extract** — it presumes density structure, which categorical-heavy data does not have.
+
+**Two cautions this project established, both quotable:**
+**(a)** an **SVM separability probe scores 0.85–0.99 for nearly every method, including those with
+silhouette ≈ 0.1** — a geometric cut through a continuum is perfectly learnable while being wholly
+arbitrary, so *never quote a separability or accuracy figure without the silhouette beside it*;
+**(b)** **KMeans and k-prototypes were the most stable methods in the field with nearly the least
+separation** — *stability without separation is not structure.*
 
 - **Approach decision (2026-07-23, evidence-based):** a mixed-type clustering diagnostic
   (`src/cluster_diagnostic.py`: LCA + k-prototypes) showed the customer base is a **continuum**
@@ -254,7 +359,8 @@ the SME ask is the critical path even though Plan B is complete.
 - **Delivery (Stage X, 2026-07-27):** `src/export_powerbi.py` joins the booking-grain `proxy_segment` back
   down onto the cleaned coupons and emits a Power BI **star schema** → `outputs/powerbi_export/`: `coupons/`
   (38.1M, drill-through), `agg/` (flight-level detail), `agg_dashboard.parquet` (~1.7M, headline visuals),
-  `dim_date.csv` (time intelligence), **`dim_segment.csv` (the persona dimension — 11 rows, added v1.4;
+  `dim_date.csv` (time intelligence), **`scorecard_segment_month.csv` (per-segment scorecard source —
+  segment × travel month, additive, no stored shares)**, **`dim_segment.csv` (the persona dimension — 11 rows, added v1.4;
   measured behaviour recomputed per build + editorial persona text + `Trust`/`DataCaveat` governance
   columns, so persona cards render in BI and carry their caveats)** + QA sample + `summary.md`.
   Row-preserving (38,116,259 in = out); 99.95%
@@ -272,7 +378,7 @@ the SME ask is the critical path even though Plan B is complete.
      Mitigated in-band by `DataAsOfDate` / `IsCompleteTravelMonth` / `IsCompleteTravelYear` (TRUE for **2025
      only**), which every trend visual must filter on.
   2. **`DaysBeforeMonthEnd` cannot support the requested LY-vs-CY pickup measure** — it holds exactly one value
-     per departure month across all 37 months (8 distinct values in the whole extract, 99.7% of them `-7`),
+     per departure month across all 37 months (12 distinct values in the whole extract, 91.45% of them `-7`),
      i.e. departure-month metadata against a single extract date, not a booking snapshot. Pickup requires
      either `LeadTimeDays` (exported) or **repeated dated extracts of the same departure months** — a new data
      request to PAL.
@@ -868,5 +974,7 @@ These rules are not implemented in the current pipeline because the required fie
 ---
 
 *Document prepared for Philippine Airlines internal use.*
+*v1.6 — 12 August 2026 (rule-confidence diagnostics: internal confidence measured on the full population — 66.5% of bookings match exactly one rule, Corporate is the most contested segment at 6.4% uncontested despite its ×10 penalty, and the Last-Minute 3-day cut is the most consequential arbitrary constant in the model; `DaysBeforeMonthEnd` figures corrected — no modelling change)*
+*v1.5 — 31 July 2026 (birds-eye view: pipeline + validation-ladder diagrams, the model of record, and a technique inventory statused in-pipeline / candidate / diagnostic / dropped; Stage X adds `scorecard_segment_month.csv` for per-segment scorecards, asserted to reconcile)*
 *v1.4 — 31 July 2026 (Stage X ships `dim_segment.csv`, the persona dimension: measured behaviour recomputed per build, editorial persona text, and `Trust`/`DataCaveat` governance columns kept separate so evidence is distinguishable from assertion — no modelling change)*
 *v1.3 — 29 July 2026 (out-of-time stability: segment shares hold across a 12-month issuance step (TVD 1.93 pp, full population) and a model fitted a year earlier transfers for free (ratio 1.02 vs a within-window ceiling); revenue mix is the weaker leg (TVD 3.21 pp); the extract is departure-filtered, so calendar-year windows are invalid — plus v1.2 detection power: the null is bounded at ≥2% prevalence and we are blind below ~1%)*

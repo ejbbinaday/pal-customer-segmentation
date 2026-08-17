@@ -53,6 +53,7 @@ powerbi_export/
 ├── model/                        ✅ LOAD THESE
 │   ├── dim_date.csv                 120 KB — mark as Date table
 │   ├── dim_segment.csv               11 rows — persona cards + segment colours & caveats
+│   ├── scorecard_segment_month.csv  127 KB — ⭐ per-segment scorecards (start here)
 │   ├── fact_flight/                 470 MB — your main fact table
 │   └── fact_dashboard.parquet        29 MB — optional lightweight alternative
 │
@@ -73,7 +74,7 @@ headline visuals — but it has **no** flight number, O&D or `LeadTimeDays`.
 
 ---
 
-## 3. Build it in six steps
+## 3. Build it in seven steps
 
 1. **Get Data → Folder →** point at `model/fact_flight/`, Combine & Load. *(Parquet, partitioned
    by year — Power BI handles this natively.)*
@@ -83,26 +84,149 @@ headline visuals — but it has **no** flight number, O&D or `LeadTimeDays`.
    Add a second relationship to `FACT[IssueMonth]` and leave it **inactive**.
 5. **Get Data → Text/CSV →** load `model/dim_segment.csv`, then relate
    `dim_segment[Segment]` → `FACT[CustomerSegment]` (one-to-many, active).
-6. **Add a page-level filter: `IsCompleteTravelMonth = TRUE`.** Do this before anything else —
+6. **For scorecards, also load `model/scorecard_segment_month.csv`** and relate
+   `[CustomerSegment]` → `dim_segment[Segment]` and `[TravelMonth]` → `dim_date[Date]`. See §3a.
+7. **Add a page-level filter: `IsCompleteTravelMonth = TRUE`.** Do this before anything else —
    see note ⚠️ #1 below. Then start building.
+
+---
+
+## 3a. Per-segment scorecards — `scorecard_segment_month.csv` ⭐
+
+**If your job is "a scorecard per segment", load this file and stop.** It exists so you never have to
+aggregate 20M rows to fill a KPI tile.
+
+- **Grain:** segment × travel month, plus only the flags a scorecard must filter on — `IsInternational`,
+  `IsCompleteTravelMonth`, `IsCompleteTravelYear`, and the `IsRefund` / `IsAward` / `IsNonRev` /
+  `RevMissing` exclusions. **1,835 rows**, 127 KB. Open it in Excel and check totals before writing a
+  single measure.
+- **Relate:** `scorecard_segment_month[CustomerSegment]` → `dim_segment[Segment]`, and
+  `[TravelMonth]` → `dim_date[Date]`. Persona text, penalty weights and segment colours then come
+  free from `dim_segment` (§3b).
+- **Every numeric column is additive** — `Coupons`, `Bookings`, `PaxCount`, `NetRevenue`, `NetFare`.
+  Sum at any level and the answer is correct.
+
+### ⚠️ There are no percentages in this file — do not add any
+
+A stored share is only correct for the filter context it was computed in. The moment the report slices
+to one region or one month it is **silently wrong and nothing visibly breaks**. Write them as measures:
+
+```dax
+Bookings         = SUM ( scorecard_segment_month[Bookings] )
+Net Revenue      = SUM ( scorecard_segment_month[NetRevenue] )
+Rev per Booking  = DIVIDE ( [Net Revenue], [Bookings] )
+
+Segment Share of Bookings =
+    DIVIDE ( [Bookings], CALCULATE ( [Bookings], REMOVEFILTERS ( dim_segment ) ) )
+
+Bookings LY      = CALCULATE ( [Bookings], SAMEPERIODLASTYEAR ( dim_date[Date] ) )
+Bookings YoY %   = DIVIDE ( [Bookings] - [Bookings LY], [Bookings LY] )
+```
+
+### The three things that otherwise produce a wrong scorecard
+
+1. **`Bookings` is `sum(IsPrimaryCoupon)`, not a distinct count** — that is what keeps it additive.
+   Never swap in `DISTINCTCOUNT`.
+2. **Filter `IsCompleteTravelMonth = TRUE` on every trend and YoY tile.** Travel months past the extract
+   boundary are still-filling forward book, not demand — unfiltered, a trend draws a **fake cliff**. Use
+   `IsCompleteTravelYear` for full-year comparisons (**TRUE for 2025 only**).
+3. **Exclude `IsRefund` / `IsNonRev` / `RevMissing` from commercial tiles** (and usually `IsAward` —
+   its revenue is taxes only). A clean commercial filter is:
+   `IsCompleteTravelMonth && !IsRefund && !IsNonRev && !RevMissing`.
+
+**Every flag is guaranteed non-NULL.** They are coalesced to FALSE on write, because a NULL makes
+`IsRefund = FALSE` silently drop those rows and quietly break reconciliation. The ~542 bookings whose
+refund status is genuinely unknown all carry `RevMissing = TRUE`, so they stay identifiable rather than
+disguised as clean. The file is **asserted to reconcile to the fact table on every build** — coupons and
+bookings must match exactly or the export fails.
+
+### 🚫 Do not build an accuracy or recall gauge
+
+There is deliberately **no model-accuracy KPI in this export.** Per-segment recall requires SME
+ground-truth labels, which have not arrived; every accuracy figure computable today is measured against
+the rules that produced the labels — i.e. circular, and it would mislead on a scorecard.
+
+`dim_segment` carries `PenaltyWeight` (Corporate ×10 → Budget ×1) and `RevenueAtRiskPerError`, so a
+**cost-weighted risk** tile is legitimate and useful. An accuracy gauge is not — there is no honest
+number to put in it yet.
 
 ---
 
 ## 3b. Persona cards — `dim_segment.csv`
 
-One row per segment. Because it relates to the fact table, a **card or table visual bound to
-`dim_segment` cross-filters with everything else on the page** — slice to a route or a quarter and the
-behavioural columns follow. Sort segment visuals by `SegmentSortOrder` (priority order, not
-alphabetical), and colour them by `SegmentColorHex` so Power BI, the Python figures and the slide deck
-agree.
+One row per segment — 11 rows, 29 columns. This is the table that turns a segment name into something a
+commercial reader can act on.
 
-Three kinds of column, and the difference matters when someone asks *how do you know*:
+### ⚠️ Read this before you build: two kinds of number, and they behave differently
+
+| | `Profile*` columns in `dim_segment` | Measures over `scorecard_segment_month` |
+|---|---|---|
+| Scope | **Whole population, whole period** — baked in at build time | Whatever the report is filtered to |
+| Reacts to slicers? | **No. Never.** | **Yes** |
+| Example | `ProfileMedianLeadDays` = 6 for Corporate, always | `[Bookings]` changes when you slice to North America |
+
+**Do not mix them silently on one visual.** If a card shows `[Bookings]` (filtered) beside
+`ProfileMedianLeadDays` (not filtered), a user who slices to one region sees a filtered count next to an
+unfiltered lead time with nothing indicating that only half the card moved. Either:
+
+- **label the profile block** — every row carries `ProfileScope` ("All bookings, all periods — not
+  filtered by report slicers"), so drop it on the card as a caption; or
+- **keep them in separate sections** of the card — "Profile" vs "Selected period".
+
+Every measured column is prefixed `Profile` for exactly this reason, and so that `Bookings` means one
+unambiguous thing in the model.
+
+### Three kinds of column — the difference matters when someone asks *how do you know*
 
 | Kind | Columns | Provenance |
 |---|---|---|
-| **Measured** | `Bookings` · `BookingSharePct` · `MedianLeadDays` · `RoundTripPct` · `InternationalPct` · `PremiumCabinPct` · `ConnectingPct` · `GroupBookingPct` · `MedianRevenuePerBooking` · `AvgRevenuePerBooking` · `AvgCouponsPerBooking` · `TopDestinationRegions` · `ModalChannel` · `ModalIssueCountry` | Recomputed from the booking table on **every build**, at **booking grain** |
+| **Measured** (static profile) | `ProfileBookings` · `ProfileBookingSharePct` · `ProfileMedianLeadDays` · `ProfileRoundTripPct` · `ProfileInternationalPct` · `ProfilePremiumCabinPct` · `ProfileConnectingPct` · `ProfileGroupBookingPct` · `ProfileMedianRevenuePerBooking` · `ProfileAvgRevenuePerBooking` · `ProfileAvgCouponsPerBooking` · `ProfileTopDestinationRegions` · `ProfileModalChannel` · `ProfileModalIssueCountry` | Recomputed from the booking table on **every build**, at **booking grain** |
 | **Editorial** | `PersonaName` · `PersonaHeadline` · `WhyTheyFly` · `WhatTheyWant` · `WhatNotToDo` | Written by the project team — informed inference. **Motivation cannot be measured from a booking extract; do not present these as findings.** |
-| **Governance** | `Trust` · `DataCaveat` · `IsModelledSegment` · `PenaltyWeight` · `RevenueAtRiskPerError` · `SegmentColorHex` | Project metadata; the penalty/peso figures are **PAL's own estimates** |
+| **Governance** | `Trust` · `DataCaveat` · `IsModelledSegment` · `PenaltyWeight` · `RevenueAtRiskPerError` · `SegmentColorHex` · `ProfileScope` | Project metadata; the penalty/peso figures are **PAL's own estimates** |
+
+### How to actually build the cards
+
+**Setup, once:**
+
+1. Load `model/dim_segment.csv`. Relate `dim_segment[Segment]` → `FACT[CustomerSegment]` **and** →
+   `scorecard_segment_month[CustomerSegment]` (one-to-many, single direction).
+2. **Sort segments in priority order, not alphabetically:** select the `Segment` column → *Column tools
+   → Sort by column* → `SegmentSortOrder`. Corporate first, `Excluded (non-revenue)` last.
+3. Hide `SegmentSortOrder` and `SegmentColorHex` from report view (they drive behaviour, not display).
+
+**Pattern A — one card per segment, all on a page (recommended for a review deck).**
+Use the **Multi-row card** visual bound to `dim_segment`. It renders one block per row, which *is* a
+persona card, with no custom visual needed.
+- Fields, in this order: `PersonaName` · `PersonaHeadline` · `ProfileBookings` ·
+  `ProfileMedianLeadDays` · `ProfileRoundTripPct` · `ProfileAvgRevenuePerBooking` ·
+  `ProfileTopDestinationRegions` · `WhyTheyFly` · `WhatTheyWant` · `Trust` · `DataCaveat`
+- *Format → General → Title* = "Segment personas". Turn **word wrap on** for the text fields.
+- Add a page filter `IsModelledSegment = TRUE` to drop `Unassigned` and `Excluded (non-revenue)`.
+
+**Pattern B — a slicer plus a detail card (recommended for exploration).**
+1. A **slicer** on `dim_segment[Segment]`, set to *single select*.
+2. **Card (new)** or **Table** visuals for the editorial text: `PersonaName`, `PersonaHeadline`,
+   `WhyTheyFly`, `WhatTheyWant`, `WhatNotToDo`.
+3. A **Table** for the static profile block — include `ProfileScope` as the caption so the "doesn't
+   filter" behaviour is visible.
+4. A separate row of KPI cards for the **live** numbers, using scorecard measures (`[Bookings]`,
+   `[Net Revenue]`, `[Rev per Booking]`, `[Bookings YoY %]` from §3a). Title that row
+   **"Selected period"** so the distinction is on screen, not in a footnote.
+5. A **callout / text box** bound to `DataCaveat`, styled as a warning. See below — this is not optional.
+
+**Brand the card with the segment's own colour.** On any visual with a colour property: *Format → Data
+colors → fx → Format by = Field value → Based on field = `SegmentColorHex`*. That keeps Power BI, the
+Python figures and the slide deck colouring each segment identically. For a coloured accent bar, a
+1-pixel-tall bar chart of a constant with `SegmentColorHex` as the fill works well.
+
+**A cost-weighted risk tile is legitimate, an accuracy gauge is not:**
+
+```dax
+Revenue at Risk = SUM ( scorecard_segment_month[Bookings] ) * MAX ( dim_segment[RevenueAtRiskPerError] )
+```
+
+That is a *sizing* measure — "what is on the line in this segment if we get it wrong" — not a claim about
+how often we get it wrong. There is no honest accuracy number yet (§3a).
 
 **Put `Trust` and `DataCaveat` on the card itself — they are not footnotes.** Persona cards persuade,
 so a card reading *"Mabuhay Loyalist · 0.03% of bookings"* invites the reader to conclude the loyalty

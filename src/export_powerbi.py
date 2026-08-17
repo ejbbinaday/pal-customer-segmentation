@@ -11,6 +11,7 @@ Outputs — pick per dashboard:
     summary.md                     field dictionary, reconciliation, caveats
     model/dim_date.csv             Date dimension for DAX time intelligence
     model/dim_segment.csv          Segment persona dimension — drives the persona-card visuals
+    model/scorecard_segment_month.csv  Per-segment scorecard source (segment × travel month)
     model/fact_dashboard.parquet   headline grain (~2.1M rows) — bind the summary visuals here
     model/fact_flight/             flight-level rollup (~20.6M) — full dashboard incl. flight no.
     detail/fact_coupons/           coupon grain (38.1M) — only for Age / UniqueID
@@ -52,6 +53,7 @@ AGG = MODEL / "fact_flight"
 AGG_DASH = MODEL / "fact_dashboard.parquet"
 DIM_DATE = MODEL / "dim_date.csv"
 DIM_SEGMENT = MODEL / "dim_segment.csv"
+SCORECARD = MODEL / "scorecard_segment_month.csv"
 SAMPLE = QA / "sample_100k.csv"
 GUIDE_OUT = OUT / "START-HERE.md"
 TMP = OUT / ".duckdb_tmp"
@@ -496,6 +498,75 @@ def build_agg_dashboard(con: duckdb.DuckDBPyConnection) -> int:
     return _rollup(con, AGG_DASH, DASH_KEYS, partition=False)
 
 
+# Scorecard grain — segment × travel month, plus only the flags a scorecard must filter on.
+# Deliberately excludes Route / Cabin / Channel / Farebrand: those explode the row count and belong to
+# `fact_dashboard`. This table exists so a per-segment scorecard is a few hundred rows, not 2.1M.
+#
+# Every flag is coalesced to FALSE below and `RevMissing` is carried explicitly. In the raw fact,
+# `IsRefund` and `IsInternational` are NULL on a small number of coupons (167 scorecard rows / ~542
+# bookings, all of them revenue-missing). A NULL in a Power BI filter column is a silent data-loss
+# trap: `IsRefund = FALSE` evaluates NULL as *not matching*, so those rows vanish from a scorecard
+# with nothing visibly wrong and totals that quietly fail to reconcile. Coalescing makes the filter
+# behave, and `RevMissing = TRUE` keeps the affected rows identifiable rather than disguised as clean.
+SCORECARD_KEYS = [
+    "CustomerSegment",
+    "TravelMonth",
+    "IsInternational",
+    "IsCompleteTravelMonth",
+    "IsCompleteTravelYear",
+    "IsRefund",
+    "IsAward",
+    "IsNonRev",
+    "RevMissing",
+]
+# Flags that need the NULL→FALSE coalesce (the rest are non-null by construction).
+SCORECARD_COALESCE = {"IsInternational", "IsRefund", "IsAward", "IsNonRev", "RevMissing"}
+
+
+def build_scorecard(con: duckdb.DuckDBPyConnection) -> int:
+    """Per-segment scorecard source — small enough to open in Excel, additive at every level.
+
+    CSV rather than Parquet on purpose: it is a few hundred rows, so the BI developer can eyeball it
+    and sanity-check totals before wiring a single measure.
+
+    **No percentages, shares or ratios are stored here, and that is deliberate.** A stored
+    `share_of_bookings` is correct only for the filter context it was computed in — the moment the
+    report slices to one region or one month it silently becomes wrong, and nothing visibly breaks.
+    Shares must be DAX measures over these additive columns. Same reason `Bookings` is
+    `sum(IsPrimaryCoupon)` rather than a stored distinct count: everything in this table sums.
+    """
+
+    def _expr(k: str) -> str:
+        return f'coalesce("{k}", FALSE)' if k in SCORECARD_COALESCE else f'"{k}"'
+
+    # GROUP BY takes the bare expressions; SELECT aliases them back to the original column names.
+    sel = [f'{_expr(k)} AS "{k}"' for k in SCORECARD_KEYS]
+    grp = [_expr(k) for k in SCORECARD_KEYS]
+    con.execute(f"""
+        COPY (
+            SELECT {", ".join(sel)},
+                   count(*)                             AS Coupons,
+                   sum("IsPrimaryCoupon"::INT)          AS Bookings,
+                   coalesce(sum("PaxCount"), 0)         AS PaxCount,
+                   round(coalesce(sum("NetRevenue"), 0), 2) AS NetRevenue,
+                   round(coalesce(sum("NetFare"), 0), 2)    AS NetFare
+            FROM fact
+            GROUP BY {", ".join(grp)}
+            ORDER BY 1, 2
+        ) TO '{SCORECARD}' (FORMAT CSV, HEADER)
+    """)
+    n = sum(1 for _ in SCORECARD.open()) - 1
+    # A scorecard that does not reconcile to the fact table is worse than no scorecard — assert it here
+    # rather than letting the BI developer discover it against a 38M-row table.
+    tot = con.execute(f"""
+        SELECT sum(Coupons), sum(Bookings) FROM read_csv_auto('{SCORECARD}')
+    """).fetchone()
+    ref = con.execute('SELECT count(*), sum("IsPrimaryCoupon"::INT) FROM fact').fetchone()
+    if tuple(tot) != tuple(ref):
+        raise AssertionError(f"scorecard does not reconcile: {tot} vs fact {ref}")
+    return n
+
+
 def build_dim_date(con: duckdb.DuckDBPyConnection, last_month: date) -> int:
     """Date dimension for DAX time intelligence (YoY, 12-mo trend)."""
     lo, hi = con.execute("""
@@ -631,20 +702,29 @@ def build_dim_segment(con: duckdb.DuckDBPyConnection) -> int:
                 p.avoid                   AS "WhatNotToDo",
                 p.trust                   AS "Trust",
                 p.caveat                  AS "DataCaveat",
-                s.bookings                AS "Bookings",
-                s.share_pct               AS "BookingSharePct",
-                s.med_lead                AS "MedianLeadDays",
-                s.rt_pct                  AS "RoundTripPct",
-                s.intl_pct                AS "InternationalPct",
-                s.prem_pct                AS "PremiumCabinPct",
-                s.conn_pct                AS "ConnectingPct",
-                s.group_pct               AS "GroupBookingPct",
-                s.med_rev                 AS "MedianRevenuePerBooking",
-                s.avg_rev                 AS "AvgRevenuePerBooking",
-                s.avg_coupons             AS "AvgCouponsPerBooking",
-                s.top_regions             AS "TopDestinationRegions",
-                s.modal_channel           AS "ModalChannel",
-                s.modal_country           AS "ModalIssueCountry"
+                -- Every measured column is prefixed `Profile` on purpose. These are **whole-population,
+                -- whole-period** values baked in at build time: they do NOT respond to report slicers,
+                -- unlike the additive measures over `scorecard_segment_month`. Without the prefix,
+                -- `Bookings` would exist in both tables — one static, one filter-aware — and a card
+                -- mixing them would show a filtered booking count beside an unfiltered lead time with
+                -- no visual cue that only half the card reacted to the slicer.
+                s.bookings                AS "ProfileBookings",
+                s.share_pct               AS "ProfileBookingSharePct",
+                s.med_lead                AS "ProfileMedianLeadDays",
+                s.rt_pct                  AS "ProfileRoundTripPct",
+                s.intl_pct                AS "ProfileInternationalPct",
+                s.prem_pct                AS "ProfilePremiumCabinPct",
+                s.conn_pct                AS "ProfileConnectingPct",
+                s.group_pct               AS "ProfileGroupBookingPct",
+                s.med_rev                 AS "ProfileMedianRevenuePerBooking",
+                s.avg_rev                 AS "ProfileAvgRevenuePerBooking",
+                s.avg_coupons             AS "ProfileAvgCouponsPerBooking",
+                s.top_regions             AS "ProfileTopDestinationRegions",
+                s.modal_channel           AS "ProfileModalChannel",
+                s.modal_country           AS "ProfileModalIssueCountry",
+                -- Renders on the card as a caption, so a reader can never mistake the profile block
+                -- for something the slicer filtered.
+                'All bookings, all periods — not filtered by report slicers' AS "ProfileScope"
             FROM (VALUES\n{rows}
             ) AS p(seg, sort, tier, pen, risk, color, persona, headline, why, wants, avoid,
                    trust, caveat)
@@ -659,6 +739,11 @@ def dir_mb(p: Path) -> float:
     if p.is_file():
         return round(p.stat().st_size / 1e6, 1)
     return round(sum(f.stat().st_size for f in p.rglob("*.parquet")) / 1e6, 1)
+
+
+def _csv_rows(p: Path) -> int:
+    """Data-row count of a written CSV (header excluded); 0 if it was skipped."""
+    return (sum(1 for _ in p.open()) - 1) if p.exists() else 0
 
 
 def write_report(con, n_clean, n_fact, n_agg, n_dash, n_dates, bounds) -> None:  # noqa: PLR0913
@@ -736,17 +821,64 @@ def write_report(con, n_clean, n_fact, n_agg, n_dash, n_dates, bounds) -> None: 
         f"| `model/dim_date.csv` | {n_dates:,} | — | mark as Date table for YoY / 12-mo trend |",
         f"| `model/dim_segment.csv` | {len(PERSONA)} | — | **persona cards** + segment colours, "
         "penalty weights, caveats |",
+        f"| `model/scorecard_segment_month.csv` | {_csv_rows(SCORECARD):,} | — | "
+        "**per-segment scorecards** — segment × travel month, additive |",
         "| `qa/sample_100k.csv` | 100,000 | — | build + validate DAX first |",
         "| `START-HERE.md` | — | — | **read this first** |",
         "",
+        "## Per-segment scorecards — `model/scorecard_segment_month.csv`\n",
+        "Built for exactly this job. Grain is **segment × travel month**, plus only the flags a "
+        "scorecard has to filter on (`IsInternational`, the two completeness flags, and the "
+        "`IsRefund` / `IsAward` / `IsNonRev` exclusions). A few hundred rows, so you can open it in "
+        "Excel and check totals before writing a single measure. Relate "
+        "`scorecard_segment_month[CustomerSegment]` → `dim_segment[Segment]` and "
+        "`[TravelMonth]` → `dim_date[Date]`.\n",
+        "**Every numeric column is additive: `Coupons`, `Bookings`, `PaxCount`, `NetRevenue`, "
+        "`NetFare`.** Sum them at any level and the answer is right.\n",
+        "**⚠️ There are no percentages, shares or ratios in this file, and that is deliberate — do not "
+        "add any.** A stored share is only correct for the filter context it was computed in; the "
+        "moment the report slices to one region or one month it is silently wrong and nothing visibly "
+        "breaks. Write them as measures instead:\n",
+        "```dax\nBookings = SUM ( scorecard_segment_month[Bookings] )\n"
+        "Net Revenue = SUM ( scorecard_segment_month[NetRevenue] )\n"
+        "Rev per Booking = DIVIDE ( [Net Revenue], [Bookings] )\n"
+        "Segment Share of Bookings =\n"
+        "    DIVIDE ( [Bookings], CALCULATE ( [Bookings], REMOVEFILTERS ( dim_segment ) ) )\n"
+        "Bookings LY = CALCULATE ( [Bookings], SAMEPERIODLASTYEAR ( dim_date[Date] ) )\n```\n",
+        "**Three things that will otherwise produce a wrong scorecard:**\n",
+        "1. **`Bookings` is `sum(IsPrimaryCoupon)`, not a distinct count** — so it stays additive. Never "
+        "replace it with `DISTINCTCOUNT`.",
+        "2. **Filter `IsCompleteTravelMonth = TRUE` on every trend and YoY tile.** Travel months past "
+        "the extract boundary are still-filling forward book, not demand — an unfiltered trend draws a "
+        "**fake cliff**. For full-year comparisons use `IsCompleteTravelYear`.",
+        "3. **Exclude `IsRefund` / `IsNonRev` / `RevMissing` from commercial tiles** (and usually "
+        "`IsAward`, whose revenue is taxes only). They ship as flags rather than being pre-filtered so "
+        "your totals can still reconcile to the full extract. **Every flag in this file is guaranteed "
+        "non-NULL** — they are coalesced to FALSE on write, because a NULL would make `IsRefund = FALSE` "
+        "silently drop those rows and quietly break reconciliation. The ~542 bookings whose refund "
+        "status is genuinely unknown are all `RevMissing = TRUE`, so they stay identifiable.\n",
+        "This file is **asserted to reconcile to the fact table on every build** — coupons and bookings "
+        "must match exactly or the export fails. Verified this run.\n",
+        "**There is no model-accuracy or recall KPI in this export, on purpose.** Per-segment recall "
+        "needs SME ground-truth labels, which have not landed yet; every accuracy figure computable "
+        "today is measured against the rules that produced the labels, i.e. circular. `dim_segment` "
+        "carries `PenaltyWeight` and `RevenueAtRiskPerError` if you want to build a *cost-weighted risk* "
+        "tile, but **do not build an accuracy gauge** — there is no honest number to put in it.\n",
         "## Persona cards — `model/dim_segment.csv`\n",
-        "One row per segment, joined to the fact tables on `CustomerSegment` = `Segment`. Build a "
-        "persona card as a **card or table visual bound to this table**, and it cross-filters with "
-        "every other visual on the page (slice to a route and the card's behaviour columns follow).\n",
-        "Two kinds of column, and the distinction matters when someone asks *how do you know*:\n",
-        "- **Measured** (`MedianLeadDays`, `RoundTripPct`, `InternationalPct`, `PremiumCabinPct`, "
-        "`ConnectingPct`, `GroupBookingPct`, `Median`/`AvgRevenuePerBooking`, `AvgCouponsPerBooking`, "
-        "`TopDestinationRegions`, `ModalChannel`, `ModalIssueCountry`, `Bookings`, `BookingSharePct`) "
+        "One row per segment, joined on `Segment` = `CustomerSegment`. **Step-by-step build recipe for "
+        "the cards — which visual, which fields, in what order — is in `START-HERE.md` §3b.**\n",
+        "⚠️ **The `Profile*` columns are whole-population and whole-period: they do NOT respond to report "
+        "slicers.** Live, filter-aware numbers come from measures over `scorecard_segment_month` instead. "
+        "Never put the two side by side unlabelled — a card showing a filtered `[Bookings]` next to an "
+        "unfiltered `ProfileMedianLeadDays` gives the reader no cue that only half of it moved when they "
+        "sliced. Every row carries a `ProfileScope` caption for exactly this purpose, and the `Profile` "
+        "prefix also keeps `Bookings` meaning one unambiguous thing in the model.\n",
+        "Three kinds of column, and the distinction matters when someone asks *how do you know*:\n",
+        "- **Measured** (`Profile` prefix: `ProfileMedianLeadDays`, `ProfileRoundTripPct`, "
+        "`ProfileInternationalPct`, `ProfilePremiumCabinPct`, `ProfileConnectingPct`, "
+        "`ProfileGroupBookingPct`, `ProfileMedian`/`ProfileAvgRevenuePerBooking`, "
+        "`ProfileAvgCouponsPerBooking`, `ProfileTopDestinationRegions`, `ProfileModalChannel`, "
+        "`ProfileModalIssueCountry`, `ProfileBookings`, `ProfileBookingSharePct`) "
         "— recomputed from the booking table on every build, at **booking grain** so multi-coupon "
         "segments are not over-weighted.",
         "- **Editorial** (`PersonaName`, `PersonaHeadline`, `WhyTheyFly`, `WhatTheyWant`, "
@@ -878,9 +1010,10 @@ def main() -> None:
         n_fact = con.execute("SELECT count(*) FROM fact").fetchone()[0]
         n_agg, n_dash = count_of(AGG, True), count_of(AGG_DASH, False)
         n_dates = sum(1 for _ in DIM_DATE.open()) - 1
-        # Cheap and behaviour-only — rebuild it even in --report-only so the personas cannot go
-        # stale relative to a summary that describes them.
+        # Cheap and behaviour-only — rebuild both even in --report-only so neither the personas nor
+        # the scorecard can go stale relative to a summary that describes them.
         build_dim_segment(con)
+        build_scorecard(con)
         print(f"Report-only: reusing {n_fact:,} exported coupons")
     else:
         print(f"Joining segments onto {n_clean:,} coupons → {COUPONS} ...")
@@ -904,6 +1037,10 @@ def main() -> None:
         print("Building segment persona dimension ...")
         n_seg = build_dim_segment(con)
         print(f"  wrote {n_seg} segment rows → {DIM_SEGMENT.name}")
+
+        print("Building per-segment scorecard ...")
+        n_score = build_scorecard(con)
+        print(f"  wrote {n_score:,} rows → {SCORECARD.name}")
 
         print("Writing QA sample ...")
         con.execute(f"""
