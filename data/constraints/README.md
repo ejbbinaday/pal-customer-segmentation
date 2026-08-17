@@ -67,23 +67,37 @@ reported back, not silently overridden in either direction.
 
 ## `status` — can we actually use this rule?
 
+**Updated 17 August 2026** — PAL settled four of the five blocking decisions, so `query` is now empty.
+
 | status | meaning | hard | soft |
 |---|---|---|---|
-| `enforce` | `certain`, evaluable, fires on real volume — ready to auto-enforce | 4 | — |
-| `prior` | soft tilt, usable now | — | 15 |
-| `confirmed` | our seeded guess, and the SME agreed | 4 | 3 |
+| `enforce` | `certain`, evaluable, fires on real volume — ready to auto-enforce | 6 | — |
+| `prior` | soft tilt, usable now | — | 19 |
+| `confirmed` | our seeded guess, and the SME agreed | 4 | 2 |
 | `unconfirmed` | our seeded guess; the SME did not respond either way | 3 | 4 |
-| `test` | `likely` — check against the data, return to the owner if contradicted | 0 | — |
-| `query` | blocked on an SME or PAL decision (usually an unmapped/new segment) | 2 | 7 |
-| `too_thin` | evaluable, but fires on under ~11k bookings (0.05%) — not worth acting on | 1 | 7 |
+| `withdrawn` | deliberately set aside — kept for the audit trail, never enforced | — | 5 |
+| `too_thin` | evaluable, but fires on under ~11k bookings (0.05%) — not worth acting on | 1 | 6 |
+| `demoted` / `demoted_from_hard` | a `cannot_be` at only `moderate` confidence, moved to soft | — | 2 |
 | `partial` | transcribed with part of the condition dropped as unevaluable | — | 1 |
 | `contested` | several segments claim the same predicate | — | 1 |
-| `demoted` / `demoted_from_hard` | a `cannot_be` at only `moderate` confidence, moved to soft | 2 | 2 |
 | `blocked` | not evaluable at all — a field we do not have | 1 | — |
 | `unanswered` | placeholder; the SME ask came back empty | — | 2 |
+| `test` | `likely` — check against the data, return to the owner if contradicted | 0 | — |
 
 Only `enforce` rules would be applied automatically. `test` rules are checked against the data first
 and brought back to the owner if the data contradicts them.
+
+### The five rules marked `withdrawn`, and why
+
+**`dep_month` is retained as a validation anchor** (decision 1), which means **no active rule may read
+it** — the checker enforces this, not just the convention. S02, S10, S12, S16 and S20 all turned on
+departure month as their *primary* claim (peak season, the Q4–Q1 Balikbayan peak, the summer spike to
+Asian hubs, Lent/Easter, off-peak long stays), so nothing survives removing the clause. They are kept
+rather than deleted so RM Domestic can see exactly what we set aside and why.
+
+**S38 was rewritten rather than withdrawn.** Its academic-month clause was a refinement on top of a
+90–150 night stay, which stands alone — so the months were dropped and the rule survives. It fires
+wider as a result (17,354 → 51,223) and is flagged to the SME as a modified transcription.
 
 ## Three things to know before reading the conditions
 
@@ -116,9 +130,14 @@ ladder: 1 Supersaver · 2 Saver · 3 Value · 4 Economy Flex · 5 Premium Econom
 
 `n_bookings` is on the **customer** rollup, not the booking table; the checker joins for it.
 
-Canonical segment names are in `src/pal_colors.py`. Segments written as `Leisure (unmapped)`,
-`MICE (new)`, `Ultra Wealthy Leisure (new)` and `Intl. Student (new)` are **not** canonical — they are
-the SME's proposals awaiting a taxonomy decision, and are marked so they cannot be enforced by accident.
+Canonical segment names are in `src/pal_colors.py`. **Resolved 17 August 2026:**
+
+- the SME's **"Leisure"** is our existing **`Budget/Adventure`** — a naming difference, not a new segment
+- **`MICE`**, **`Ultra Wealthy Leisure`** and **`Intl. Student`** are **approved as real segments**,
+  taking the taxonomy from 10 to 13. They are in `SEG_APPROVED`, *not* in `SEG_ORDER` — the waterfall
+  does not emit them yet, so no chart should list them.
+- **`Last-Minute (flag)`** is written that way because Last-Minute is no longer a peer segment. It
+  describes a booking, not a kind of traveller: 84.1% of it would otherwise be `Budget/Adventure`.
 
 ## Related ask
 

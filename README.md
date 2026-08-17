@@ -1,7 +1,11 @@
 # PAL Customer Segmentation
 
-ML framework to auto-classify Philippine Airlines PNRs into actionable revenue segments —
-**10 named segments** (see `docs/methodology.md` and `docs/knowledge-base.md`).
+ML framework to auto-classify Philippine Airlines PNRs into actionable revenue segments.
+**The shipped model emits 10 named segments + Unassigned; PAL approved a 13-segment taxonomy on
+17 Aug 2026** (adding MICE, Ultra Wealthy Leisure and Intl. Student, and turning Last-Minute into a
+flag). The two are deliberately kept apart in `src/pal_colors.py` — `SEG_ORDER` is what the model
+emits, `SEG_APPROVED` is what PAL agreed; the waterfall change is pending. See
+`docs/methodology.md` v1.8 and `docs/sme-constraints-intake.md` §7.
 
 **The active track is the real 38M-coupon extract.** The customer base is a **continuum**, not a set of
 natural clusters — so the **rule-based purpose×value segmentation is primary** and model-based clustering

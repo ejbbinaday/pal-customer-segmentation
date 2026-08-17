@@ -1,9 +1,28 @@
 # PAL Customer Segmentation — ML Pipeline Methodology
 
 **Client:** Philippine Airlines (PAL)
-**Version:** v1.7 — 17 August 2026
+**Version:** v1.8 — 17 August 2026
 
 > **Changelog**
+> - **v1.8 (17 Aug 2026):** **Taxonomy decisions settled by PAL; the waterfall is NOT yet changed.**
+>   All five blocking decisions in `docs/sme-constraints-intake.md` §7 are resolved. ① **`stay_nights`
+>   is spent as a rule input and `dep_month` is retained as a validation anchor** — the 5 rules whose
+>   primary claim was departure month are `withdrawn`, one is rewritten without it, and
+>   `src/check_constraints.py` now **fails** if any active rule reads `dep_month`, so the decision is
+>   enforced rather than remembered. ② **MICE, Ultra Wealthy Leisure and Intl. Student are approved
+>   segments — the taxonomy goes 10 → 13.** ③ The SME's **"Leisure" is our `Budget/Adventure`** (naming
+>   only; no rename, so the palette, `dim_segment`, personas and PAL's existing slides are untouched).
+>   ④ **Last-Minute becomes a flag, not a peer segment.** ⑤ Family's `must_be` on `is_group` is demoted.
+>   `src/pal_colors.py` now separates **`SEG_ORDER` (what the model emits, 11)** from **`SEG_APPROVED`
+>   (what PAL agreed, 13)** and **`SEG_FLAGS`**, with an assert tying each to the palette — a chart must
+>   not advertise a segment the waterfall never assigns. **Rule counts:** 6 hard `enforce`, 19 soft
+>   `prior`, 5 `withdrawn`. **Still no modelling change: proxy labels are bit-identical.**
+>   The pending waterfall change is sized rather than assumed — removing the Last-Minute branch moves
+>   **84.1% of its 2,945,686 bookings to `Budget/Adventure`** and 15.9% to `Unassigned`, taking
+>   `Budget/Adventure` to **11,513,783 — 50.3% of the book**, while the flag itself covers
+>   **4,411,666 bookings (19.26%)**, i.e. **50% more short-lead volume than the segment ever exposed**.
+>   ⚠️ Half the book in one segment is not a usable targeting unit, so the **missing middle rung of the
+>   leisure ladder** is now the live taxonomy question and should be settled before that change ships.
 > - **v1.7 (17 Aug 2026):** **Four descriptive fields added to Stage F; the waterfall is untouched.**
 >   In response to the RM-Domestic SME constraint sheet (`docs/sme-constraints-intake.md`),
 >   `src/features_real.py` now emits **`stay_nights`** (nights at the destination, from the largest
@@ -1020,6 +1039,7 @@ These rules are not implemented in the current pipeline because the required fie
 ---
 
 *Document prepared for Philippine Airlines internal use.*
+*v1.8 — 17 August 2026 (PAL settles the taxonomy: 10 → 13 segments, Last-Minute becomes a flag, SME 'Leisure' = Budget/Adventure, and `stay_nights` is spent as a rule input so `dep_month` stays a validation anchor — enforced by check_constraints.py. Waterfall unchanged and sized: Budget/Adventure would reach 50.3% of the book, which re-opens the leisure ladder — no modelling change)*
 *v1.7 — 17 August 2026 (Stage F emits `stay_nights`, `dep_dow`, `turn_dest`, `route_theme` plus a new `route_theme.csv` reference, in response to the RM-Domestic SME constraint sheet; all four are descriptive — the waterfall is untouched and no proxy label moved. `stay_nights` is NULL on one-ways by definition and build-time asserted, because that missingness pattern IS the `round_trip` rule bit. Anchor tier table corrected: only `dep_month` and `n_bookings` are Tier-A — no modelling change)*
 *v1.6 — 12 August 2026 (rule-confidence diagnostics: internal confidence measured on the full population — 66.5% of bookings match exactly one rule, Corporate is the most contested segment at 6.4% uncontested despite its ×10 penalty, and the Last-Minute 3-day cut is the most consequential arbitrary constant in the model; `DaysBeforeMonthEnd` figures corrected — no modelling change)*
 *v1.5 — 31 July 2026 (birds-eye view: pipeline + validation-ladder diagrams, the model of record, and a technique inventory statused in-pipeline / candidate / diagnostic / dropped; Stage X adds `scorecard_segment_month.csv` for per-segment scorecards, asserted to reconcile)*

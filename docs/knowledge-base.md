@@ -454,6 +454,42 @@ Dashboard Wireframe → Requirements Checklist → [Appendix] Literature
 
 ---
 
+#### 2026-08-17 — PAL settles the taxonomy: 13 segments, Last-Minute becomes a flag, and the flag exposes 50% more volume than the segment did
+**Domain:** Project Decision
+All five blocking decisions from `docs/sme-constraints-intake.md` §7 resolved. Methodology v1.8.
+**① Anchor: spend `stay_nights`, keep `dep_month`.** The five rules whose *primary* claim was departure
+month are `withdrawn` (S02 peak season · S10 Q4–Q1 Balikbayan peak · S12 summer spike to Asian hubs ·
+S16 Lent/Easter · S20 off-peak long stays) — kept in the file rather than deleted so the SME can see what
+we set aside. S38 was **rewritten** instead: its academic-month clause sat on top of a 90–150 night stay
+that stands alone, so the months went and the rule survived (fires 17,354 → 51,223). *The part worth
+copying: `src/check_constraints.py` now **fails** if any active rule reads `dep_month`. A decision that
+lives only in a doc is a decision that gets undone by the next person; this one is executable.*
+**② 10 → 13 segments.** MICE, Ultra Wealthy Leisure and Intl. Student approved. **③** The SME's "Leisure"
+is our `Budget/Adventure` — naming only, no rename, so palette / `dim_segment` / personas / PAL's existing
+slides are untouched. **⑤** Family's `must_be` on `is_group` demoted.
+**The design decision inside ②:** `src/pal_colors.py` now separates **`SEG_ORDER` (11, what the model
+emits)** from **`SEG_APPROVED` (13, what PAL agreed)** plus **`SEG_FLAGS`**, with asserts tying each to the
+palette. Adding the three new names straight to `SEG_ORDER` would have put segments in every chart legend
+that the waterfall never assigns — an empty category reads as "zero customers", not as "not built yet".
+*Generalises: the approved taxonomy and the emitted taxonomy are different objects and drift apart the
+moment a decision lands ahead of the code. Name them separately or something will quietly plot a lie.*
+**④ Last-Minute → flag, and the numbers argue for it more strongly than the reasoning did.** Simulating
+the branch removal reproduces `rule_confidence.py` exactly: **84.1% of its 2,945,686 bookings go to
+`Budget/Adventure`**, 15.9% to `Unassigned`, nothing else moves. The real find is the asymmetry — as a
+*segment* Last-Minute caught only what fell through eight higher-priority rules (2.95M), but as a *flag*
+it applies wherever `lead_days <= 3`: **4,411,666 bookings, 19.26%**, including **864,292 OFW/Migrant,
+315,333 Corporate and 196,364 Balikbayan/VFR that were short-lead all along and invisible as such.**
+**A priority cascade hides every overlapping signal below the winning branch; converting one to a flag
+recovered 50% more volume without touching a single rule threshold.** Worth auditing the other branches
+for the same effect.
+**⚠️ And the cost, which re-opens a question PAL thought it had closed:** `Budget/Adventure` would reach
+**11,513,783 — 50.3% of the whole book.** Half the population in one segment is not a targeting unit. PAL
+approved *Ultra Wealthy Leisure* at the top of a leisure ladder in the same breath as sending the bottom
+rung to 50%, so **the missing middle rung is now the live taxonomy question** — flag it before the
+waterfall change ships, not after.
+**Source:** our analysis + PAL decisions, 2026-08-17 — `src/pal_colors.py`, `src/check_constraints.py`,
+`data/constraints/*.csv`, `docs/sme-constraints-intake.md` §7, `docs/methodology.md` v1.8.
+
 #### 2026-08-17 — 57 constraints transcribed, and the checker that validates them caught three errors in my own transcription
 **Domain:** Project Decision
 The SME sheet is now typed into `data/constraints/` — **15 hard + 42 soft rules**, each carrying `status`,

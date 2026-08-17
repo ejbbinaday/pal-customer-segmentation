@@ -80,7 +80,11 @@ STATUSES = {
     "too_thin",  # evaluable but fires on too little volume to act on
     "blocked",  # not evaluable at all
     "unanswered",  # placeholder — SME ask came back empty
+    "withdrawn",  # deliberately set aside (see notes); kept for the audit trail, never enforced
 }
+
+# A withdrawn rule is inert, so the volume/status consistency checks below do not apply to it.
+INERT = {"withdrawn", "blocked", "unanswered", "too_thin", "query", "demoted", "contested"}
 
 # SQL keywords and literals that appear in conditions but are not column names
 SQL_WORDS = {
@@ -200,6 +204,14 @@ def check_file(
             )
         if r["status"] == "too_thin" and n >= THIN_THRESHOLD:
             errors.append(f"{tag}: marked 'too_thin' but fires on {n:,} — promote it")
+        # decision 1 (17 Aug 2026): `dep_month` is retained as a validation anchor, so no ACTIVE
+        # rule may read it. Withdrawn rules keep their condition for the audit trail, hence the
+        # status check rather than a blanket ban.
+        if "dep_month" in idents and r["status"] not in INERT:
+            errors.append(
+                f"{tag}: active rule (status '{r['status']}') reads `dep_month`, which is a "
+                "reserved validation anchor — withdraw the rule or drop the clause"
+            )
 
     return errors, warnings, ids
 

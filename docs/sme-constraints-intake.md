@@ -2,9 +2,11 @@
 
 **Received:** 17 August 2026 · **File:** `wishlist/PALxMAIDA_Constraints&Wishlist.xlsx`
 **Responding SME:** RM — Domestic · **Ask it answers:** `data/constraints/README.md`
-**Status:** analysed, probed, and **transcribed** into `data/constraints/*.csv` (15 hard + 42 soft rules,
-each tagged with provenance and usability). **Nothing is wired into the pipeline** — five decisions block
-enforcement (§7). Validate any edit with `python src/check_constraints.py`.
+**Status:** analysed, probed, **transcribed** into `data/constraints/*.csv` (15 hard + 42 soft rules), and
+**all five blocking decisions resolved by PAL on 17 Aug** (§7). 6 hard rules are marked `enforce` and 19
+soft rules `prior`; 5 are `withdrawn` to protect a validation anchor. **The waterfall is still untouched** —
+the remaining work is the taxonomy change itself (10 → 13 segments, Last-Minute → flag), which §7 sizes.
+Validate any edit with `python src/check_constraints.py`.
 
 ---
 
@@ -42,14 +44,15 @@ the other 30 are soft priors. That roughly triples `hard_constraints.csv` (7 →
 | VFR | 4 | ✅ Balikbayan/VFR |
 | OFW | 4 | ✅ OFW/Migrant |
 | Pilgrimage | 4 | ✅ Pilgrimage |
-| Leisure | 3 | ⚠️ closest is **Budget/Adventure** — not the same concept, see §5 |
-| **Ultra wealthy leisure** | 3 | ❌ **new segment** |
-| **Intl. Student** | 3 | ❌ **new segment** |
-| **MICE** | 3 | ❌ **new segment** |
-| Last-Minute *(as 4 named flavours)* | 4 | ✅ Last-Minute, but they sub-typed it — see §5 |
+| Leisure | 3 | ✅ **`Budget/Adventure`** — confirmed by PAL 17 Aug as a naming difference, not a new segment |
+| **Ultra wealthy leisure** | 3 | ✅ **approved as a new segment** by PAL, 17 Aug |
+| **Intl. Student** | 3 | ✅ **approved as a new segment** by PAL, 17 Aug |
+| **MICE** | 3 | ✅ **approved as a new segment** by PAL, 17 Aug |
+| Last-Minute *(as 4 named flavours)* | 4 | ⚠️ **becomes a flag, not a segment** (PAL, 17 Aug) — their sub-typing is what argued for it |
 
 **Never mentioned:** `Mabuhay Loyalist`, `Family`, `Budget/Adventure`, `Digital Nomad`, `Unassigned`.
-Four of our ten segments got zero SME input, and three segments we don't model got twelve rules between them.
+Four of our ten segments got zero SME input, and three segments we didn't model got twelve rules between
+them — all three of which PAL has now approved, taking the taxonomy to 13.
 
 ---
 
@@ -377,15 +380,38 @@ continuum finding changes because stay length arrived.
 | §5.3 composite fence (premium + short stay + short lead ⇒ Corporate) | new hard rule, `certain`, four-way SME agreement |
 | §3 distributional test — is there a 30/45-night spike in the Gulf corridors? | one probe over `pal_features_booking.parquet` |
 
-### Blocked on a decision
+### Blocked on a decision — ✅ RESOLVED 17 August 2026
 
-| # | Decision | Who | Blocks |
+| # | Decision | Outcome | Rules unblocked |
 |---|---|---|---|
-| 1 | **Anchor trade-off** — which of `dep_month` / `stay_nights` do we spend? (§6) | us, then flag to PAL | ~28 of 39 rules |
-| 2 | **Do MICE, Ultra Wealthy Leisure and Intl. Student become segments 11–13?** Or sub-types under Corporate / Premium Bleisure / Balikbayan-VFR? | PAL | 9 rules |
-| 3 | **Is "Leisure" our `Budget/Adventure`, or a new mid-tier?** Their rows 26–28 describe price-sensitive advance bookers, which is `Budget/Adventure` — but then "Ultra wealthy leisure" implies they see a leisure *ladder*, and we have no middle rung. | PAL | 3 rules + taxonomy |
-| 4 | **Does Last-Minute stay one segment?** They wrote four flavours (Distressed / Spontaneous Group / Spontaneous Weekender / plain). We already know **84.1% of Last-Minute would otherwise be Budget/Adventure**, i.e. it behaves as an overlay, not a peer segment. Their sub-typing supports treating it as a flag. | us + PAL | 4 rules |
-| 5 | **Demote row 9 (Family `must_be` Group) to a lean?** (§5.1) | RM Domestic | 6 rules |
+| 1 | Anchor trade-off — spend `dep_month` or `stay_nights`? | **Spend `stay_nights`, keep `dep_month`.** The 5 rules whose primary claim is departure month are **withdrawn** (S02, S10, S12, S16, S20); S38 rewritten without its month clause. `src/check_constraints.py` now *fails* if any active rule reads `dep_month`, so the decision is enforced rather than remembered. Request `Isupgrade` / `IsTourCode` / `IsFrequentFlyer` as replacement anchors. | ~23 |
+| 2 | Are MICE / Ultra Wealthy Leisure / Intl. Student real segments? | **Yes — approved, taxonomy goes 10 → 13.** Added to `SEG_APPROVED` in `src/pal_colors.py` with colours; deliberately **not** in `SEG_ORDER`, because the waterfall does not emit them yet. | 9 |
+| 3 | Is their "Leisure" our `Budget/Adventure`? | **Yes — a naming difference.** Mapped in place; **no rename**, so the palette, Power BI dimension, personas and existing PAL slides are untouched. | 4 |
+| 4 | Does Last-Minute stay a segment? | **No — it becomes a flag.** It describes a booking, not a traveller. Sized below; the waterfall change is pending. | 4 |
+| 5 | Demote Family's `must_be` on `is_group`? | **Demoted** (S31, now `contested` at `weak`). Two narrower questions go back to RM Domestic — see §5.1. | 6 |
+
+### What decision 4 costs — measured, not assumed
+
+Removing the Last-Minute branch redistributes its 2,945,686 bookings **exactly** as
+`rule_confidence.py` predicted: **84.1% (2,476,607) to `Budget/Adventure`**, 15.9% (469,079) to
+`Unassigned`. Nothing else moves.
+
+| | before | after |
+|---|---|---|
+| `Budget/Adventure` | 9,037,176 | **11,513,783** (+27%, and **50.3% of the whole book**) |
+| `Unassigned` | 2,194,061 | 2,663,140 (+21%) |
+| `Last-Minute` | 2,945,686 | 0 — becomes a flag |
+
+**The flag is strictly more informative than the segment was.** As a segment it caught only bookings
+that fell through eight higher-priority rules: 2.95M. As a flag it applies wherever `lead_days <= 3`:
+**4,411,666 bookings (19.26%)** — including 864,292 OFW/Migrant, 315,333 Corporate and 196,364
+Balikbayan/VFR that were short-lead all along and invisible as such. **That is a 50% gain in visible
+short-lead volume**, and it is the strongest argument for the change.
+
+⚠️ **But it concentrates half the book into one segment.** `Budget/Adventure` at 50.3% is not a useful
+unit for targeting. This re-opens decision 3 from the other end: PAL approved *Ultra Wealthy Leisure*
+at the top of a leisure ladder while the bottom rung swells to half the population — so the missing
+**middle rung** is now the live taxonomy question, and worth raising before the waterfall change ships.
 
 ### Go back to the SME
 
