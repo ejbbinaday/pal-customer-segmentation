@@ -503,14 +503,42 @@ Different on every axis, not only revenue. This is **taxonomy gap #4** and it de
 1. **Do not build a "middle value rung."** It is the fare ladder reflecting when people booked.
 2. **Build `Outbound International Leisure`** (~2.0M, currently `Unassigned`) — behaviourally distinct
    and it closes our largest known gap.
-3. **Build a frequency-based domestic segment** (~3.5M) defined on **`n_bookings` and `lead_days`, not
-   fare tier** — the unmanaged-business population. ⚠️ Test first: does the frequency gap survive
-   controlling for lead time? `IsTourCode` / `IsFrequentFlyer` (already requested) would largely settle it.
+3. ~~**Build a frequency-based domestic segment**~~ — **WITHDRAWN after verification, see below.**
 4. **Ship fare tier as a reporting *band*, not a segment** — useful on the value axis, must not define a
    customer type.
 
-⚠️ **`n_bookings` is one of our two remaining validation anchors.** Recommendation 3 spends it. That is a
-second anchor decision and must be taken as deliberately as the first — see §6.
+### ⚠️ Verification result — recommendation 3 does not clear its own gate
+
+The pre-registered test was: *does the frequency gap survive controlling for lead time?* Both controls
+were run. **Both pass, but the effect collapses to a size that no longer justifies a segment.**
+
+**Control 1 — within lead-time bands** (raw gap 9.8 vs 5.4 = **1.81×**):
+
+| median lead band | tier 1–2 bookings/cust | tier 3–4 bookings/cust | ratio |
+|---|---|---|---|
+| 0–3 days | 7.8 | 11.6 | 1.49 |
+| 4–7 | 7.6 | 10.9 | 1.44 |
+| 8–14 | 6.8 | 9.2 | 1.36 |
+| 15–30 | 5.6 | 7.4 | 1.32 |
+| 31–60 | 4.4 | 5.2 | 1.20 |
+| 61+ | 3.4 | 3.8 | **1.11** |
+
+The gap survives everywhere but **attenuates monotonically to 1.11**, so much of the raw 1.81× was
+*composition* — mid-tier is concentrated in short-lead bookings, and short-lead bookers fly more.
+
+**Control 2 — tenure.** Mid-tier customers have longer tenure in the extract (343 vs 234 days), which
+inflates a lifetime count. On a **rate** basis the gap is **7.5 vs 5.7 bookings/year = 1.32×**, not 1.81×.
+
+**Conclusion: the population is real but the discriminator is weak.** A 1.32× booking-rate difference is
+not a customer type. And the axis that *does* separate strongly — **lead time, median 5 vs 25 days and
+39.6% vs 12.1% booking inside three days, a 3.3× difference** — is already a rule field and already
+drives the Last-Minute flag. So a frequency segment would spend our second-to-last validation anchor to
+add a 1.3× signal on top of a flag we are already shipping.
+
+**Revised recommendation: do not build it.** The fare **band** plus the last-minute **flag** already expose
+this population, on axes that cost nothing. **`n_bookings` stays an anchor.**
+
+*The gate was worth setting: the raw numbers looked like a segment and the controlled numbers do not.*
 
 ### Go back to the SME
 

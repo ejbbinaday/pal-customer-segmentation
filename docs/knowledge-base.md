@@ -454,6 +454,34 @@ Dashboard Wireframe → Requirements Checklist → [Appendix] Literature
 
 ---
 
+#### 2026-08-17 — The frequency segment fails its own gate: 1.81× becomes 1.32× under controls, and the anchor is kept
+**Domain:** Clustering / Methodology
+Ran the pre-registered gate on the proposed frequency-based domestic segment (the "unmanaged business
+travel" population). **Both controls pass and the recommendation still dies — because passing is not the
+same as mattering.**
+**Control 1, within lead-time bands.** Raw gap in bookings per customer was 9.8 vs 5.4 = **1.81×**. Within
+bands it is 1.49 · 1.44 · 1.36 · 1.32 · 1.20 · **1.11** as lead time grows — surviving everywhere but
+**attenuating monotonically**, so much of the raw gap was composition: mid-tier is concentrated in
+short-lead bookings and short-lead bookers fly more.
+**Control 2, tenure.** Mid-tier customers sit in the extract longer (343 vs 234 days), which inflates any
+lifetime count. On a **rate** basis: **7.5 vs 5.7 bookings/year = 1.32×**, not 1.81×.
+**Decision: do not build the segment.** A 1.32× booking-rate difference is not a customer type. And the
+axis that *does* separate strongly — **lead time, 5 vs 25 median days, 39.6% vs 12.1% booking inside three
+days, ~3.3×** — is **already a rule field** and already drives the Last-Minute flag. So the segment would
+spend `n_bookings`, our second-to-last validation anchor, to add a 1.3× signal on top of a flag already
+shipping. **`n_bookings` is kept.**
+*Generalises, and this is the third time today the same shape has appeared: **a raw ratio is a composition
+artifact until you stratify.** 30-night spikes needed a round-number control; "pays more" needed a
+booking-timing control; "flies more" needed lead-time and tenure controls. Each time the headline number
+was roughly right and roughly meaningless. Set the gate before looking, and state the effect size that
+would justify acting — "survives the control" is too low a bar on 22.9M rows, where almost everything
+survives.*
+**Also worth keeping: cheap axes first.** Before spending an anchor on a new discriminator, check whether
+an **already-spent** field separates the same population better. Here `lead_days` (already a rule input,
+already flagged) beat `n_bookings` 3.3× to 1.3×, so the expensive option was also the weaker one.
+**Source:** our analysis, 2026-08-17 — probes over `pal_features_booking.parquet` +
+`pal_features_customer.parquet`; `docs/sme-constraints-intake.md` "Verification result".
+
 #### 2026-08-17 — The "missing value rung" is mostly a yield-management artifact; the real population is frequency, not fare
 **Domain:** Data & Features
 Same-day revision of the entry below, after testing the two candidate populations on **behaviour** instead
