@@ -413,6 +413,59 @@ unit for targeting. This re-opens decision 3 from the other end: PAL approved *U
 at the top of a leisure ladder while the bottom rung swells to half the population — so the missing
 **middle rung** is now the live taxonomy question, and worth raising before the waterfall change ships.
 
+### The missing middle rung — measured 17 Aug 2026
+
+PAL approved *Ultra Wealthy Leisure* at the top of a leisure ladder while decision 4 sends the bottom
+rung to 50.3% of the book. So: **is there anything between them?** Measured on the post-change
+`Budget/Adventure`, using the fare-tier ladder the SME's own rules already use.
+
+| tier | farebrand | bookings | share of segment | mean revenue |
+|---|---|---|---|---|
+| 1 | Economy Supersaver | 4,198,045 | 36.5% | 33 |
+| 2 | Economy Saver | 3,459,469 | 30.0% | 78 |
+| 3 | Economy Value | 2,814,953 | 24.4% | 120 |
+| 4 | Economy Flex | 1,032,272 | 9.0% | 178 |
+
+**Yes, and it is the commercially important two-thirds.** Splitting at the SME's own Saver/Value line:
+tier 3–4 is **33.4% of the segment by volume but 56.2% of its revenue, at 2.57× revenue per booking.**
+Calling all 11.5M of these "budget" is simply wrong about a third of them.
+
+The ladder with the rung filled in (revenue in the extract's own units — see the currency guard in
+`src/features_real.py`; ratios are the safe reading):
+
+| rung | definition | bookings | mean revenue | step |
+|---|---|---|---|---|
+| Budget | domestic, tier 1–2 | 7,657,514 | 53 | — |
+| **Middle** | **tier 3–4 economy, no corporate/OFW/award signal** | **4,045,178** | **197** | **3.7×** |
+| Premium Bleisure | premium cabin, international | 481,666 | 1,504 | 7.6× |
+| Ultra Wealthy Leisure | premium, lead ≥ 30, stay ≥ 7 | 178,069 | 1,967 | 1.3× |
+
+**17.7% of the whole book**, and it partly closes a gap we have been reporting separately: **547,427 of
+it comes out of `Unassigned`.**
+
+⚠️ **But "the middle rung" is two populations, not one.** `Unassigned` is **75% PH-issued international
+economy (1,997,820 bookings at mean revenue 405)** — outbound Filipino international leisure, which is
+*higher*-value than the domestic middle rung, not part of it. Only the tier-3–4 slice fell into the
+definition above. So the honest statement is that the space between deep-discount domestic and premium
+cabin contains **two** distinct things:
+
+1. **mid-tier domestic economy** — 3,497,751 bookings, mean revenue ~197
+2. **outbound PH-issued international economy** — ~2.0M bookings, mean revenue ~405 — this is
+   **taxonomy gap #4**, the bucket we have been flagging to PAL as the largest actionable gap
+
+Filling the middle rung and closing the Unassigned gap are therefore **one conversation, not two.**
+
+⚠️ **This is a value cut, not a purpose cut — and not a discovered cluster.** Behaviour is nearly
+identical across tiers 1–4 (median stay 3–4 nights, round-trip rate 32–38%): what separates them is
+**what they paid**, not how they travel. That is legitimate — the deliverable is explicitly
+*trip-purpose × value* segmentation and this is the value axis — but it must not be presented as
+structure we found in the data. The continuum finding stands, and the noise-floor discipline applies:
+if anyone proposes validating this split with a silhouette, it needs a floor measured on this
+population with this feature set.
+
+**Open question for PAL, not for us:** does the middle rung split by *purpose* (mid-tier domestic
+leisure vs outbound international leisure) or stay one value band? Two segments or one.
+
 ### Go back to the SME
 
 - **Row 46 is unimplementable** — no PNR party size. (§4)

@@ -454,6 +454,37 @@ Dashboard Wireframe → Requirements Checklist → [Appendix] Literature
 
 ---
 
+#### 2026-08-17 — The missing leisure rung is real, is 17.7% of the book, and is two populations rather than one
+**Domain:** Data & Features
+Follow-up to the decision-4 sizing: if `Budget/Adventure` is heading to 50.3% of the book, is there
+anything between it and the newly-approved *Ultra Wealthy Leisure*? Measured on the post-change segment
+using the fare-tier ladder the SME's own rules already use.
+**Yes — and it is the commercially important part.** Inside the 11,513,783: tier 1 Supersaver 36.5% ·
+tier 2 Saver 30.0% · tier 3 Value 24.4% · tier 4 Flex 9.0%. Split at the SME's own Saver/Value line,
+**tier 3–4 is 33.4% of the segment by volume but 56.2% of its revenue, at 2.57× revenue per booking.**
+Calling all 11.5M of them "budget" is wrong about a third of them.
+**The ladder, filled in** (extract's own revenue units; ratios are the safe reading): Budget (domestic
+tier 1–2) 7,657,514 @ 53 → **Middle (tier 3–4 economy) 4,045,178 @ 197 (3.7×)** → Premium Bleisure
+481,666 @ 1,504 (7.6×) → Ultra Wealthy 178,069 @ 1,967. Monotone, with the one structural jump where
+the cabin product changes rather than the fare.
+**⚠️ The find that changes the shape of the question: it is TWO populations.** `Unassigned` is **75%
+PH-issued international economy — 1,997,820 bookings at mean revenue 405**, i.e. *higher*-value than the
+domestic middle rung, not part of it. So the space between deep-discount domestic and premium cabin holds
+(a) **mid-tier domestic economy**, 3,497,751 @ ~197, and (b) **outbound PH-issued international economy**,
+~2.0M @ ~405 — and (b) **is taxonomy gap #4**, the bucket we have been reporting to PAL separately as the
+largest actionable gap. **Filling the middle rung and closing Unassigned are one conversation, not two** —
+worth knowing before anyone schedules them as separate workstreams.
+**⚠️ Discipline note: this is a value cut, not a purpose cut, and not a discovered cluster.** Behaviour is
+nearly identical across tiers 1–4 (median stay 3–4 nights, round-trip 32–38%); what separates them is what
+they *paid*. Legitimate — the deliverable is explicitly *trip-purpose × value* and this is the value axis —
+but it must never be presented as structure found in the data. If anyone proposes validating the split
+with a silhouette it needs a floor measured on this population with this feature set (2026-08-14 lesson).
+*Generalises: when a segment swells past ~40% of the book, check whether the rule that defines it is
+coarser than the ladder its own SME rules already use. Here `is_domestic AND NOT any_premium` ignored a
+1–7 fare ladder that the constraint sheet leans on in eleven separate rules.*
+**Source:** our analysis, 2026-08-17 — probe over `pal_features_booking.parquet`;
+`docs/sme-constraints-intake.md` "The missing middle rung".
+
 #### 2026-08-17 — PAL settles the taxonomy: 13 segments, Last-Minute becomes a flag, and the flag exposes 50% more volume than the segment did
 **Domain:** Project Decision
 All five blocking decisions from `docs/sme-constraints-intake.md` §7 resolved. Methodology v1.8.
