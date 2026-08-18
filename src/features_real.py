@@ -186,7 +186,12 @@ def build_booking(con: duckdb.DuckDBPyConnection) -> None:
             -- arg_min/arg_max then pick arbitrarily, so `round_trip` — the sole bit splitting
             -- OFW/Migrant from Balikbayan/VFR — flipped on ~20 bookings between identical runs.
             -- Immaterial in size, fatal to reproducibility: two runs of the same code produced
-            -- different Parquet. `coupon_number` orders legs within a ticket and breaks every tie.
+            -- different Parquet. `coupon_number` orders legs within a ticket and breaks most ties.
+            -- ⚠️ RESIDUAL, measured 2026-08-18: **1,830 bookings still have a duplicate
+            -- (departure_dt, coupon_number) pair**, so the ordering is not total and the build still
+            -- moves by ±1 booking between runs. Immaterial numerically (1 in 22.9M) but it drifts the
+            -- `fires` counts in data/constraints/*.csv, which check_constraints.py then flags. Fix is
+            -- a third key (sector, flight_number) — deferred, not forgotten.
             SELECT *, (departure_dt, coupon_number) AS ord_key,
                    -- Gap to the previous coupon, in departure order. For a round trip the largest
                    -- gap IS the stay; max-gap (rather than last-minus-first) is robust to
