@@ -1,0 +1,711 @@
+<title>PAL Segmentation Brief</title>
+
+<style>
+  /* ── tokens: light is the base, both dark paths redefine only these ───────── */
+  :root {
+    --ground:      #EDF0F2;
+    --surface:     #FFFFFF;
+    --surface-sunk:#E4E9EC;
+    --line:        #CFD8DE;
+    --line-soft:   #DFE6EA;
+    --ink:         #1A2530;
+    --ink-soft:    #55646F;
+    --ink-faint:   #7E8C97;
+    --accent:      #196675;
+    --accent-soft: #CFE3E7;
+    --ok:          #2C6E4E;
+    --ok-soft:     #D6E7DC;
+    --warn:        #8A6318;
+    --warn-soft:   #F0E4CB;
+    --stop:        #8E332A;
+    --stop-soft:   #F1DAD6;
+    --meter-track: #DDE4E8;
+
+    --serif: "Iowan Old Style", Charter, "Bitstream Charter", Georgia, "Times New Roman", serif;
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, "Cascadia Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:      #0D1319;
+      --surface:     #151E26;
+      --surface-sunk:#101820;
+      --line:        #2B3A45;
+      --line-soft:   #22303A;
+      --ink:         #E3E9ED;
+      --ink-soft:    #9AA9B4;
+      --ink-faint:   #74848F;
+      --accent:      #57B4C4;
+      --accent-soft: #1D3C44;
+      --ok:          #63B183;
+      --ok-soft:     #1B3527;
+      --warn:        #CFA455;
+      --warn-soft:   #35291140;
+      --stop:        #DD7568;
+      --stop-soft:   #3A1F1B;
+      --meter-track: #24313B;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground:      #0D1319;
+    --surface:     #151E26;
+    --surface-sunk:#101820;
+    --line:        #2B3A45;
+    --line-soft:   #22303A;
+    --ink:         #E3E9ED;
+    --ink-soft:    #9AA9B4;
+    --ink-faint:   #74848F;
+    --accent:      #57B4C4;
+    --accent-soft: #1D3C44;
+    --ok:          #63B183;
+    --ok-soft:     #1B3527;
+    --warn:        #CFA455;
+    --warn-soft:   #35291140;
+    --stop:        #DD7568;
+    --stop-soft:   #3A1F1B;
+    --meter-track: #24313B;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--serif);
+    font-size: 17px;
+    line-height: 1.62;
+    margin: 0;
+    padding: 0 20px 96px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 860px; margin: 0 auto; }
+  .prose { max-width: 66ch; }
+
+  /* ── masthead ─────────────────────────────────────────────────────────────── */
+  header.mast {
+    padding: 64px 0 28px;
+    border-bottom: 2px solid var(--ink);
+    margin-bottom: 8px;
+  }
+  .kicker {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 18px;
+  }
+  h1 {
+    font-size: clamp(34px, 5.4vw, 52px);
+    line-height: 1.06;
+    letter-spacing: -0.02em;
+    font-weight: 600;
+    margin: 0 0 18px;
+    text-wrap: balance;
+  }
+  .standfirst {
+    font-size: 19px;
+    color: var(--ink-soft);
+    margin: 0;
+    max-width: 60ch;
+  }
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 34px;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    padding: 14px 0 0;
+  }
+  .meta b { color: var(--ink-soft); font-weight: 500; }
+
+  /* ── sections ─────────────────────────────────────────────────────────────── */
+  section { padding-top: 52px; }
+  h2 {
+    font-size: 12px;
+    font-family: var(--mono);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    font-weight: 500;
+    color: var(--ink-faint);
+    margin: 0 0 22px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--line);
+  }
+  h3 {
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    margin: 0 0 10px;
+    text-wrap: balance;
+  }
+  p { margin: 0 0 14px; }
+  p:last-child { margin-bottom: 0; }
+  a { color: var(--accent); }
+
+  /* ── the confidence rail: this page's one structural idea ─────────────────── */
+  .claim {
+    display: grid;
+    grid-template-columns: 3px 1fr;
+    gap: 0 22px;
+    background: var(--surface);
+    border: 1px solid var(--line-soft);
+    border-left: 0;
+    margin-bottom: 14px;
+  }
+  .claim > .rail { background: var(--ink-faint); }
+  .claim > .body { padding: 22px 26px 24px; min-width: 0; }
+  .claim.is-ok   > .rail { background: var(--ok); }
+  .claim.is-warn > .rail { background: var(--warn); }
+  .claim.is-stop > .rail { background: var(--stop); }
+
+  .stance {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 7px;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    margin-bottom: 14px;
+    border-radius: 2px;
+  }
+  .is-ok   .stance { color: var(--ok);   background: var(--ok-soft); }
+  .is-warn .stance { color: var(--warn); background: var(--warn-soft); }
+  .is-stop .stance { color: var(--stop); background: var(--stop-soft); }
+
+  .figure {
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+    font-size: clamp(30px, 4.6vw, 40px);
+    line-height: 1.05;
+    letter-spacing: -0.03em;
+    display: block;
+    margin-bottom: 6px;
+  }
+  .is-ok   .figure { color: var(--ok); }
+  .is-warn .figure { color: var(--warn); }
+  .is-stop .figure { color: var(--stop); }
+  .figure-note {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    display: block;
+    margin-bottom: 16px;
+  }
+  .qual {
+    border-top: 1px solid var(--line-soft);
+    padding-top: 14px;
+    margin-top: 16px;
+    font-size: 15.5px;
+    color: var(--ink-soft);
+  }
+  .qual b { color: var(--ink); font-weight: 600; }
+
+  /* ── tables ───────────────────────────────────────────────────────────────── */
+  .scroll { overflow-x: auto; margin: 4px 0 10px; }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 14.5px;
+    min-width: 540px;
+  }
+  caption {
+    text-align: left;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    padding-bottom: 10px;
+  }
+  th, td { padding: 8px 12px; text-align: left; vertical-align: baseline; }
+  thead th {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    font-weight: 500;
+    color: var(--ink-faint);
+    border-bottom: 1px solid var(--line);
+  }
+  tbody tr { border-bottom: 1px solid var(--line-soft); }
+  tbody tr:last-child { border-bottom: 0; }
+  td.num, th.num {
+    text-align: right;
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+  }
+  td.seg { font-weight: 600; }
+  .tag {
+    font-family: var(--mono);
+    font-size: 9.5px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--accent);
+    border: 1px solid var(--accent-soft);
+    padding: 1px 5px;
+    margin-left: 7px;
+    border-radius: 2px;
+    white-space: nowrap;
+  }
+  tr.retired td { color: var(--ink-faint); }
+  tr.retired td.seg { font-weight: 400; text-decoration: line-through; }
+
+  /* magnitude meter: one hue, identity carried by the row label */
+  .meter { width: 150px; }
+  .track {
+    height: 7px;
+    background: var(--meter-track);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 4px;
+    display: block;
+  }
+
+  /* ── say / don't say ──────────────────────────────────────────────────────── */
+  .facing {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 16px;
+  }
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--line-soft);
+    padding: 22px 24px 24px;
+  }
+  .panel h3 {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+  }
+  .panel.yes h3 { color: var(--ok); }
+  .panel.no h3 { color: var(--stop); }
+  .panel ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+  .panel li {
+    display: grid;
+    grid-template-columns: 18px 1fr;
+    gap: 10px;
+    font-size: 15.5px;
+    line-height: 1.5;
+  }
+  .panel li .mk {
+    font-family: var(--mono);
+    font-weight: 700;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+  .panel.yes li .mk { color: var(--ok); }
+  .panel.no li .mk { color: var(--stop); }
+
+  ul.plain { padding-left: 1.1em; margin: 0 0 14px; }
+  ul.plain li { margin-bottom: 8px; }
+
+  code {
+    font-family: var(--mono);
+    font-size: 0.88em;
+    background: var(--surface-sunk);
+    padding: 1px 5px;
+    border-radius: 2px;
+  }
+
+  footer {
+    margin-top: 64px;
+    padding-top: 20px;
+    border-top: 1px solid var(--line);
+    font-family: var(--mono);
+    font-size: 11.5px;
+    line-height: 1.8;
+    letter-spacing: 0.04em;
+    color: var(--ink-faint);
+  }
+
+  @media (max-width: 620px) {
+    body { font-size: 16px; }
+    .claim > .body { padding: 18px 18px 20px; }
+  }
+</style>
+
+<div class="wrap">
+
+  <header class="mast">
+    <p class="kicker">Results brief · pre-defence</p>
+    <h1>Anonymous trip-purpose segmentation, as it actually stands</h1>
+    <p class="standfirst">
+      Eleven segments over 22.9 million bookings. Three results worth leading with, one
+      that did not work, and the four claims that are easy to make and wrong.
+    </p>
+    <div class="meta">
+      <span><b>18 August 2026</b></span>
+      <span>22,911,450 bookings</span>
+      <span>Revenue in USD <b>(confirmed)</b></span>
+      <span>Waterfall v2</span>
+    </div>
+  </header>
+
+  <section>
+    <h2>What to lead with</h2>
+
+    <div class="claim is-ok">
+      <div class="rail"></div>
+      <div class="body">
+        <span class="stance">Safe to state</span>
+        <span class="figure">−74%</span>
+        <span class="figure-note">Unassigned bookings · 9.58% → 2.47%</span>
+        <h3>The largest known gap in the deliverable is closed</h3>
+        <p class="prose">
+          For months we have reported an unclassified bucket as the biggest actionable gap. Three
+          quarters of it turned out to be Filipinos buying international economy tickets in the
+          Philippines — a population that behaves distinctly, not merely a residue. It is now its
+          own segment.
+        </p>
+        <p class="qual"><b>Holds up because</b> the new segment differs on round-trip rate, stay
+        length, lead time and connections — not only on price. 64% round trip and 24% connecting,
+        against 38% and 5% for domestic leisure.</p>
+      </div>
+    </div>
+
+    <div class="claim is-ok">
+      <div class="rail"></div>
+      <div class="body">
+        <span class="stance">Safe to state</span>
+        <span class="figure">44 / 55</span>
+        <span class="figure-note">Segment pairs clearly distinct · median AUC 0.861</span>
+        <h3>The segments differ on evidence the rules never saw</h3>
+        <p class="prose">
+          Every pair tested against fields deliberately withheld from the rules, with per-pair
+          exclusion wherever an anchor would have leaked a rule back in. Forty-four pairs clearly
+          distinct, eleven weakly distinguishable, none indistinguishable.
+        </p>
+        <p class="qual"><b>Say which column.</b> That is the adaptive measure. On the strict
+        measure — only the two unconditionally clean fields that survived the July leak audit —
+        the median is 0.637 and eleven pairs fall below 0.60. The strict view is thin by
+        construction, not by failure.</p>
+      </div>
+    </div>
+
+    <div class="claim is-ok">
+      <div class="rail"></div>
+      <div class="body">
+        <span class="stance">Safe to state</span>
+        <span class="figure">4,411,666</span>
+        <span class="figure-note">Short-lead bookings now visible · was 2,945,686</span>
+        <h3>Turning Last-Minute into a flag exposed half again as much volume</h3>
+        <p class="prose">
+          As a segment it only ever caught what fell through eight higher-priority rules. As a
+          flag it applies to every short-lead booking — including 864,292 overseas-worker,
+          315,333 corporate and 196,364 balikbayan bookings that were short-lead all along and
+          invisible as such.
+        </p>
+        <p class="qual"><b>The general lesson</b> is that a priority cascade hides every
+        overlapping signal beneath the winning branch. This recovered 50% more volume without
+        moving a single threshold.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>The one that did not work</h2>
+
+    <div class="claim is-stop">
+      <div class="rail"></div>
+      <div class="body">
+        <span class="stance">Do not claim improvement</span>
+        <span class="figure">0.730 → 0.728</span>
+        <span class="figure-note">Overseas worker vs balikbayan · old labels vs new</span>
+        <h3>The weakest boundary is exactly where it was</h3>
+        <p class="prose">
+          This boundary splits 6.8 million bookings and was the motivation for the whole
+          exercise. Tested by holding method, anchors and population fixed and varying only the
+          labels, the new taxonomy is neutral on it — marginally negative, within noise.
+        </p>
+        <p class="qual"><b>And 0.608 → 0.72 is not a real comparison.</b> The earlier 0.608 is a
+        cell from the strict pairwise matrix; 0.72 comes from an isolated clean-pair test. Two
+        different measurements. Like for like, the strict figure has moved 0.608 → 0.548.</p>
+        <p class="qual"><b>Why.</b> The only change touching this pair moves 40,000 bookings —
+        1.4% of the branch. The stay-length discriminator that motivated the work is still a soft
+        prior and still changes no label.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>The taxonomy as shipped</h2>
+    <p class="prose">
+      Eleven segments and an unassigned remainder — four added, three removed against the original
+      ten. Bars encode share of bookings; identity is carried by the label, so they are one hue.
+    </p>
+    <div class="scroll">
+      <table>
+        <caption>Segment sizes and revenue contribution</caption>
+        <thead>
+          <tr>
+            <th>Segment</th>
+            <th>Share of bookings</th>
+            <th class="num">Bookings</th>
+            <th class="num">Mean rev</th>
+            <th class="num">Rev share</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="seg">Leisure <span class="tag">renamed</span></td>
+            <td class="meter"><span class="track"><span class="fill" style="width:100%"></span></span></td>
+            <td class="num">11,595,711</td><td class="num">$80</td><td class="num">14.95%</td>
+          </tr>
+          <tr>
+            <td class="seg">OFW / Migrant</td>
+            <td class="meter"><span class="track"><span class="fill" style="width:33.7%"></span></span></td>
+            <td class="num">3,907,805</td><td class="num">$312</td><td class="num">19.64%</td>
+          </tr>
+          <tr>
+            <td class="seg">Balikbayan / VFR</td>
+            <td class="meter"><span class="track"><span class="fill" style="width:24.8%"></span></span></td>
+            <td class="num">2,871,255</td><td class="num">$615</td><td class="num">28.41%</td>
+          </tr>
+          <tr>
+            <td class="seg">Outbound Intl. Leisure <span class="tag">new</span></td>
+            <td class="meter"><span class="track"><span class="fill" style="width:18.8%"></span></span></td>
+            <td class="num">2,182,074</td><td class="num">$398</td><td class="num">13.98%</td>
+          </tr>
+          <tr>
+            <td class="seg">Corporate</td>
+            <td class="meter"><span class="track"><span class="fill" style="width:10.1%"></span></span></td>
+            <td class="num">1,168,451</td><td class="num">$460</td><td class="num">8.65%</td>
+          </tr>
+          <tr>
+            <td class="seg">Unassigned</td>
+            <td class="meter"><span class="track"><span class="fill" style="width:4.9%"></span></span></td>
+            <td class="num">566,126</td><td class="num">$177</td><td class="num">1.61%</td>
+          </tr>
+          <tr>
+            <td class="seg">Premium Bleisure</td>
+            <td class="meter"><span class="track"><span class="fill" style="width:3.0%"></span></span></td>
+            <td class="num">343,309</td><td class="num">$1,188</td><td class="num">6.57%</td>
+          </tr>
+          <tr>
+            <td class="seg">Ultra Wealthy Leisure <span class="tag">new</span></td>
+            <td class="meter"><span class="track"><span class="fill" style="width:1.4%"></span></span></td>
+            <td class="num">157,490</td><td class="num">$1,968</td><td class="num">4.99%</td>
+          </tr>
+          <tr>
+            <td class="seg">Pilgrimage</td>
+            <td class="meter"><span class="track"><span class="fill" style="width:0.4%"></span></span></td>
+            <td class="num">43,616</td><td class="num">$404</td><td class="num">0.28%</td>
+          </tr>
+          <tr>
+            <td class="seg">Intl. Student <span class="tag">new</span></td>
+            <td class="meter"><span class="track"><span class="fill" style="width:0.4%"></span></span></td>
+            <td class="num">42,153</td><td class="num">$1,159</td><td class="num">0.79%</td>
+          </tr>
+          <tr>
+            <td class="seg">MICE <span class="tag">new</span></td>
+            <td class="meter"><span class="track"><span class="fill" style="width:0.2%"></span></span></td>
+            <td class="num">27,007</td><td class="num">$269</td><td class="num">0.12%</td>
+          </tr>
+          <tr>
+            <td class="seg">Mabuhay Loyalist</td>
+            <td class="meter"><span class="track"><span class="fill" style="width:0.06%"></span></span></td>
+            <td class="num">6,453</td><td class="num">$113</td><td class="num">0.01%</td>
+          </tr>
+          <tr class="retired">
+            <td class="seg">Family</td>
+            <td class="meter">—</td>
+            <td class="num">dropped</td><td class="num">—</td><td class="num">—</td>
+          </tr>
+          <tr class="retired">
+            <td class="seg">Digital Nomad</td>
+            <td class="meter">—</td>
+            <td class="num">dropped</td><td class="num">—</td><td class="num">—</td>
+          </tr>
+          <tr class="retired">
+            <td class="seg">Last-Minute</td>
+            <td class="meter">—</td>
+            <td class="num">now a flag</td><td class="num">—</td><td class="num">—</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="prose" style="color: var(--ink-soft); font-size: 15.5px;">
+      <strong>Family</strong> was dropped because it had no positive definition — every booking in
+      it was there only because it was a group booking nothing else claimed.
+      <strong>Digital Nomad</strong> was dropped as unidentifiable in anonymous data, closing a
+      requirement gap by deletion rather than definition.
+    </p>
+  </section>
+
+  <section>
+    <h2>The number people will get wrong</h2>
+    <div class="claim is-warn">
+      <div class="rail"></div>
+      <div class="body">
+        <span class="stance">Quote the second figure</span>
+        <span class="figure">23.4%</span>
+        <span class="figure-note">Genuinely reclassified · 5,358,355 bookings</span>
+        <h3>Not 62.7%</h3>
+        <p class="prose">
+          62.7% of labels differ textually from the previous run, but 39.3 points of that is only
+          the <code>Budget/Adventure → Leisure</code> rename. The real reclassification is 23.4%.
+        </p>
+        <p class="qual"><b>Why it matters:</b> 62.7% invites the question "so the model changed
+        completely?" and the answer is no. Lead with 23.4% and the rename becomes a footnote
+        rather than a challenge.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Validation, with the honest reading</h2>
+
+    <div class="claim is-warn">
+      <div class="rail"></div>
+      <div class="body">
+        <span class="stance">State the limitation first</span>
+        <h3>The segment label adds little on top of the raw features</h3>
+        <p class="prose">
+          Against held-out outcomes the label alone scores 0.60 on both stable measures — real
+          signal, well above a coin flip. But added to the features it contributes +0.0005 on
+          whether a booking flew and +0.0024 on rebooking within 180 days.
+        </p>
+        <p class="qual"><b>This is expected, not a failure.</b> The label is a function of the
+        features, so the features already contain it. It is precisely why the value of this work
+        is targeting and communication rather than prediction — and saying so first is stronger
+        than being asked.</p>
+      </div>
+    </div>
+
+    <div class="claim is-ok">
+      <div class="rail"></div>
+      <div class="body">
+        <span class="stance">Safe to state</span>
+        <span class="figure">1.13</span>
+        <span class="figure-note">Transfer ratio against a within-window ceiling</span>
+        <h3>A model fitted a year earlier carves the later data as well as one fitted on it</h3>
+        <p class="prose">
+          Segment composition holds where the volume is. What drift there is sits in the three
+          smallest segments, where a few hundred bookings move a mean — treat that as unresolved
+          noise, not established behavioural change.
+        </p>
+        <p class="qual"><b>Practical consequence:</b> on this evidence an annual refit buys
+        nothing. Outcome fields are excluded throughout as right-censored — recent bookings have
+        not flown yet, and comparing them would manufacture a cliff.</p>
+      </div>
+    </div>
+
+    <div class="claim is-stop">
+      <div class="rail"></div>
+      <div class="body">
+        <span class="stance">Not re-verified</span>
+        <h3>Detection power was not re-run</h3>
+        <p class="prose">
+          The test establishing that we could find a planted segment at ≥2% prevalence, and never
+          below ~1%, last ran on 29 July against the previous labels.
+        </p>
+        <p class="qual"><b>Its conclusion is method-level</b>, so relabelling does not invalidate
+        it — but it has not been re-checked against the current taxonomy. Say that plainly if
+        asked rather than presenting it as current.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Domain finding from the SME programme</h2>
+    <div class="claim is-warn">
+      <div class="rail"></div>
+      <div class="body">
+        <span class="stance">Present the pattern, not the cause</span>
+        <span class="figure">19.1% vs 8.5%</span>
+        <span class="figure-note">Gulf round trips at 28–32 nights vs 12–16 nights</span>
+        <h3>Manila–Gulf traffic runs on a one-month clock no other corridor has</h3>
+        <p class="prose">
+          It is the only corridor where a month-long trip outweighs a fortnight. Every other
+          corridor sits at 0.60 or below on the same ratio. Revenue Management attributes it to
+          employer-mandated leave for overseas workers.
+        </p>
+        <p class="qual"><b>The confound is open.</b> If Gulf economy fares carry a one-month
+        maximum-stay condition, the fare rule produces an identical pattern. The field that would
+        settle it has been requested and has not arrived. Describe the rhythm; do not assert the
+        reason.</p>
+        <p class="qual"><b>Two parts of the SME's claim did not survive testing:</b> there is no
+        excess at 45 nights, and pooling Hong Kong and Taipei with the Gulf drops discrimination
+        <em>below chance</em> — 0.375 against 0.676 for the Gulf alone.</p>
+      </div>
+    </div>
+    <p class="prose">
+      Across the programme: 39 rules received, all 24 follow-up questions answered, 57 rules
+      transcribed with provenance and live firing counts, and all six rules marked
+      <em>certain</em> now asserted at build time. A first draft of the waterfall satisfied only
+      four of the six — ordering alone does not implement a prohibition.
+    </p>
+    <p class="prose">
+      Scoring the 21 live tendencies against our own labels: they are <strong>silent on 43.6% of
+      the book</strong>, and where they do make a call they <strong>agree with us 70.5%</strong>
+      of the time. Their largest disagreement independently supports dropping Last-Minute as a
+      segment.
+    </p>
+  </section>
+
+  <section>
+    <h2>In the room</h2>
+    <div class="facing">
+      <div class="panel yes">
+        <h3>Say</h3>
+        <ul>
+          <li><span class="mk">+</span><span>Unassigned fell 74% — the largest known gap is closed</span></li>
+          <li><span class="mk">+</span><span>44 of 55 segment pairs clearly distinct on independent evidence</span></li>
+          <li><span class="mk">+</span><span>23.4% of bookings reclassified</span></li>
+          <li><span class="mk">+</span><span>The Gulf one-month pattern is real and corridor-specific</span></li>
+          <li><span class="mk">+</span><span>Every certain SME rule is enforced in code and asserted on every build</span></li>
+          <li><span class="mk">+</span><span>Revenue is confirmed as USD — annual value at risk spans $495 to $9,784 per customer</span></li>
+        </ul>
+      </div>
+      <div class="panel no">
+        <h3>Do not say</h3>
+        <ul>
+          <li><span class="mk">×</span><span>That the weakest boundary improved — it did not</span></li>
+          <li><span class="mk">×</span><span>0.608 → 0.72 — those are different tests</span></li>
+          <li><span class="mk">×</span><span>62.7% reclassified — that figure is mostly a rename</span></li>
+          <li><span class="mk">×</span><span>That employer leave <em>causes</em> the Gulf pattern — the fare-rule confound is open</span></li>
+          <li><span class="mk">×</span><span>Anything from detection power as re-verified — it was not re-run</span></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Limitations worth owning before being asked</h2>
+    <ul class="plain prose">
+      <li><strong>No loyalty field.</strong> Mabuhay Loyalist sits at 0.03% of bookings because we
+      can only see award redemptions. The segment is real; our ability to see it is not.</li>
+      <li><strong>No ancillary revenue</strong> anywhere in the extract, which understates premium
+      and leisure segments specifically.</li>
+      <li><strong>The customer base is a continuum</strong>, not a set of natural clusters. That is
+      an established finding, re-tested six ways, and it is why rules label and machine learning
+      validates rather than the reverse.</li>
+      <li><strong>Blind below roughly 1% prevalence</strong> — any segment smaller than about
+      229,000 bookings could exist without us detecting it.</li>
+      <li><strong>The build still moves by one booking between runs.</strong> 1,830 bookings have
+      tied sort keys; cause and fix are recorded. Immaterial at one in 22.9 million, but it is a
+      known defect rather than an unknown.</li>
+    </ul>
+  </section>
+
+  <footer>
+    Philippine Airlines · anonymous trip-purpose × value segmentation<br>
+    Measured on the full 38.1M-coupon extract, aggregated to 22,911,450 bookings · methodology v2.0<br>
+    Every figure regenerable from source; validation outputs under <code>outputs/</code>
+  </footer>
+
+</div>

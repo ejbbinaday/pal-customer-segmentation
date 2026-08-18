@@ -299,10 +299,12 @@ Key references:
   methodology, the full rule waterfall as implemented, ten data-backed **persona cards**, the success
   metrics with a worked peso cost calculation, and the SME asks (hard/soft constraints + labelled
   sample) with exact file formats. Written for PAL commercial stakeholders, not for engineers.
-- **`docs/defense-brief-2026-08-18.md`** — **one-page state of the model**: taxonomy as shipped,
+- **`docs/defense-brief-2026-08-18.{md,html}`** — **one-page state of the model**: taxonomy as shipped,
   what changed and the number to quote (23.4%, not 62.7%), all four validation stages with the honest
   reading of each, the SME programme, and an explicit *what to say / what not to say* list. Written for
-  presenting, so every claim carries its caveat.
+  presenting, so every claim carries its caveat. The `.html` is the shareable version, published
+  as a Claude artifact: every claim carries a coloured confidence rail marking it safe to state,
+  caveated, or not to be said.
 - **`docs/segment-cost-research.md`** — **answers PAL question A1: what a misclassification costs.**
   Five cost components each sourced from published airline revenue-management and customer-value
   research, our own per-segment economics in confirmed USD (annual value at risk spans **$495–$9,784**),
