@@ -85,6 +85,17 @@ SEG_RETIRED = {
     "Last-Minute": "became a booking flag, not a segment (PAL, 17 Aug 2026)",
 }
 
+# Renames, as a machine-readable map. Anything comparing an old label to a new one MUST apply this
+# first, or the rename shows up as a disagreement — it produced a fake 6.9M-booking "finding" in
+# src/apply_soft_priors.py before this map existed.
+SEG_RENAMED = {"Budget/Adventure": "Leisure"}
+
+
+def canonical(seg: str) -> str:
+    """Old label -> current label. Identity for everything that was not renamed."""
+    return SEG_RENAMED.get(seg, seg)
+
+
 # Sequential lists matching the orders above (for palette= args)
 SEG_PALETTE = [SEG_COLORS[s] for s in SEG_ORDER]
 SEG_APPROVED_PALETTE = [SEG_COLORS[s] for s in SEG_APPROVED]

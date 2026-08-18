@@ -141,6 +141,7 @@ python src/build_pbip.py      # Power BI project reproducing the revenue/PAX moc
 python src/sub_segment.py     # LCA sub-types within large rule segments → outputs/sub_segments/
 python src/rule_confidence.py # how *determined* is each rule label? (~1 min) → outputs/rule_confidence/
 python src/check_constraints.py       # validate data/constraints/*.csv against the feature table (~1 min)
+(cd src && python apply_soft_priors.py)  # Stage P: score the 21 live SME tendencies vs the labels (~1 min)
 python src/simulate_waterfall_v2.py   # DESIGN ONLY: proposed taxonomy change, before/after + rule check (~1 min)
 python src/probe_stay_length.py       # SME claim: does stay length split OFW from Balikbayan? (~30 s) → outputs/stay_length/
 (cd src && python probe_constraint_coverage.py)  # all 39 SME rules: evaluable? fires? (~1 min) → outputs/constraint_coverage/
@@ -298,6 +299,13 @@ Key references:
   methodology, the full rule waterfall as implemented, ten data-backed **persona cards**, the success
   metrics with a worked peso cost calculation, and the SME asks (hard/soft constraints + labelled
   sample) with exact file formats. Written for PAL commercial stakeholders, not for engineers.
+- **`docs/segment-cost-research.md`** — **answers PAL question A1: what a misclassification costs.**
+  Five cost components each sourced from published airline revenue-management and customer-value
+  research, our own per-segment economics in confirmed USD (annual value at risk spans **$495–$9,784**),
+  a transparent weight formula, and **recommended penalty weights** with three documented overrides.
+  Flags that the shipped ×1–10 ladder is inverted against measured revenue in two places.
+- **`docs/pal-email-draft.md`** — draft of the two open questions to PAL (the Mecca-seasonality
+  contradiction and the promised-fields timing), plus notes on what was deliberately left out.
 - **`docs/pal-questions.md`** + **`docs/pal-questions.csv`** — **the consolidated ask list for PAL:
   24 open items in four groups** (7 blocking decisions · 5 data requests · 8 changes-to-their-rules
   needing confirmation · 4 still unanswered from the original workbook). Each row carries our
