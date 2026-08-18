@@ -40,9 +40,14 @@ data/reference/ Curated lookups (tracked, rebuilt by src/build_airport_ref.py):
                  route_theme.csv    — 32 airports → 8 trip-purpose themes (descriptive only; keyed on
                    TRIP endpoints, so codeshare beyond-points FCO/TLV/CDG/LIS resolve). Kept separate
                    from airport_region.csv on purpose — see that script's docstring
-wishlist/      Filled-in SME workbooks returned by PAL (tracked, read-only inputs).
+wishlist/      Filled-in SME workbooks returned by PAL (tracked, read-only inputs — never edit these;
+                 they are the record of what PAL actually said).
                  PALxMAIDA_Constraints&Wishlist.xlsx — 39 new rules from RM Domestic; analysed in
                  docs/sme-constraints-intake.md, transcribed into data/constraints/ (not yet enforced)
+                 pal-questions-answered-2026-08-18.csv — RM's answers to all 24 items in
+                 docs/pal-questions.csv. Several are consequential (drop Family, drop Digital Nomad,
+                 rename Budget/Adventure to Leisure, read routes directionally) and three conflict
+                 with earlier decisions — not yet actioned
 src/           All Python (analysis pipeline + report/slide generators + shared palette)
 docs/          Business + methodology + EDA + monitoring docs, onboarding guide
 reports/       Tracked deliverables: HTML EDA report, exported slide PNGs, POC figures
