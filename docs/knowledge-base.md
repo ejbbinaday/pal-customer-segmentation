@@ -454,6 +454,36 @@ Dashboard Wireframe → Requirements Checklist → [Appendix] Literature
 
 ---
 
+#### 2026-08-18 — Waterfall v2 shipped, and the boundary it was meant to fix did NOT improve
+**Domain:** Clustering / Methodology
+Built waterfall v2 into `src/features_real.py` (11 segments + Unassigned, `is_last_minute` flag,
+`value_band`, six `enforce` rules asserted in code) and re-ran V1. **The headline claim does not survive
+the check, and this entry exists so nobody presents it.**
+**What the fresh V1 run says about OFW↔Balikbayan:** strict (TIER_A anchors only) **0.548 —
+"not distinguishable"**; adaptive (full admissible set) **0.713**; the isolated clean-pair test **0.72**.
+**⚠️ The 0.608 in `continuum-levers-plan.md` is the *strict pairwise matrix* cell, not the clean-pair
+test.** So "0.608 → 0.72" compares two different measurements and is not a real improvement. Like for
+like, strict has gone **0.608 → 0.548**, slightly *worse*.
+**The decisive test was an A/B on identical method, anchors and population, varying only the labels**
+(`proxy_segment_v1` is retained in the parquet for exactly this): **v1 0.730 · v2 0.728.** The new
+taxonomy is **neutral** on this boundary — within noise, marginally negative.
+**Why that was predictable in hindsight, and was in fact predicted:** the only v2 change touching this
+pair is the H08 exclusion, which moves ~40k premium short-stay bookings out of Balikbayan/VFR — 1.4% of
+the branch. **The Gulf stay-length discriminator that justified spending the anchor is still a soft prior
+and still changes no label** (see the entry below). We spent the anchor, shipped the taxonomy, and the
+boundary is where it was.
+*Generalises: keep the previous labels in the output. The A/B took four minutes and it is the difference
+between "we improved the weakest boundary" and "we did not". Without `proxy_segment_v1` in the parquet we
+would have compared against a remembered number from a different test and been wrong in public.*
+**What v2 *did* buy, and it is worth defending on its own terms:** `Unassigned` falls **9.58% → 2.47%**
+(−74%), closing taxonomy gap #4; four new segments PAL asked for; `Last-Minute` converted to a flag that
+exposes **4,411,666 short-lead bookings against the 2,945,686 the segment ever showed**; and every
+`enforce` hard rule now asserted at build time. **Genuine reclassification is 23.4% of bookings
+(5,358,355)** — *not* the 62.7% of labels that differ textually, which mostly reflects the
+`Budget/Adventure → Leisure` rename. **Quote 23.4%.**
+**Source:** our analysis, 2026-08-18 — `outputs/validate_construct/summary.md` line 87 and §3;
+A/B run in-session; `docs/waterfall-v2-design.md`.
+
 #### 2026-08-18 — We spent a validation anchor and never wired up the rule it was spent for
 **Domain:** Clustering / Methodology
 Checking the settled design before recommending next steps: **the OFW↔Balikbayan boundary is still split

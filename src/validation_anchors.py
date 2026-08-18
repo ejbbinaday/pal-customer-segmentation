@@ -64,7 +64,13 @@ RULE_FIELDS = frozenset(
         "round_trip",  # → the *only* bit splitting OFW/Migrant from Balikbayan/VFR
         "any_premium",  # → Premium Bleisure, Budget/Adventure
         "is_group",  # → Family
-        "is_domestic",  # → Budget/Adventure
+        "is_domestic",  # → Leisure (was Budget/Adventure)
+        # ── added 2026-08-18 when waterfall v2 shipped ────────────────────────────────
+        "stay_nights",  # → Corporate x2, MICE, Intl. Student, Ultra Wealthy, the H08 exclusion.
+        #   Spent deliberately (PAL decision, see docs/sme-constraints-intake.md §6). Note its
+        #   *definedness* is `round_trip`, so it could never have validated the OFW↔Balikbayan
+        #   boundary even while it was still an anchor.
+        "any_cabin_j",  # → MICE exclusion (H13, in the weaker form PAL accepted)
         "proxy_segment",  # the label itself
     }
 )
@@ -111,7 +117,9 @@ CANDIDATE_ANCHORS: dict[str, str] = {
     # proving only that the rule was applied. Its real value is pairs that agree on round_trip —
     # Corporate vs Premium Bleisure being the one Lever A flagged as under-served.
     # Declared leak when promoted: ("round_trip",)
-    "stay_nights": "nights at the destination — no rule reads it, but definedness IS round_trip",
+    # ⚠️ `stay_nights` was here until 2026-08-18. Waterfall v2 consumes it, so it has moved to
+    # RULE_FIELDS and can never validate anything again. This is the trade PAL agreed: it bought
+    # MICE, Intl. Student, Ultra Wealthy Leisure and the Corporate fence.
     # No rule reads any day-of-week, and `dep_month` (a coarser sibling) is already an anchor.
     # TIER_A *candidate*, but do not assert that without measuring it — see (3) above.
     "dep_dow": "departure day of week — no rule reads it; TIER_A candidate pending measurement",
@@ -180,7 +188,16 @@ ANCHOR_LEAKS: dict[str, tuple[str, ...]] = {
 #
 # Every bit named anywhere in ANCHOR_LEAKS must appear here, or `admissible_for_groups` silently skips
 # the check for it (missing column → `continue`) and the leak ships. `src/audit_leaks.py` asserts this.
-AUDIT_BITS = ("corp_channel", "is_domestic", "is_international", "foreign_issue", "pilgrimage")
+AUDIT_BITS = (
+    "corp_channel",
+    "is_domestic",
+    "is_international",
+    "foreign_issue",
+    "pilgrimage",
+    # added 2026-08-18: waterfall v2 makes `stay_nights` a rule input, and any anchor that leaks
+    # `round_trip` must have that bit loaded or `admissible_for_groups` skips the check silently
+    "round_trip",
+)
 
 LEAK_TOLERANCE = 0.20  # max allowed gap in a rule bit's rate between two groups
 

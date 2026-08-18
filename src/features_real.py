@@ -118,6 +118,36 @@ def assert_stay_contract(con: duckdb.DuckDBPyConnection) -> None:
         raise AssertionError("stay_nights contract violated — " + "; ".join(problems))
 
 
+def assert_hard_constraints(con: duckdb.DuckDBPyConnection) -> None:
+    """Every `enforce` rule in hard_constraints.csv must hold — checked in code, not in review.
+
+    Ordering alone does NOT implement a `cannot_be`: a first draft of this waterfall satisfied only
+    4 of 6, and the two failures (H08, H10) each needed an explicit branch. This assertion is what
+    stops that regressing silently, and it reads the CSV rather than a copy of it so the rules and
+    the code cannot drift apart.
+    """
+    import csv as _csv
+
+    rules = ROOT / "data" / "constraints" / "hard_constraints.csv"
+    problems = []
+    for r in _csv.DictReader(rules.open()):
+        if r["status"] != "enforce" or not r["condition"].strip():
+            continue
+        op = "<>" if r["verdict"] == "must_be" else "="
+        n = con.execute(
+            f"SELECT count(*) FROM booking WHERE ({r['condition']}) "
+            f"AND proxy_segment {op} '{r['segments']}'"
+        ).fetchone()[0]
+        if n:
+            verb = "must be" if r["verdict"] == "must_be" else "cannot be"
+            problems.append(f"{r['rule_id']} ({verb} {r['segments']}): {n:,} bookings violate it")
+    if problems:
+        raise AssertionError(
+            "waterfall violates enforce-status hard constraints — " + "; ".join(problems)
+        )
+    print("  hard-constraint check: all enforce rules satisfied")
+
+
 def build_booking(con: duckdb.DuckDBPyConnection) -> None:
     """coupon → booking, join route ref, exclude all-non-rev customers, engineer + proxy-label."""
     # customers to exclude: every coupon non-revenue (settled 2026-07-23)
@@ -218,18 +248,67 @@ def build_booking(con: duckdb.DuckDBPyConnection) -> None:
 
     assert_stay_contract(con)
 
-    # prioritized proxy-label waterfall (first match wins) — seeds, not final labels
-    # ⚠️ UNCHANGED by the 2026-08-17 feature addition. `stay_nights`, `dep_dow` and `route_theme`
-    # are deliberately NOT read here: the moment a branch consumes one, it becomes a rule input and
-    # stops being usable to validate the rules (see src/validation_anchors.py). Adding one is a
-    # methodology decision, not a refactor — docs/sme-constraints-intake.md §6.
+    # ── proxy-label waterfall v2 (first match wins) — seeds, not final labels ──────────
+    # Taxonomy settled by PAL 17-18 Aug 2026 (`wishlist/pal-questions-answered-2026-08-18.csv`);
+    # designed and simulated in `docs/waterfall-v2-design.md`; every `enforce` hard rule in
+    # `data/constraints/hard_constraints.csv` is asserted below by assert_hard_constraints().
+    #
+    # Design rule: new branches were INSERTED, existing ones never reordered, so each delta is
+    # attributable to a new branch rather than to churn. `proxy_segment_v1` is kept alongside so the
+    # before/after is reproducible and so a regression can be diagnosed rather than guessed at.
     con.execute("""
         CREATE TABLE booking AS
         SELECT *,
             (dep_month IN (4, 5, 12)) AS peak_month,
-            -- refined 2026-07-23: Corporate broadened (corp channel OR business+short-lead),
-            -- Budget broadened to domestic-non-premium. Outbound PH-issued intl economy is a known
-            -- taxonomy gap (#4) → intentionally left Unassigned, flagged to PAL.
+            -- Last-Minute is a FLAG, not a segment (PAL 17 Aug): it describes a booking, not a
+            -- traveller. As a segment it only caught what fell through 8 higher branches (2.95M);
+            -- as a flag it covers every short-lead booking (4.41M), including ones labelled
+            -- Corporate/OFW/VFR that were short-lead all along and invisible as such.
+            (lead_days <= 3) AS is_last_minute,
+            -- the value half of "trip-purpose x value": an attribute, never a segment. A price
+            -- difference is not a customer type — tested and rejected 17 Aug.
+            CASE WHEN max_tier <= 2 THEN 'Budget'
+                 WHEN max_tier <= 4 THEN 'Mid'
+                 ELSE 'Premium' END AS value_band,
+            CASE
+                WHEN is_award                                              THEN 'Mabuhay Loyalist'
+                WHEN corp_channel OR (any_business AND lead_days <= 7)      THEN 'Corporate'
+                -- H11 must_be: same-day/next-day turnaround on a flexible or premium fare
+                WHEN round_trip AND stay_nights <= 1 AND max_tier >= 4      THEN 'Corporate'
+                -- the composite fence: four SME rules independently funnel short-turnaround premium
+                -- travel to Corporate, so one branch satisfies H10 and H12 together (design §4)
+                WHEN round_trip AND lead_days <= 3 AND stay_nights <= 3
+                     AND any_premium                                       THEN 'Corporate'
+                -- MICE before Family-was: a positive definition beats a residual. `NOT any_cabin_j`
+                -- is H13 in the weaker form PAL accepted (B3) — party size is still unavailable.
+                WHEN is_group AND round_trip AND lead_days >= 45
+                     AND stay_nights BETWEEN 3 AND 7 AND NOT any_cabin_j    THEN 'MICE'
+                WHEN pilgrimage                                            THEN 'Pilgrimage'
+                WHEN sea_crew                                              THEN 'OFW/Migrant'
+                WHEN is_international AND round_trip
+                     AND stay_nights BETWEEN 90 AND 150                    THEN 'Intl. Student'
+                WHEN foreign_issue AND is_international AND max_tier <= 4
+                     AND NOT round_trip                                    THEN 'OFW/Migrant'
+                -- H08 carries no lead-time clause, so the fence above misses it: without this
+                -- exclusion 2,934 bookings violated a `certain` cannot_be rule
+                WHEN foreign_issue AND is_international AND max_tier <= 4
+                     AND round_trip
+                     AND NOT (stay_nights <= 3 AND any_premium)            THEN 'Balikbayan/VFR'
+                -- specific before general: Ultra Wealthy is a premium subset, so it must precede
+                -- Premium Bleisure or it can never fire
+                WHEN any_premium AND round_trip AND lead_days >= 30
+                     AND stay_nights >= 7                                  THEN 'Ultra Wealthy Leisure'
+                WHEN any_premium AND is_international                       THEN 'Premium Bleisure'
+                -- closes taxonomy gap #4: PH-issued international economy, 75% of the old
+                -- Unassigned bucket. `Family` is gone (PAL 18 Aug), so its international group
+                -- bookings land here.
+                WHEN NOT foreign_issue AND is_international
+                     AND NOT any_premium                    THEN 'Outbound International Leisure'
+                WHEN is_domestic AND NOT any_premium                        THEN 'Leisure'
+                ELSE 'Unassigned'
+            END AS proxy_segment,
+            -- v1, retained for before/after comparison and regression diagnosis only. Nothing
+            -- downstream should read this.
             CASE
                 WHEN is_award                                              THEN 'Mabuhay Loyalist'
                 WHEN corp_channel OR (any_business AND lead_days <= 7)      THEN 'Corporate'
@@ -244,9 +323,10 @@ def build_booking(con: duckdb.DuckDBPyConnection) -> None:
                 WHEN lead_days <= 3                                        THEN 'Last-Minute'
                 WHEN is_domestic AND NOT any_premium                       THEN 'Budget/Adventure'
                 ELSE 'Unassigned'
-            END AS proxy_segment
+            END AS proxy_segment_v1
         FROM bk
     """)
+    assert_hard_constraints(con)
     con.execute(f"COPY booking TO '{BOOKING_OUT}' (FORMAT PARQUET, COMPRESSION zstd)")
 
 
