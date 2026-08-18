@@ -9,8 +9,7 @@ That last check is the point. A first draft of v2 satisfied only 4 of 6 — orde
 enforce a `cannot_be`, and two rules needed explicit branches. See the design doc §4.
 
 Run:
-    python src/simulate_waterfall_v2.py                  # recommended ordering (Family first)
-    python src/simulate_waterfall_v2.py outbound-first   # the §7 alternative
+    python src/simulate_waterfall_v2.py
 """
 
 import csv
@@ -44,21 +43,31 @@ V1 = """CASE
 
 # ── proposed (v2). Design rule: INSERT new branches, never reorder existing ones,
 #    so every delta is attributable to a new branch rather than to churn.
-def v2(family_before_outbound: bool) -> str:
-    outbound = (
-        "  WHEN NOT foreign_issue AND is_international AND NOT any_premium\n"
-        "       THEN 'Outbound International Leisure'\n"
-    )
-    family = "  WHEN is_group THEN 'Family'\n"
-    tail = (family + outbound) if family_before_outbound else (outbound + family)
-    return f"""CASE
+def v2(_unused: bool = True) -> str:
+    """Proposed waterfall. Design rule: INSERT new branches, never reorder existing ones,
+    so every delta is attributable to a new branch rather than to churn.
+
+    Settled by PAL 18 Aug (`wishlist/pal-questions-answered-2026-08-18.csv`):
+      • `Family` is gone — it had no positive definition beyond `is_group` (A6/C6)
+      • `Budget/Adventure` is renamed `Leisure` (D4)
+      • Gulf rule reads DIRECTIONALLY on the inbound leg, not agnostically (C2)
+      • Catholic pilgrimage hubs withdrawn — Jeddah/Medina only (D3)
+
+    Dropping `Family` also settles the A5 ordering question by removing it: the 190,777
+    international group bookings it was about now land in Outbound International Leisure,
+    which is where the "Outbound first" ordering would have put them anyway.
+    """
+    return """CASE
   WHEN is_award THEN 'Mabuhay Loyalist'
   WHEN corp_channel OR (any_business AND lead_days <= 7) THEN 'Corporate'
   WHEN round_trip AND stay_nights <= 1 AND max_tier >= 4 THEN 'Corporate'
   -- the composite fence (intake doc §5.3): four SME rules independently funnel short-turnaround
   -- premium travel to Corporate. Expressing it once satisfies H10 and H12 together.
   WHEN round_trip AND lead_days <= 3 AND stay_nights <= 3 AND any_premium THEN 'Corporate'
-  WHEN is_group AND round_trip AND lead_days >= 45 AND stay_nights BETWEEN 3 AND 7 THEN 'MICE'
+  -- H13, per PAL B3: a group booking in business cabin is not MICE. The 'party > 10' threshold
+  -- remains unevaluable, so this is the weaker form RM accepted.
+  WHEN is_group AND round_trip AND lead_days >= 45 AND stay_nights BETWEEN 3 AND 7
+       AND NOT any_cabin_j THEN 'MICE'
   WHEN pilgrimage THEN 'Pilgrimage'
   WHEN sea_crew THEN 'OFW/Migrant'
   WHEN is_international AND round_trip AND stay_nights BETWEEN 90 AND 150 THEN 'Intl. Student'
@@ -67,24 +76,24 @@ def v2(family_before_outbound: bool) -> str:
   -- exclusion here. Without this, 2,934 bookings violated a `certain` cannot_be rule.
   WHEN foreign_issue AND is_international AND max_tier <= 4 AND round_trip
        AND NOT (stay_nights <= 3 AND any_premium) THEN 'Balikbayan/VFR'
-  WHEN any_premium AND round_trip AND lead_days >= 30 AND stay_nights >= 7
-       THEN 'Ultra Wealthy Leisure'
+  WHEN any_premium AND round_trip AND lead_days >= 30 AND stay_nights >= 7 THEN 'Ultra Wealthy Leisure'
   WHEN any_premium AND is_international THEN 'Premium Bleisure'
-{tail}  WHEN is_domestic AND NOT any_premium THEN 'Budget/Adventure'
+  WHEN NOT foreign_issue AND is_international AND NOT any_premium
+       THEN 'Outbound International Leisure'
+  WHEN is_domestic AND NOT any_premium THEN 'Leisure'
   ELSE 'Unassigned' END"""
 
 
-fam_first = sys.argv[1] == "family-first" if len(sys.argv) > 1 else True
-con.execute(f"""CREATE VIEW s AS SELECT *, {V1} AS v1, {v2(fam_first)} AS v2,
+# `Family` no longer exists, so the ordering argument is retained only so old invocations
+# do not crash; it has no effect.
+_ = sys.argv[1:] or None
+con.execute(f"""CREATE VIEW s AS SELECT *, {V1} AS v1, {v2()} AS v2,
                 (lead_days <= 3) AS f_last_minute,
                 CASE WHEN max_tier <= 2 THEN 'Budget' WHEN max_tier <= 4 THEN 'Mid'
                      ELSE 'Premium' END AS value_band
              FROM b""")
 tot = con.execute("SELECT count(*) FROM s").fetchone()[0]
-print(
-    f"ordering: {'Family before Outbound' if fam_first else 'Outbound before Family'}   "
-    f"({tot:,} bookings)\n"
-)
+print(f"waterfall v2 — PAL-settled taxonomy ({tot:,} bookings)\n")
 print(f"{'segment':<32}{'v1':>11}{'v2':>11}{'delta':>11}{'%':>8}")
 segs = con.execute(
     """SELECT s FROM (SELECT v1 AS s FROM s UNION SELECT v2 FROM s) ORDER BY s"""
@@ -96,7 +105,13 @@ for (seg,) in segs:
     print(f"  {seg:<30}{a:>11,}{z:>11,}{z - a:>+11,}{pct:>8}")
 
 print("\nWhere each NEW segment's population comes from:")
-for seg in ("MICE", "Intl. Student", "Ultra Wealthy Leisure", "Outbound International Leisure"):
+for seg in (
+    "MICE",
+    "Intl. Student",
+    "Ultra Wealthy Leisure",
+    "Outbound International Leisure",
+    "Leisure",
+):
     rows = con.execute(
         f"SELECT v1, count(*) n FROM s WHERE v2='{seg}' GROUP BY 1 ORDER BY n DESC"
     ).fetchall()

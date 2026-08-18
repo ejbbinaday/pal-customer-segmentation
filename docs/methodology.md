@@ -1,9 +1,29 @@
 # PAL Customer Segmentation — ML Pipeline Methodology
 
 **Client:** Philippine Airlines (PAL)
-**Version:** v1.8 — 17 August 2026
+**Version:** v1.9 — 18 August 2026
 
 > **Changelog**
+> - **v1.9 (18 Aug 2026):** **PAL answered all 24 open questions; taxonomy now settled at 11 segments +
+>   `Unassigned`. Still no modelling change — the waterfall is unbuilt and proxy labels are unmoved.**
+>   Answers filed verbatim at `wishlist/pal-questions-answered-2026-08-18.csv`. Five changed the design:
+>   **`Family` is dropped** (it had no positive definition — 100% of it was "a group booking no other
+>   rule claimed"; its 350,527 bookings redistribute 190,777 / 155,025 / 4,725 to Outbound International
+>   Leisure / Leisure / Unassigned); **`Budget/Adventure` is renamed `Leisure`** — a rename this time, not
+>   a mapping, reversing the v1.8 position; **`Digital Nomad` is dropped**, retiring the one requirement
+>   segment never implemented; **the Gulf rule becomes explicitly directional on the inbound leg**
+>   (`origin_first`, i.e. RUHMNL) rather than direction-agnostic — RM was right that agnostic matching
+>   conflates workers leaving with workers returning, and it costs only 4% of volume (90,540 vs 94,247);
+>   and **the Catholic pilgrimage hubs are withdrawn**, leaving Jeddah/Medina only. **H13 is unblocked** —
+>   the group indicator may stand in for PNR party size, though the "party > 10" threshold remains
+>   unevaluable, so the rule ships in a weaker form. **Revenue is confirmed as USD**, the first
+>   confirmation we have had, which retroactively validates every revenue figure quoted.
+>   `src/pal_colors.py` gains **`SEG_RETIRED`** so a stale segment name is a lookup rather than a mystery.
+>   ⚠️ **Two items remain open and both block *publishing* rather than building:** PAL supplied a
+>   May/June Mecca window (a departure-month rule) immediately after agreeing to withdraw the month-based
+>   rules that protect `dep_month` as a validation anchor — recorded in S41, deliberately not encoded;
+>   and **cost weights are deferred** (*"see run first"*), so any build must carry explicit placeholders.
+>   Full detail: `docs/waterfall-v2-design.md` §0.
 > - **v1.8 (17 Aug 2026):** **Taxonomy decisions settled by PAL; the waterfall is NOT yet changed.**
 >   All five blocking decisions in `docs/sme-constraints-intake.md` §7 are resolved. ① **`stay_nights`
 >   is spent as a rule input and `dep_month` is retained as a validation anchor** — the 5 rules whose
@@ -1039,6 +1059,7 @@ These rules are not implemented in the current pipeline because the required fie
 ---
 
 *Document prepared for Philippine Airlines internal use.*
+*v1.9 — 18 August 2026 (PAL answers all 24 questions: Family and Digital Nomad dropped, Budget/Adventure renamed Leisure, Gulf rule made directional, Catholic pilgrimage hubs withdrawn, H13 unblocked via a group-indicator proxy, revenue confirmed as USD. Taxonomy settled at 11 segments + Unassigned; waterfall still unbuilt — no modelling change)*
 *v1.8 — 17 August 2026 (PAL settles the taxonomy: 10 → 13 segments, Last-Minute becomes a flag, SME 'Leisure' = Budget/Adventure, and `stay_nights` is spent as a rule input so `dep_month` stays a validation anchor — enforced by check_constraints.py. Waterfall unchanged and sized: Budget/Adventure would reach 50.3% of the book, which re-opens the leisure ladder — no modelling change)*
 *v1.7 — 17 August 2026 (Stage F emits `stay_nights`, `dep_dow`, `turn_dest`, `route_theme` plus a new `route_theme.csv` reference, in response to the RM-Domestic SME constraint sheet; all four are descriptive — the waterfall is untouched and no proxy label moved. `stay_nights` is NULL on one-ways by definition and build-time asserted, because that missingness pattern IS the `round_trip` rule bit. Anchor tier table corrected: only `dep_month` and `n_bookings` are Tier-A — no modelling change)*
 *v1.6 — 12 August 2026 (rule-confidence diagnostics: internal confidence measured on the full population — 66.5% of bookings match exactly one rule, Corporate is the most contested segment at 6.4% uncontested despite its ×10 penalty, and the Last-Minute 3-day cut is the most consequential arbitrary constant in the model; `DaysBeforeMonthEnd` figures corrected — no modelling change)*

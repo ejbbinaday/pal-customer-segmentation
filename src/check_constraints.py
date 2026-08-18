@@ -171,7 +171,9 @@ def check_file(
 
         cond = r["condition"].strip()
         if not cond:
-            if r["status"] not in {"blocked", "unanswered"}:
+            # `withdrawn` joins these because a placeholder that never had a condition can still be
+            # withdrawn — S42 (Digital Nomad) was an unanswered ask that PAL then deleted outright.
+            if r["status"] not in {"blocked", "unanswered", "withdrawn"}:
                 errors.append(f"{tag}: empty condition but status is '{r['status']}'")
             continue
 

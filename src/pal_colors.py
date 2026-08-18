@@ -1,17 +1,25 @@
 """Canonical PAL segment colour palette — import this everywhere.
 
-⚠️ **`SEG_ORDER` is the *current model output*, not the approved taxonomy.** They diverged on
-2026-08-17 when PAL settled the taxonomy decisions from `docs/sme-constraints-intake.md` §7:
+⚠️ **`SEG_ORDER` is the *current model output*; `SEG_APPROVED` is the taxonomy PAL has agreed.**
+They diverge until the waterfall change in `docs/waterfall-v2-design.md` lands. Plot with
+`SEG_ORDER` (what the data contains); plan with `SEG_APPROVED` (what PAL asked for). A chart legend
+must never advertise a segment the model does not assign — an empty category reads as "zero
+customers", not "not built yet".
 
-  • **MICE · Ultra Wealthy Leisure · Intl. Student** were approved as real segments, taking the
-    taxonomy from 10 to 13. They have colours below and appear in `SEG_APPROVED`, but the proxy
-    waterfall in `src/features_real.py` does **not emit them yet**, so they are deliberately kept
-    out of `SEG_ORDER` — a chart legend must not advertise a segment the model never assigns.
-  • **Last-Minute becomes a flag, not a peer segment.** It stays in `SEG_ORDER` because the shipped
-    model still emits it (2,945,686 bookings), and leaves once the waterfall changes.
+Settled by PAL 17–18 Aug 2026 (`wishlist/pal-questions-answered-2026-08-18.csv`):
 
-So: plot with `SEG_ORDER` (what the data contains); plan with `SEG_APPROVED` (what PAL agreed).
-Reconciling the two is the pending waterfall change — see `docs/methodology.md`.
+  • **added** MICE · Ultra Wealthy Leisure · Intl. Student · Outbound International Leisure
+  • **renamed** `Budget/Adventure` → **`Leisure`** (D4). A rename, not a mapping — reversing the
+    17 Aug position, so the palette, Power BI dimension, personas and decks all follow.
+  • **dropped `Family`** (A6/C6). It had no positive definition: 100% of it was "a group booking no
+    other rule claimed". RM's own read was that the only further signal would be group travel over
+    long weekends, which needs a PH holiday calendar we do not have.
+  • **dropped `Digital Nomad`** (D2). The one segment in the original requirement never implemented;
+    resolved by deletion rather than by a definition.
+  • **`Last-Minute` becomes a flag**, not a peer segment — it describes a booking, not a traveller.
+
+Net: **11 segments + `Unassigned`**, down from a nominal 10 named + Unassigned but with four
+additions and three removals.
 """
 
 SEG_COLORS = {
@@ -21,20 +29,20 @@ SEG_COLORS = {
     "Premium Bleisure": "#C084FC",  # violet / purple
     "Balikbayan/VFR": "#22C55E",  # emerald green
     "Pilgrimage": "#F97316",  # orange
-    "Family": "#E879F9",  # fuchsia / magenta
-    "Budget/Adventure": "#A3E635",  # lime
-    "Last-Minute": "#94A3B8",  # slate (neutral)
-    "Digital Nomad": "#2DD4BF",  # teal
-    # approved 2026-08-17, not yet emitted by the waterfall. Hues chosen to stay distinguishable
-    # from the ten above in both light and dark renders, and from each other.
+    "Leisure": "#A3E635",  # lime — was Budget/Adventure, renamed 18 Aug
     "MICE": "#0EA5E9",  # deep cyan — adjacent to Corporate, which it splits off from
     "Ultra Wealthy Leisure": "#A855F7",  # deep purple — adjacent to Premium Bleisure, its parent
-    "Intl. Student": "#84CC16",  # olive-lime — adjacent to Budget/Adventure
+    "Intl. Student": "#84CC16",  # olive-lime — adjacent to Leisure
+    "Outbound International Leisure": "#14B8A6",  # teal — freed by dropping Digital Nomad
     "Unassigned": "#4B5563",  # dark gray
+    # ── retired, kept so historical artifacts still render ────────────────────────
+    "Budget/Adventure": "#A3E635",  # renamed to Leisure (same hue, so old charts stay comparable)
+    "Last-Minute": "#94A3B8",  # slate — now a flag, see SEG_FLAGS
+    "Family": "#E879F9",  # fuchsia — dropped 18 Aug
+    "Digital Nomad": "#2DD4BF",  # never implemented; dropped 18 Aug
 }
 
-# What the shipped model actually emits today. Use for any chart, table or legend built from
-# `proxy_segment`, so the categories match the data.
+# What the shipped model emits TODAY. Use for any chart or table built from `proxy_segment`.
 SEG_ORDER = [
     "Corporate",
     "Mabuhay Loyalist",
@@ -49,35 +57,40 @@ SEG_ORDER = [
     "Unassigned",
 ]
 
-# The taxonomy PAL has approved. Differs from SEG_ORDER until the waterfall is updated:
-# adds the three new segments; `Last-Minute` is absent because it becomes a flag.
+# The taxonomy PAL has approved. Becomes SEG_ORDER when the waterfall change lands.
 SEG_APPROVED = [
     "Corporate",
+    "MICE",
     "Mabuhay Loyalist",
     "OFW/Migrant",
-    "Premium Bleisure",
     "Balikbayan/VFR",
-    "Pilgrimage",
-    "Family",
-    "Budget/Adventure",
-    "Digital Nomad",
-    "MICE",
+    "Outbound International Leisure",
+    "Premium Bleisure",
     "Ultra Wealthy Leisure",
+    "Pilgrimage",
     "Intl. Student",
+    "Leisure",
     "Unassigned",
 ]
 
-# Booking-level flags that may accompany any segment, rather than competing with one.
-# `Last-Minute` moves here once the waterfall change lands (PAL decision, 2026-08-17): 84.1% of it
-# would otherwise be Budget/Adventure, so it describes a booking, not a kind of traveller.
+# Booking-level flags: they accompany a segment rather than competing with one.
 SEG_FLAGS = ["Last-Minute"]
 
-# Sequential list matching SEG_ORDER (for palette= args)
-SEG_PALETTE = [SEG_COLORS[s] for s in SEG_ORDER]
+# Segments that existed and no longer do. Kept explicit so a stale reference is a lookup, not a
+# mystery — and so `dim_segment` can carry a retirement note instead of a row vanishing.
+SEG_RETIRED = {
+    "Budget/Adventure": "renamed to 'Leisure' (PAL, 18 Aug 2026)",
+    "Family": "dropped — no positive definition beyond `is_group` (PAL, 18 Aug 2026)",
+    "Digital Nomad": "dropped — never implementable in anonymous data (PAL, 18 Aug 2026)",
+    "Last-Minute": "became a booking flag, not a segment (PAL, 17 Aug 2026)",
+}
 
-# Same, for the approved taxonomy
+# Sequential lists matching the orders above (for palette= args)
+SEG_PALETTE = [SEG_COLORS[s] for s in SEG_ORDER]
 SEG_APPROVED_PALETTE = [SEG_COLORS[s] for s in SEG_APPROVED]
 
 assert set(SEG_ORDER) <= set(SEG_COLORS), "every emitted segment needs a colour"
 assert set(SEG_APPROVED) <= set(SEG_COLORS), "every approved segment needs a colour"
 assert set(SEG_FLAGS) <= set(SEG_COLORS), "every flag needs a colour"
+assert set(SEG_RETIRED) <= set(SEG_COLORS), "retired segments keep their colour for old artifacts"
+assert not set(SEG_APPROVED) & set(SEG_RETIRED), "a segment cannot be both approved and retired"

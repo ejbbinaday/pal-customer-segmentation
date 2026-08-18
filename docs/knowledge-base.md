@@ -454,6 +454,52 @@ Dashboard Wireframe → Requirements Checklist → [Appendix] Literature
 
 ---
 
+#### 2026-08-18 — PAL answers all 24 questions: two segments deleted, one renamed, and a correction to our own correction
+**Domain:** Project Decision
+All 24 open items came back answered in one pass (`wishlist/pal-questions-answered-2026-08-18.csv`, filed
+verbatim). Our columns were returned unedited and the ids and schema intact, which is the payoff for
+sending a CSV with blank answer columns rather than prose in an email. Methodology v1.9.
+**Two segments deleted, which is a first for this project.** ① **`Family` is dropped** — "might be best to
+drop family as only other indicator would be group travel during long weekends". We had told them it had
+no positive definition (100% of it was *a group booking no other rule claimed*) and they followed the
+argument to its end. Its 350,527 bookings redistribute **190,777 → Outbound International Leisure ·
+155,025 → Leisure · 4,725 → Unassigned**. ② **`Digital Nomad` is dropped** — the one segment in the
+original requirement we never implemented, resolved by deletion rather than definition after months of
+being carried as a gap. *Worth noting: applying "a positive definition beats a residual" honestly did not
+produce a better rule, it produced a deleted segment. That is a legitimate outcome and we should expect it
+again.*
+**③ `Budget/Adventure` → `Leisure`, a rename this time.** Reverses our 17 Aug choice to map the name
+rather than rename the segment — so palette, Power BI dimension, personas and every deck follow. Cheap
+option chosen on Monday, expensive option chosen on Tuesday; the lesson is that "just map it" was our
+inference, not their instruction.
+**④ They rejected our route-direction fix, and they were right.** We had made the Gulf rule
+direction-agnostic; RM said *"do not agree, RUHMNL should be read as is"*. Agnostic matching **conflates
+workers leaving for the job with workers coming home** — genuinely different rules that we had merged for
+convenience. The directional reading costs almost nothing: **90,540 bookings against 94,247 agnostic, 96%
+of the volume with a cleaner definition.** *Generalises: when a rule looks wrong, prefer fixing its
+direction to widening it. Widening recovered the volume and lost the concept.*
+**⑤ Catholic pilgrimage hubs withdrawn** — "No other airport codes to add". Consistent with our own
+measurement that those rules fired on under 700 bookings each. **⑥ H13 unblocked** — the group indicator
+may stand in for PNR party size, though the "party > 10" *threshold* stays unevaluable, so the rule ships
+weaker (2,832 bookings, 219 of which would otherwise be MICE).
+**⑦ Revenue is USD.** First confirmation, after our own guard could only say "plausibly single-currency".
+Retroactively validates every revenue figure quoted — and 53 USD for a domestic promo booking is
+plausible in a way the unlabelled number never was. *Ask what the units are before quoting the numbers,
+not after.*
+**⚠️ One answer contradicts a decision made the day before.** D3 supplies a **May/June Mecca window** — a
+departure-month rule — immediately after **C8 agreed to withdraw the month-based rules** protecting
+`dep_month` as a validation anchor. Recorded in S41 and **deliberately not encoded**, flagged back to
+them. *An SME answering one question can undo the answer to another without either party noticing; a
+cross-check against already-settled decisions belongs in every intake, not just the first.*
+**⚠️ Cost weights deferred** — "see run first" — so any build carries explicit placeholders that must not
+reach a published number. **A5 dissolved rather than resolved:** they answered the Family-vs-Outbound
+ordering question *and* asked us to drop Family, so the 190,777 bookings land where the rejected
+alternative would have put them.
+**Net taxonomy: 11 segments + `Unassigned`** — four added, three removed against the original ten.
+`SEG_RETIRED` added to `pal_colors.py` so a stale name is a lookup rather than a mystery.
+**Source:** `wishlist/pal-questions-answered-2026-08-18.csv`; `docs/waterfall-v2-design.md` §0;
+`docs/methodology.md` v1.9.
+
 #### 2026-08-17 — The frequency segment fails its own gate: 1.81× becomes 1.32× under controls, and the anchor is kept
 **Domain:** Clustering / Methodology
 Ran the pre-registered gate on the proposed frequency-based domestic segment (the "unmanaged business
@@ -2154,4 +2200,4 @@ is now `src/dashboard.py`. See `README.md`.
 ---
 
 *Knowledge base maintained by CPT 3 — PAL Customer Segmentation*
-*Last updated: 17 August 2026*
+*Last updated: 18 August 2026*

@@ -1,6 +1,13 @@
 # Open questions for PAL
 
-**Compiled:** 17 August 2026 · **From:** the RM-Domestic constraint workbook and what we found testing it
+**Compiled:** 17 August 2026 · **✅ ANSWERED 18 August 2026 — all 24 items**
+**Answers:** `wishlist/pal-questions-answered-2026-08-18.csv` (verbatim, read-only) ·
+**What they changed:** `docs/waterfall-v2-design.md` §0
+**Still open:** only two — the **D3/C8 seasonality conflict** (PAL gave a May/June Mecca window right
+after agreeing to withdraw the month-based rules) and **A1's deferred cost weights** (*"see run first"*).
+Both block publishing, neither blocks building.
+
+**From:** the RM-Domestic constraint workbook and what we found testing it
 **Sources:** `docs/sme-constraints-intake.md` · `docs/waterfall-v2-design.md` · `data/constraints/*.csv`
 
 **Also exported as `docs/pal-questions.csv`** — same 24 rows, one per question, with blank
