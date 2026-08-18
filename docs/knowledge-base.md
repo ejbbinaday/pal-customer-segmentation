@@ -454,6 +454,32 @@ Dashboard Wireframe → Requirements Checklist → [Appendix] Literature
 
 ---
 
+#### 2026-08-18 — We spent a validation anchor and never wired up the rule it was spent for
+**Domain:** Clustering / Methodology
+Checking the settled design before recommending next steps: **the OFW↔Balikbayan boundary is still split
+on `round_trip` alone.** Branches 9/10 are unchanged from v1. The Gulf stay-length discriminator (S14) is
+a **soft prior**, and **nothing in the codebase reads soft priors** — `grep` finds only
+`check_constraints.py` opening that file. **19 rules are marked `prior` and not one of them can affect a
+label.** So the rule that justified spending `stay_nights` is, today, documentation.
+`stay_nights` is not wasted — it does real work in six branches (Corporate ×2, MICE, Intl. Student, Ultra
+Wealthy Leisure, the H08 exclusion). But the *headline* reason we spent it is unimplemented, and nobody
+noticed across three days of design work because the anchor decision and the labelling mechanism were
+discussed in separate sessions.
+**And the fix is smaller than the headline number implied.** Promoting S14 to a branch moves **79,993
+bookings, 2.6% of the Balikbayan/VFR branch** (median stay 33 vs 12 nights, mean revenue USD 723 vs 619,
+0% vs 4% group — the predicted direction, real but narrow). ⚠️ **The 0.676 AUC was measured on a corridor
+proxy** — stay length separating Gulf-bound from US/AU-bound *destinations* — **not on the OFW/VFR labels.**
+So it will not transform the 0.608 boundary and we must not tell PAL it will.
+*Generalises, and it is the sharpest lesson of the week: **a decision to spend a resource is not the same
+as the work that spends it.** We priced the trade carefully, took it deliberately, documented it in three
+places — and then designed a waterfall that does not contain the rule. Check that the mechanism exists
+before pricing what it buys.*
+**Corollary worth acting on:** the real discriminator for this boundary is probably a **frequent-flyer
+number**, not stay length, and PAL has just agreed to supply `IsFrequentFlyer` / `IsTourCode` /
+`Isupgrade`. Those fields are on the critical path for the weakest part of the deliverable — chasing them
+beats either implementing S14 or building the soft-prior layer for this particular purpose.
+**Source:** our analysis, 2026-08-18 — `docs/waterfall-v2-design.md` §7a.
+
 #### 2026-08-18 — PAL answers all 24 questions: two segments deleted, one renamed, and a correction to our own correction
 **Domain:** Project Decision
 All 24 open items came back answered in one pass (`wishlist/pal-questions-answered-2026-08-18.csv`, filed

@@ -182,6 +182,47 @@ the build must carry **explicit placeholders** that cannot be mistaken for agree
 
 Dissolved by dropping `Family`; see §0.
 
+## 7a. ⚠️ Known gap — the anchor bought less than the headline implied
+
+**The boundary `stay_nights` was spent to fix is still split on `round_trip` alone.**
+
+Branches 9 and 10 are unchanged from v1. The Gulf stay-length discriminator (**S14**) is a *soft prior*,
+and **nothing in the codebase reads soft priors** — only `check_constraints.py` opens that file. So the
+rule that justified the anchor trade is currently documentation.
+
+`stay_nights` is not wasted: it does real work in six branches (Corporate ×2, MICE, Intl. Student,
+Ultra Wealthy Leisure, and the H08 exclusion). But the *headline* justification is unimplemented.
+
+**And implementing it would be smaller than the 0.676 figure suggests.** Promoting S14 to a branch ahead
+of Balikbayan/VFR moves **79,993 bookings — 2.6% of that branch**:
+
+| | S14 → OFW | stays VFR |
+|---|---|---|
+| bookings | 79,993 | 2,965,951 |
+| mean revenue (USD) | 723 | 619 |
+| median stay | **33 nights** | 12 nights |
+| % group | 0% | 4% |
+| median lead | 39 days | 47 days |
+
+The profile difference is real and in the predicted direction. But **the 0.676 AUC was measured on a
+*corridor proxy*** — stay length separating Gulf-bound from US/Canada/Australia-bound destinations — **not
+on the OFW/VFR labels themselves.** Applied as a rule it touches 2.6% of the branch, so **it will not
+transform the 0.608 boundary AUC and we should not tell PAL it will.**
+
+**Two ways forward, and they are not exclusive:**
+
+1. **Promote S14 to a branch** (cheap, honest, modest). Every branch in this waterfall is already
+   inferential — "cabin J → Corporate" is a heuristic — so a moderate-strength rule is not out of place
+   in a *proxy* labeller. Do it, and state the size plainly.
+2. **Build the soft-prior consumption layer.** 19 rules are marked `prior` and none of them can affect
+   a label. Until that layer exists, three-quarters of the SME's contribution is inert. This is the
+   larger prize and it is the architecture the constraint files were designed for.
+
+**The real fix for this boundary is probably neither.** A frequent-flyer number is a far stronger
+OFW-vs-Balikbayan signal than stay length, and PAL has just agreed to supply `IsFrequentFlyer`,
+`IsTourCode` and `Isupgrade` (B2). **Those fields are on the critical path for the weakest part of the
+deliverable** — chasing them matters more than either option above.
+
 ## 8. The anchor position is unchanged from what was agreed
 
 The design consumes: `is_award` · `corp_channel` · `any_business` · `lead_days` · `round_trip` ·
