@@ -1,0 +1,473 @@
+<title>PAL Segmentation Handover Pack</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root{
+    --bg:#FBFBF8; --surface:#FFFFFF; --ink:#17233B; --ink-soft:#46506A; --ink-faint:#6E7890;
+    --line:#DEE0D7; --line-soft:#EAEBE3;
+    --accent:#12608F; --accent-ink:#0C4A70; --accent-bg:#EDF3F7;
+    --go:#1E7A4C; --go-bg:#EAF4EE;
+    --warn:#B34A0E; --warn-bg:#FBF0E7;
+    --chip:#F0F2EC; --code-bg:#F2F3EE;
+    --shadow:0 1px 3px rgba(23,35,59,.07);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#0E1420; --surface:#151D2E; --ink:#E7EBF3; --ink-soft:#AEB7C9; --ink-faint:#7E89A3;
+      --line:#2A3550; --line-soft:#212C44;
+      --accent:#6FB2DE; --accent-ink:#8FC6EA; --accent-bg:#16283C;
+      --go:#59B884; --go-bg:#122A1C;
+      --warn:#E58B4B; --warn-bg:#2B1C0F;
+      --chip:#1C2740; --code-bg:#1A2438;
+      --shadow:0 1px 3px rgba(0,0,0,.4);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0E1420; --surface:#151D2E; --ink:#E7EBF3; --ink-soft:#AEB7C9; --ink-faint:#7E89A3;
+    --line:#2A3550; --line-soft:#212C44;
+    --accent:#6FB2DE; --accent-ink:#8FC6EA; --accent-bg:#16283C;
+    --go:#59B884; --go-bg:#122A1C;
+    --warn:#E58B4B; --warn-bg:#2B1C0F;
+    --chip:#1C2740; --code-bg:#1A2438;
+    --shadow:0 1px 3px rgba(0,0,0,.4);
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  @media (prefers-reduced-motion: reduce){ html{scroll-behavior:auto} }
+  body{margin:0; background:var(--bg); color:var(--ink);
+    font-family:"Source Serif 4", Georgia, serif; font-size:17px; line-height:1.62}
+  h1,h2,h3,h4{font-family:Archivo,"Helvetica Neue",Arial,sans-serif; text-wrap:balance}
+  code,.mono,td.num,.meta,.eyebrow,.navbar a,.step{font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace}
+  main{max-width:920px; margin:0 auto; padding:0 24px 96px}
+  section{margin-top:60px}
+  p,li{max-width:76ch}
+  a{color:var(--accent-ink); text-decoration-color:var(--line)}
+  a:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+  code{background:var(--code-bg); padding:.08em .35em; border-radius:4px; font-size:.85em}
+  strong{color:var(--ink)}
+  header.mast{border-bottom:3px solid var(--ink); padding:56px 0 28px}
+  .eyebrow{font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:var(--accent-ink); font-weight:600}
+  header.mast h1{font-size:clamp(32px,5.5vw,50px); font-weight:800; margin:10px 0 14px; letter-spacing:-.01em; line-height:1.08}
+  .meta{display:flex; flex-wrap:wrap; gap:8px 22px; font-size:12.5px; color:var(--ink-soft)}
+  .meta b{color:var(--ink); font-weight:600}
+  .standfirst{font-size:18px; color:var(--ink-soft); max-width:72ch; margin-top:20px}
+  .navbar{position:sticky; top:0; z-index:9; background:var(--bg); border-bottom:1px solid var(--line);
+    display:flex; gap:2px; overflow-x:auto; padding:8px 0}
+  .navbar a{font-size:12px; letter-spacing:.04em; color:var(--ink-soft); text-decoration:none;
+    padding:6px 12px; border-radius:999px; white-space:nowrap}
+  .navbar a:hover{background:var(--chip); color:var(--ink)}
+  h2{font-size:26px; font-weight:800; margin:0 0 6px}
+  .kicker{font-size:12px; letter-spacing:.13em; text-transform:uppercase; color:var(--ink-faint);
+    font-family:"IBM Plex Mono",monospace; font-weight:500; margin-bottom:8px}
+  h3{font-size:18.5px; font-weight:700; margin:32px 0 10px}
+  .lede{color:var(--ink-soft); margin-top:4px}
+  .card{background:var(--surface); border:1px solid var(--line); border-radius:6px;
+    padding:20px 24px; box-shadow:var(--shadow); margin-top:16px}
+  .card h4{margin-top:0; font-size:16px}
+  .card p{font-size:15px}
+  .plain{border-left:4px solid var(--go); background:var(--go-bg); border-radius:4px;
+    padding:12px 16px; font-style:italic; font-size:15.5px; margin:14px 0}
+  .warnbox{border-left:4px solid var(--warn); background:var(--warn-bg); border-radius:4px;
+    padding:12px 16px; font-size:15px; margin:14px 0}
+  .tblwrap{overflow-x:auto; margin-top:14px; border:1px solid var(--line); border-radius:6px; background:var(--surface)}
+  table{border-collapse:collapse; width:100%; font-size:14.5px}
+  th{font-family:Archivo,sans-serif; font-size:12px; letter-spacing:.08em; text-transform:uppercase;
+    text-align:left; color:var(--ink-faint); padding:12px 16px; border-bottom:2px solid var(--line)}
+  td{padding:10px 16px; border-bottom:1px solid var(--line-soft); vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  td.num{font-size:13.5px; font-weight:600; color:var(--accent-ink); white-space:nowrap; font-variant-numeric:tabular-nums}
+  pre.pipe, pre.cmd{background:var(--code-bg); border:1px solid var(--line); border-radius:6px;
+    padding:14px 18px; overflow-x:auto; font-family:"IBM Plex Mono",monospace;
+    font-size:12.5px; line-height:1.65; color:var(--ink); margin-top:14px}
+  pre.cmd .c{color:var(--ink-faint)}
+  ol.steps{counter-reset:st; list-style:none; padding-left:0; margin-top:14px}
+  ol.steps li{counter-increment:st; position:relative; padding:12px 16px 12px 56px; background:var(--surface);
+    border:1px solid var(--line); border-radius:6px; margin-top:8px; max-width:none; font-size:15px}
+  ol.steps li::before{content:counter(st); position:absolute; left:16px; top:12px;
+    font-family:Archivo,sans-serif; font-weight:800; font-size:15px; color:var(--accent-ink);
+    background:var(--accent-bg); border-radius:6px; width:26px; height:26px; display:grid; place-items:center}
+  .foot{margin-top:72px; padding-top:20px; border-top:1px solid var(--line); font-size:13px; color:var(--ink-faint)}
+</style>
+
+<main>
+<header class="mast">
+  <div class="eyebrow">PAL Customer Segmentation · MAIDA Capstone CPT 3</div>
+  <h1>Handover Pack</h1>
+  <div class="meta">
+    <span>For <b>PAL BI / Data &amp; Analytics</b></span>
+    <span>Version <b>v1.0 · 27 Aug 2026</b></span>
+    <span>Source of record <b>docs/handover-pack.md</b></span>
+  </div>
+  <p class="standfirst">Everything PAL needs to own this system: what was delivered, how it works,
+  how to refresh on a new extract, what "retraining" means here (less than you fear), how to change
+  the rules safely, a two-week knowledge-transfer plan with pass/fail exercises, and the improvement
+  roadmap in the order the evidence supports. Plain English first, technical detail second — a
+  commercial owner and an engineer can work from the same page.</p>
+</header>
+
+<nav class="navbar" aria-label="Sections">
+  <a href="#delivered">Delivered</a>
+  <a href="#how">How it works</a>
+  <a href="#setup">Setup</a>
+  <a href="#runbook">Runbook</a>
+  <a href="#retrain">Retraining</a>
+  <a href="#monitor">Monitoring</a>
+  <a href="#powerbi">Power BI</a>
+  <a href="#kt">KT plan</a>
+  <a href="#limits">Limitations</a>
+  <a href="#roadmap">Roadmap</a>
+  <a href="#map">Doc map</a>
+</nav>
+
+<section id="delivered">
+  <div class="kicker">1 · Inventory</div>
+  <h2>What you are receiving</h2>
+  <div class="tblwrap"><table>
+    <tr><th>Deliverable</th><th>Where</th><th>In one sentence</th></tr>
+    <tr><td><strong>The segmentation model</strong></td><td><code>src/features_real.py</code> (the rule waterfall)</td><td>A deterministic rulebook that labels every booking into 11 segments + Unassigned — auditable line by line, no model server needed</td></tr>
+    <tr><td><strong>Level 2 sub-segments</strong></td><td><code>src/sub_segment.py</code> + <code>src/subsegment_assign.py</code></td><td>20 ML-derived sub-types inside the 5 biggest segments, stamped on all 21.7M of their bookings</td></tr>
+    <tr><td><strong>The pipeline</strong></td><td><code>src/</code> — one script per stage</td><td>Raw gz extract → cleaned → features → labels → dashboard, every stage writing a checkable report</td></tr>
+    <tr><td><strong>Power BI star schema</strong></td><td><code>outputs/powerbi_export/</code> (regenerable)</td><td>38,116,259 coupons in = out, asserted; persona and sub-segment dimensions; <code>START-HERE.md</code> inside</td></tr>
+    <tr><td><strong>Validation harness</strong></td><td><code>src/validate_*.py</code> + the circularity contract</td><td>Four label-free audits that make the boundaries honest</td></tr>
+    <tr><td><strong>Drift monitor</strong></td><td><code>src/monitor_real.py</code></td><td>The tripwire: PSI on every rule input + segment-mix stability, ~1 minute per run</td></tr>
+    <tr><td><strong>SME rule registry</strong></td><td><code>data/constraints/*.csv</code></td><td>PAL's own 57 rules with provenance; the six <code>enforce</code> rules are asserted on every build</td></tr>
+    <tr><td><strong>Documentation</strong></td><td><code>docs/</code></td><td>Methodology spec, data dictionary, business case, stakeholder report, this pack — map in §11</td></tr>
+  </table></div>
+  <p><strong>The two sentences that explain the whole design.</strong> PAL's customers form a
+  continuum, not natural clusters — ten methods across six algorithm families confirmed it. So
+  <strong>the rules label, and ML checks the labels</strong>: business rules draw the segment
+  boundaries where decisions need them, and machine learning refines below them, audits them on
+  independent evidence, and watches the inputs for drift.</p>
+</section>
+
+<section id="how">
+  <div class="kicker">2 · Mechanism</div>
+  <h2>How it works — the pipeline in one page</h2>
+<pre class="pipe">raw extract (4 gzipped CSVs, 38.1M coupons)
+  → typed Parquet          fast columnar working copy               (~90 s, once per extract)
+  → clean + flag           value tiers 1–7, award/group/refund flags (~21 s)
+  → features               coupon → BOOKING → customer grain         (22.9M bookings, 13.4M customers)
+  → RULE WATERFALL         ← THE MODEL: 11 segments + Unassigned
+     ├─ LCA level 2        sub-types inside the 5 biggest segments
+     ├─ V1–V4 validation   four label-free audits of the boundaries
+     └─ PSI monitoring     drift tripwires on every rule input
+  → Power BI export        star schema, 38,116,259 rows in = out (asserted)</pre>
+  <div class="plain">Plain version: a ticket row is one flight leg; the pipeline first reassembles
+  legs into purchase decisions (bookings), then a priority checklist — like a triage nurse —
+  assigns each booking the first segment whose rule it matches. Nothing "learns" at the top level,
+  which is a feature: scoring a new booking is just applying the same checklist, so the labeller
+  itself can never drift. Change can only enter through the input data — and that is exactly what
+  the monitor watches.</div>
+  <p><strong>The grain rule that explains most numbers:</strong> 38.1M coupons → 22.9M bookings
+  (1.66 legs per booking) → 13.4M customers. If a figure looks wrong by ~40%, someone is mixing
+  coupon-grain and booking-grain. Full spec: <code>docs/methodology.md</code>; field meanings:
+  <code>docs/data-dictionary.md</code>.</p>
+</section>
+
+<section id="setup">
+  <div class="kicker">3 · Environment</div>
+  <h2>Setup from zero</h2>
+  <p><strong>Hardware:</strong> any machine with ~8&nbsp;GB free RAM (the heavy stages set
+  <code>memory_limit='8GB'</code>) and ~15&nbsp;GB free disk. A laptop rebuilds everything.</p>
+<pre class="cmd"><span class="c"># 1. Python 3.11–3.14</span>
+python -m venv .venv &amp;&amp; source .venv/bin/activate
+pip install -r requirements-pipeline.txt   <span class="c"># pinned — keep it pinned (results depend on it)</span>
+pip install -r requirements-dev.txt        <span class="c"># optional: lint + security tooling</span>
+
+<span class="c"># 2. Data in place (not in git)</span>
+<span class="c">#    data/PAL-data/*.txt.gz   ← the coupon extract, 4 gzipped CSVs</span></pre>
+  <p>Docker alternative (identical env regardless of host): <code>docker build -t pal-segmentation .</code>
+  — see <code>README.md</code>. Full annotated package list: <code>docs/installation.md</code>.</p>
+  <div class="warnbox"><strong>Two rules that protect reproducibility:</strong> keep
+  <code>requirements-pipeline.txt</code> pinned (clustering output is version-sensitive), and never
+  hand-edit anything under <code>outputs/</code> or <code>data/interim/</code> — they are
+  regenerated; the scripts are the source of truth.</div>
+</section>
+
+<section id="runbook">
+  <div class="kicker">4 · Operate</div>
+  <h2>The runbook — refreshing on a new extract</h2>
+  <div class="plain">Plain version: drop the new files in, run nine commands in order, and check
+  five numbers. Total hands-off time ≈ 15 minutes; nothing needs a GPU, a cluster, or a licence.</div>
+  <div class="warnbox"><strong>Step 0 — the extract.</strong> Same shape as before: coupon-grain,
+  the ~40 columns in the data dictionary. Ask the extract owner to confirm the <strong>filter is on
+  departure date</strong> (it was 2024-05-01 → 2027-05-31); if the window moves, the monitor's
+  comparison windows must move with it (§6).</div>
+<pre class="cmd">python src/build_parquet.py        <span class="c"># 1 · gz → typed Parquet (~90 s)</span>
+python src/profile_raw.py          <span class="c"># 2 · profile: nulls, ranges, grain (~1 min)</span>
+python src/clean_real.py           <span class="c"># 3 · clean + flag (~21 s)</span>
+python src/eda_real.py             <span class="c"># 4 · grain confirmations (~1 min)</span>
+python src/features_real.py        <span class="c"># 5 · features + THE LABELS (Stage F)</span>
+python src/check_constraints.py    <span class="c"># 6 · SME rules still valid vs the feature table (~1 min)</span>
+python src/subsegment_assign.py    <span class="c"># 7 · level-2 sub-types onto every booking (~30 s)</span>
+python src/monitor_real.py         <span class="c"># 8 · drift report (~1 min) — READ THIS ONE (§6)</span>
+python src/export_powerbi.py       <span class="c"># 9 · Power BI star schema (~5 min)</span></pre>
+  <p>Optional after a refresh: <code>segment_charts.py</code> (the six segment charts) and
+  <code>report_figures.py</code> (EDA figures) — both draw from the full tables so charts cannot
+  disagree with the build.</p>
+  <h3>The five checks after any refresh</h3>
+  <div class="tblwrap"><table>
+    <tr><th>#</th><th>Check</th><th>Where</th><th>Healthy looks like</th></tr>
+    <tr><td class="num">1</td><td>Coupons in = coupons out</td><td><code>export_powerbi.py</code> — it <strong>asserts</strong> this</td><td>equal, or the build fails loudly</td></tr>
+    <tr><td class="num">2</td><td>Segment distribution vs last run</td><td><code>outputs/features_real/summary.md</code></td><td>shares move smoothly; a segment jumping &gt;2–3 pp deserves a look before publishing</td></tr>
+    <tr><td class="num">3</td><td>Hard-rule assertions</td><td><code>features_real.py</code> (build fails if violated)</td><td>six PAL <code>enforce</code> rules pass</td></tr>
+    <tr><td class="num">4</td><td>Constraint sheet still evaluable</td><td><code>check_constraints.py</code></td><td>0 errors</td></tr>
+    <tr><td class="num">5</td><td>Drift verdicts</td><td><code>outputs/monitor_real/summary.md</code></td><td>STABLE, or an explainable alarm (§6)</td></tr>
+  </table></div>
+  <p><strong>If something fails:</strong> every stage writes <code>outputs/&lt;stage&gt;/summary.md</code>
+  — read the failing stage's report first; the assertions name what broke. Nothing downstream
+  should run past a failed stage.</p>
+</section>
+
+<section id="retrain">
+  <div class="kicker">5 · Maintain</div>
+  <h2>"Retraining" — what it actually means here</h2>
+  <div class="plain">Plain version: there is no model to retrain in the usual sense. The labeller
+  is a rulebook — you re-run it, you don't retrain it. Three different maintenance actions exist,
+  triggered by evidence, not by a calendar.</div>
+
+  <div class="card">
+    <h4>5a · Relabelling (every new extract) — automatic</h4>
+    <p>The waterfall is deterministic: rerunning Stage F on new data <strong>is</strong> the
+    "retrain". No fitting, no seeds, no drift inside the model. Reproducible to within ±1 booking
+    in 22.9M (1,830 tied sort keys — cause documented; fix drafted, on the hardening list).</p>
+  </div>
+
+  <div class="card">
+    <h4>5b · Refitting level 2 (the LCA sub-types) — occasional</h4>
+    <p><strong>When:</strong> the taxonomy changes, a segment's profile drifts (§6 flags it), or
+    roughly annually. <strong>How:</strong> <code>sub_segment.py</code> (refit profiles) then
+    <code>subsegment_assign.py</code> (re-stamp bookings). Three things learned the hard way:</p>
+    <p>① <strong>Determinism is not <code>random_state</code>.</strong> The cell table must be
+    <code>ORDER BY ALL</code> before StepMix sees it — under multithreading an unordered
+    <code>GROUP BY</code> returns rows in a different order every run, changing which optimum the
+    fit lands in. The code does this; do not remove it.<br>
+    ② <strong><code>StepMix.bic()</code> lies on a weighted cell table</strong> — weighted BIC is
+    hand-computed in the script; keep it that way.<br>
+    ③ <strong>Sub-types are provisional by design</strong> — actionable partitions of a continuum,
+    not natural kinds. Target with them; never score a customer's worth by them. Balikbayan/VFR's
+    sub-structure is the least stable — act on the direction of its value spread, not exact cell
+    edges.</p>
+  </div>
+
+  <div class="card">
+    <h4>5c · Changing the rules (the taxonomy itself) — governed, not casual</h4>
+    <p><em>The rules are the model, so a rule change is a model release — simulate first, check the
+    guardrails, re-audit, then ship. The repo contains a worked example of doing this right: the
+    v1 → v2 change of 18 Aug.</em></p>
+    <ol class="steps">
+      <li><strong>Write the proposal</strong> — what changes, why, expected movement
+        (<code>docs/waterfall-v2-design.md</code> is the template).</li>
+      <li><strong>Simulate before building</strong> — a before/after on all 22.9M bookings, the
+        <code>simulate_waterfall_v2.py</code> pattern: how many labels move, where they go, does
+        any hard rule break.</li>
+      <li><strong>Check the anchor budget</strong> — a field can be a rule input <strong>or</strong>
+        validation evidence, never both; spending a clean field on a rule permanently weakens the
+        audit. Only two fields are unconditionally clean today (<code>dep_month</code>,
+        <code>n_bookings</code>); <code>validation_anchors.py</code> is the registry and it
+        <strong>raises</strong> on violations.</li>
+      <li><strong>Check the SME constraints</strong> — <code>check_constraints.py</code>; the six
+        <code>enforce</code> rules are asserted on every build. Ordering alone does not implement a
+        "cannot be" — the v2 build initially satisfied only 4 of 6.</li>
+      <li><strong>Update the palette contract</strong> — <code>src/pal_colors.py</code>: charts
+        assert they can never advertise a segment the waterfall doesn't emit.</li>
+      <li><strong>Re-run the audits</strong> — V1 construct + V4 stability at minimum (~15 min +
+        ~1 min quick); after a large change, detection power <code>--quick</code> too.</li>
+      <li><strong>Update the paper trail</strong> — methodology changelog + README; regenerate
+        <code>dim_segment.csv</code>. A rule change that skips the docs resurfaces as a
+        "stale number" incident — the project's history proves it.</li>
+    </ol>
+  </div>
+
+  <div class="card">
+    <h4>5d · When the calendar does matter</h4>
+    <p>Re-run <code>validate_temporal.py</code> when a new 12-month issuance window completes clean
+    of the departure-date censoring — read that script's §0 before any temporal analysis; naive
+    calendar windows fake a lead-time collapse.</p>
+  </div>
+</section>
+
+<section id="monitor">
+  <div class="kicker">6 · Watch</div>
+  <h2>Monitoring — the tripwires and how to read them</h2>
+  <p><strong>Cadence: monthly</strong> <code>python src/monitor_real.py</code> (~1 min), or after
+  any refresh. Output: <code>outputs/monitor_real/summary.md</code>.</p>
+  <div class="tblwrap"><table>
+    <tr><th>Signal</th><th>What it measures, plainly</th><th>Bands</th><th>Current</th></tr>
+    <tr><td>Segment-mix PSI</td><td>has the share-of-segments pie shifted?</td><td>&lt;0.10 stable · 0.10–0.25 watch · ≥0.25 act</td><td class="num">0.0028 — very stable</td></tr>
+    <tr><td>Per-rule-input PSI</td><td>has any field feeding a rule shifted?</td><td>same bands</td><td class="num">22 of 23 stable</td></tr>
+    <tr><td>Per-segment volume/revenue drift</td><td>is any single segment moving?</td><td>judgement + trend</td><td>small drifters are the small segments</td></tr>
+  </table></div>
+  <div class="card">
+    <h4>The worked example that teaches the tool — the one live alarm</h4>
+    <p><code>channel</code> reads PSI <strong>0.4111 → RETRAIN</strong>. Decomposed, <strong>93% of
+    it is NDC</strong> — a sales channel PAL switched on mid-window, 0 → 366,890 bookings. Excluding
+    brand-new categories the same feature reads <strong>0.0285 → STABLE</strong>. The report prints
+    both verdicts side by side.</p>
+    <p><em>The lesson: a new-category alarm and a behaviour-drift alarm need different responses —
+    the first means "does the waterfall need a branch for this new thing?", the second means "has
+    the world changed under an existing rule?". Retraining on a distribution change PAL itself
+    caused would have been the wrong move.</em></p>
+  </div>
+  <p><strong>What the monitor deliberately does not compute:</strong> clustering-quality scores and
+  cross-window ARI — those grade a <em>fitted</em> clustering, and the shipped labeller is
+  deterministic. The report says so on the page rather than leaving a blank.</p>
+  <p><strong>Escalation:</strong> PSI ≥ 0.25 on a rule input after excluding new categories →
+  investigate before the next publish; sustained segment-share move &gt; ~2 pp → re-run V1 on the
+  affected boundaries; a new channel or farebrand appears → taxonomy question for the commercial
+  owner (§5c).</p>
+</section>
+
+<section id="powerbi">
+  <div class="kicker">7 · Deliver</div>
+  <h2>The Power BI model — rebuild and the traps</h2>
+  <p>Rebuild: <code>python src/export_powerbi.py</code> (requires <code>subsegment_assign.py</code>
+  first). The folder <code>outputs/powerbi_export/</code> is a self-contained handoff —
+  <code>START-HERE.md</code> inside is the 5-minute guide (canonical copy:
+  <code>docs/powerbi-guide.md</code>, with starter DAX).</p>
+  <ol class="steps">
+    <li><strong>The fake cliff.</strong> Travel months after the extract boundary are still-filling
+      forward book. Default every trend visual to <code>IsCompleteTravelMonth = TRUE</code>
+      (full-year comparisons: 2025 is the only complete travel year).</li>
+    <li><strong>Grain double-count.</strong> Use <code>IsPrimaryCoupon = TRUE</code> for
+      booking-level measures; <code>Bookings</code> is <code>SUM(IsPrimaryCoupon)</code>, never a
+      DISTINCTCOUNT.</li>
+    <li><strong>Revenue-halving filter.</strong> Never compute revenue with <code>Bookings &gt; 0</code>
+      as a row filter — it silently drops non-primary coupons' revenue (it cost Balikbayan −54%
+      before a cross-check caught it). Correct: <code>SUM(NetRevenue) / SUM(Bookings)</code> over
+      unfiltered rows.</li>
+    <li><strong>No stored percentages.</strong> Shares are DAX measures, never columns — a share is
+      only valid in the filter context that computed it.</li>
+    <li><strong>Caveats on the cards.</strong> <code>Trust</code> and <code>DataCaveat</code> ship
+      as columns on <code>dim_segment</code> — keep them on persona cards. And <strong>no accuracy
+      KPI exists by design</strong> — any number computable today would be self-graded.</li>
+  </ol>
+</section>
+
+<section id="kt">
+  <div class="kicker">8 · Learn</div>
+  <h2>Knowledge transfer — the two-week plan</h2>
+  <p class="lede"><em>Each exercise has a pass condition. The goal is not to watch us run it — it is
+  that by day 10, PAL has run everything, broken something safely, and read every report the system
+  writes.</em></p>
+  <h3>Week 1 — operate it</h3>
+  <div class="tblwrap"><table>
+    <tr><th>Day</th><th>Exercise</th><th>Pass condition</th></tr>
+    <tr><td class="num">1</td><td>Environment + <code>build_parquet.py</code> + <code>profile_raw.py</code></td><td>profile row count = <strong>38,116,259</strong>; column profile matches the data dictionary</td></tr>
+    <tr><td class="num">2</td><td>Run steps 3–6 of the runbook</td><td>segment table matches the published distribution (Leisure ≈50.6%, Unassigned ≈2.47%)</td></tr>
+    <tr><td class="num">3</td><td><code>subsegment_assign.py</code> + <code>monitor_real.py</code>; write a 5-line reading of the drift report</td><td>the write-up correctly explains the NDC alarm as a new category, not behaviour drift</td></tr>
+    <tr><td class="num">4</td><td><code>export_powerbi.py</code>; open the model; tie totals</td><td>fact totals reconcile to the scorecard in Excel; trend visual filtered to complete months</td></tr>
+    <tr><td class="num">5</td><td>Read the methodology's at-a-glance + validation ladder; teach it back in 10 minutes</td><td>can answer: why rules and not clustering? why no accuracy number?</td></tr>
+  </table></div>
+  <h3>Week 2 — change it safely (sandbox on a branch)</h3>
+  <div class="tblwrap"><table>
+    <tr><th>Day</th><th>Exercise</th><th>Pass condition</th></tr>
+    <tr><td class="num">6</td><td>Wiggle a threshold: change the short-lead flag from 3 → 5 days in a copy of Stage F; measure the movement</td><td>reports how many bookings' flag flips, and why the <em>segment</em> labels don't move</td></tr>
+    <tr><td class="num">7</td><td>Break a guardrail on purpose: write a toy rule that reads <code>dep_month</code>; run <code>check_constraints.py</code></td><td>watches it <strong>fail</strong>, and can explain the anchor budget in plain words</td></tr>
+    <tr><td class="num">8</td><td>Refit level 2 twice; hash-compare the lookup CSVs</td><td>identical hashes; can explain why <code>ORDER BY ALL</code> is load-bearing</td></tr>
+    <tr><td class="num">9</td><td>Mock rule change end to end: simulate → constraints → V4 quick → docs note</td><td>the seven steps of §5c executed in order, on a throwaway rule</td></tr>
+    <tr><td class="num">10</td><td>Mock monthly review: run the monitor on a modified sample; present verdicts</td><td>correct STABLE/WATCH/ACT calls; escalation path named</td></tr>
+  </table></div>
+  <p><strong>Exit criteria:</strong> one full refresh unassisted · one drift report read correctly ·
+  one simulated rule change through all seven steps · knows which document answers which question
+  (§11).</p>
+</section>
+
+<section id="limits">
+  <div class="kicker">9 · Boundaries</div>
+  <h2>Limitations that must travel with the system</h2>
+  <p class="lede"><em>Say these before anyone asks; each has a number and a source — they are
+  measurements, not apologies.</em></p>
+  <div class="card"><p>
+  · <strong>No accuracy figure exists — by design.</strong> Every label came from our rules, so any
+  accuracy computable today is circular. The SME-labelled sample (~1,000 bookings) unlocks a real
+  one.<br>
+  · <strong>The loyalty blind spot.</strong> No loyalty-tier field → Mabuhay Loyalist is visible
+  only via award redemptions (0.03%). The segment is real; our sight is not.<br>
+  · <strong>Blind below ~1% prevalence.</strong> A real segment smaller than ~229k bookings could
+  exist and the detection tests would not have found it.<br>
+  · <strong>Labels add no incremental prediction</strong> over the raw features (+0.0005–0.0024
+  AUC) — a compression cannot beat its source. The value is shared vocabulary and targeting.<br>
+  · <strong>No churn rate is computable</strong> — 73.9% of customers have one booking in a
+  ~27-month window (right-censoring). Loyalty use-cases wait for the identity join.<br>
+  · <strong>Revenue mix is the weaker stability leg</strong> (TVD 3.36 pp vs 1.71 pp on shares) — a
+  segment holding its size is not evidence its value held.<br>
+  · <strong>Known edges:</strong> ±1 booking build variance (1,830 tied keys); <code>dest_region</code>
+  is an alphabetical max on multi-region trips (1.65%); the <code>Unassigned</code> premium-cabin
+  anomaly must be diagnosed before any lounge/premium policy is set from this output.</p></div>
+</section>
+
+<section id="roadmap">
+  <div class="kicker">10 · Improve</div>
+  <h2>Future improvements — in the order the evidence supports</h2>
+  <div class="plain">Plain version: data before algorithms. Every test says the ceiling is in the
+  data we have, not in the methods — so the roadmap starts with fields, not fancier models.</div>
+
+  <h3>Tier 1 — data investments (each unlocks something specific)</h3>
+  <div class="tblwrap"><table>
+    <tr><th>Ask</th><th>Unlocks</th></tr>
+    <tr><td><strong>Loyalty tier join</strong> (PAL answer B4)</td><td>Mabuhay becomes measurable; churn/retention becomes a real department case; the vendors' strongest levers and ours simultaneously</td></tr>
+    <tr><td><strong>Fare basis codes</strong> (requested)</td><td>Settles the Manila–Gulf one-month-clock confound (behaviour vs fare rule)</td></tr>
+    <tr><td><strong>Ancillary revenue</strong></td><td>Corrects per-booking value for bag-heavy segments (OFW especially); quantifies the CX case</td></tr>
+    <tr><td><strong>Party size</strong> (B3)</td><td>Lets MICE be valued per contract — the largest single understatement</td></tr>
+    <tr><td><strong>Repeated dated extracts</strong></td><td>Enables the LY-vs-CY pickup measure the current extract cannot support</td></tr>
+  </table></div>
+
+  <h3>Tier 2 — close the validation loop</h3>
+  <ol class="steps">
+    <li><strong>SME gold sample</strong> — ~1,000 hand-labelled bookings, contested boundaries first
+      (Corporate), with inter-rater agreement. Retires the circularity caveat; also makes rule
+      re-weighting estimable.</li>
+    <li><strong>One instrumented marketing campaign</strong> — replaces the invented recovery-rate
+      assumption in the business case with a measurement; verifiable inside a single cycle.</li>
+    <li><strong>Penalty-weight sign-off</strong> — the dollar-grounded proposal ($495–$9,784
+      spread) awaits PAL's "see a run first".</li>
+  </ol>
+
+  <h3>Tier 3 — model work (each gated by a pre-registered decision rule)</h3>
+  <div class="card"><p>
+  · Stage-matched GMM vs LCA re-test on the sub-segmentation job (GMM won the <em>top-level</em>
+  benchmark; swap only if it wins the actual job).<br>
+  · V4 transfer with a multi-seed spread and a wider method panel (the current two-method reading
+  is unresolved on purpose).<br>
+  · Re-run <code>rule_confidence.py</code> against the v2 waterfall (published figures are v1-era).<br>
+  · The seven "continuum levers" (<code>docs/continuum-levers-plan.md</code>) — each with a stop
+  rule; embeddings last.</p></div>
+
+  <h3>Tier 4 — production hardening</h3>
+  <div class="card"><p>
+  · <strong>Feature contract at ingestion</strong> — a silently missing input column degrades
+  labels without failing loudly; the contract should gate any production deployment.<br>
+  · Fix the 1,830 tied sort keys (drafted) → byte-identical builds.<br>
+  · Add the one-sentence NDC explanation to the monitor's prose.<br>
+  · Keep every report generator's <code>--report-only</code> path — most "stale numbers" incidents
+  are stale prose, and the two deserve different fix costs.</p></div>
+</section>
+
+<section id="map">
+  <div class="kicker">11 · Navigate</div>
+  <h2>Document map — which file answers which question</h2>
+  <div class="tblwrap"><table>
+    <tr><th>Question</th><th>Read</th></tr>
+    <tr><td>How does the whole method work, formally?</td><td><code>docs/methodology.md</code> (spec + changelog)</td></tr>
+    <tr><td>What does each field mean?</td><td><code>docs/data-dictionary.md</code></td></tr>
+    <tr><td>How do I set up the environment?</td><td><code>docs/installation.md</code></td></tr>
+    <tr><td>How do I build the dashboard / write DAX?</td><td><code>docs/powerbi-guide.md</code> (copied into the export as <code>START-HERE.md</code>)</td></tr>
+    <tr><td>What do the segments mean commercially?</td><td><code>docs/stakeholder-report.md</code> (personas, plain language)</td></tr>
+    <tr><td>Why should PAL invest — the money case?</td><td><code>docs/do-nothing-vs-implement.md</code> (measured) + <code>docs/business-case-benchmark.md</code> (benchmark)</td></tr>
+    <tr><td>What did PAL's own experts contribute?</td><td><code>docs/sme-constraints-intake.md</code> + <code>data/constraints/README.md</code></td></tr>
+    <tr><td>What changed when, and why?</td><td><code>docs/knowledge-base.md</code> §15 (the dated learning log)</td></tr>
+    <tr><td>The full study version of everything above?</td><td><code>docs/final-defense-reviewer.md</code></td></tr>
+    <tr><td>What's still open with PAL?</td><td><code>docs/pal-questions.md</code> / <code>.csv</code></td></tr>
+  </table></div>
+  <p><strong>Handover contacts:</strong> the capstone team remains reachable through AIM for a
+  transition period; the learning log (<code>docs/knowledge-base.md</code> §15) is the append-only
+  project memory — keep writing to it. The single most important habit to inherit: <strong>when a
+  number changes, grep the generators first, then the docs</strong> — a figure quoted inside a
+  script is a stale sentence with a schedule.</p>
+
+  <p class="foot">Prepared by CPT 3 — PAL Customer Segmentation · v1.0 · Sources:
+  <code>README.md</code>, <code>docs/methodology.md</code> v1.12, <code>docs/installation.md</code>,
+  <code>outputs/</code> stage summaries, <code>docs/knowledge-base.md</code> §15 · Source of record:
+  <code>docs/handover-pack.md</code> · Last updated 2026-08-27.</p>
+</section>
+</main>

@@ -412,6 +412,16 @@
         <p class="qual"><b>The general lesson</b> is that a priority cascade hides every
         overlapping signal beneath the winning branch. This recovered 50% more volume without
         moving a single threshold.</p>
+        <p class="qual"><b>But the flag does not ride along with every segment.</b> Three of the
+        eleven rules read lead time too, so a short-lead <em>rate</em> per segment is partly
+        tautology: <b>MICE</b> (rule: lead &ge; 45 days) and <b>Ultra Wealthy Leisure</b>
+        (lead &ge; 30) are 0% short-lead <em>by construction</em>, not by behaviour, and
+        <b>Corporate's 35.6% is partly circular</b> &mdash; one of its two branches only admits
+        bookings with lead &le; 7 days. On the channel branch, which carries no lead-time condition,
+        Corporate is <b>23.3%</b>. Still above the 19.26% book average, so the behaviour is real at a
+        quarter of its apparent size &mdash; quote 23.3%. The three counts above are on the old
+        labels, which is correct for "what was invisible before"; under the new ones the same
+        4,411,666 bookings split 858,318 &middot; 415,411 &middot; 193,897.</p>
       </div>
     </div>
   </section>
@@ -586,36 +596,54 @@
       </div>
     </div>
 
-    <div class="claim is-ok">
+    <div class="claim is-warn">
       <div class="rail"></div>
       <div class="body">
-        <span class="stance">Safe to state</span>
-        <span class="figure">1.13</span>
-        <span class="figure-note">Transfer ratio against a within-window ceiling</span>
-        <h3>A model fitted a year earlier carves the later data as well as one fitted on it</h3>
+        <span class="stance">Name the method</span>
+        <span class="figure">1.24 &middot; 0.89</span>
+        <span class="figure-note">Transfer ratio against a within-window ceiling &mdash; GMM &middot; LCA</span>
+        <h3>Last year's model still carves this year's data &mdash; on the method that transfers best</h3>
         <p class="prose">
-          Segment composition holds where the volume is. What drift there is sits in the three
-          smallest segments, where a few hundred bookings move a mean — treat that as unresolved
-          noise, not established behavioural change.
+          Segment sizes and composition hold across a twelve-month step on full-population counts,
+          and what drift there is sits in the three smallest segments, where a few hundred bookings
+          move a mean. Treat that as unresolved noise, not established behavioural change.
         </p>
-        <p class="qual"><b>Practical consequence:</b> on this evidence an annual refit buys
-        nothing. Outcome fields are excluded throughout as right-censored — recent bookings have
-        not flown yet, and comparing them would manufacture a cliff.</p>
+        <p class="qual"><b>Where it is weaker than it looks:</b> the two methods land on opposite
+        sides of 1.0 &mdash; <code>GMM(full)</code> transfers at 0.740 against a 0.595 ceiling, while
+        <code>LCA</code> transfers <em>below</em> its own ceiling at 0.648 against 0.726. So say "on
+        the best-transferring method", not "on this evidence". An annual refit buys little, not
+        nothing.</p>
+        <p class="qual"><b>Withdrawn:</b> the earlier LCA figures &mdash; 0.729 against 0.645, ratio
+        1.13 &mdash; do not reproduce. That run's per-window sample was silently 43% of intended, and
+        a ratio that crosses 1.0 when the sample doubles was never a finding. Outcome fields are
+        excluded throughout as right-censored &mdash; recent bookings have not flown yet, and
+        comparing them would manufacture a cliff.</p>
       </div>
     </div>
 
-    <div class="claim is-stop">
+    <div class="claim is-ok">
       <div class="rail"></div>
       <div class="body">
-        <span class="stance">Not re-verified</span>
-        <h3>Detection power was not re-run</h3>
+        <span class="stance">Re-verified 18 August</span>
+        <span class="figure">2%</span>
+        <span class="figure-note">Prevalence floor &mdash; blind below roughly 1%</span>
+        <h3>We would find a planted segment at 2% of bookings, and we would miss one below 1%</h3>
         <p class="prose">
-          The test establishing that we could find a planted segment at ≥2% prevalence, and never
-          below ~1%, last ran on 29 July against the previous labels.
+          Re-run against the new taxonomy at <code>k</code>=11 and the conclusion is unchanged.
+          Reading the majority of the twelve method &times; archetype combinations rather than the
+          luckiest one: detected at 2% prevalence from distinctness &asymp;0.494, at 5% from
+          &asymp;0.219, at 10% from &asymp;0.13 &mdash; and <b>never</b>, at any distinctness tested,
+          at 0.5% or 1%.
         </p>
-        <p class="qual"><b>Its conclusion is method-level</b>, so relabelling does not invalidate
-        it — but it has not been re-checked against the current taxonomy. Say that plainly if
-        asked rather than presenting it as current.</p>
+        <p class="qual"><b>The bounded null, and the gap that travels with it:</b> no segment exists
+        in these features at or above 2% of bookings with distinctness &asymp;0.494 or greater. But a
+        segment below ~1% &mdash; roughly 229,000 bookings, commercially meaningful &mdash; could
+        exist unseen. Do not quote the single-method minimum of 0.114; groups as distinct as 0.567
+        were missed elsewhere in the same grid.</p>
+        <p class="qual"><b>One instrument failed its own control.</b> The H0 component count returned
+        median 2 but a maximum of 131 across 100 draws of unchanged data, so no detection conclusion
+        rests on it. That qualifies July's "1 significant H0 component" &mdash; the continuum reading
+        survives as the centre of a noisy distribution, not as a measurement.</p>
       </div>
     </div>
   </section>
@@ -696,6 +724,11 @@
       validates rather than the reverse.</li>
       <li><strong>Blind below roughly 1% prevalence</strong> — any segment smaller than about
       229,000 bookings could exist without us detecting it.</li>
+      <li><strong>Two sampling defects were found and fixed on 18 August, after the validation
+      numbers were first written.</strong> A filter placed above a reservoir sample returned
+      <code>n &times; selectivity</code> rows rather than <code>n</code>, so V4 ran on 43% of its
+      intended sample and the sub-segmentation ran on as little as 5% of its own. Both are corrected
+      and re-run; V4's transfer figures changed as a result. Neither touched a segment label.</li>
       <li><strong>The build still moves by one booking between runs.</strong> 1,830 bookings have
       tied sort keys; cause and fix are recorded. Immaterial at one in 22.9 million, but it is a
       known defect rather than an unknown.</li>

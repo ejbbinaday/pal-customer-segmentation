@@ -95,7 +95,8 @@ Three EDA facts that *forced* design decisions — present them as consequences,
 - **57.7% domestic** → the domestic/international split, not fare, is the primary purpose axis.
 - **71% of bookings are Economy Saver/Supersaver** → value is nearly non-discriminative, so we had to
   build an airport→region lookup to separate domestic-budget from international-OFW/diaspora.
-- **Median lead time 25 days; 13.3% booked within 3 days** → timing is a strong, direct signal
+- **Median lead time 18 days; 19.3% of bookings inside 3 days** (booking grain; 25 days / 13.3% is the
+  coupon-grain reading) → timing is a strong, direct signal
   (Last-Minute is the one segment the data hands us for free).
 
 > **Analogy for "value is non-discriminative":** "Asking *what fare did they pay* is like trying to tell

@@ -1,0 +1,98 @@
+airport,country,region,is_domestic
+ANC,US,North America,0
+BAG,PH,Philippines,1
+BCD,PH,Philippines,1
+BKK,TH,Southeast Asia,0
+BLR,IN,South Asia,0
+BNE,AU,Oceania,0
+BPA,PH,Philippines,1
+BQA,PH,Philippines,1
+BSI,PH,Philippines,1
+BSO,PH,Philippines,1
+BWN,BN,Southeast Asia,0
+BXU,PH,Philippines,1
+CAN,CN,East Asia,0
+CBO,PH,Philippines,1
+CEB,PH,Philippines,1
+CGK,ID,Southeast Asia,0
+CGM,PH,Philippines,1
+CGY,PH,Philippines,1
+CJU,KR,East Asia,0
+CPH,DK,Europe,0
+CRK,PH,Philippines,1
+CRM,PH,Philippines,1
+CTS,JP,East Asia,0
+CYP,PH,Philippines,1
+CYZ,PH,Philippines,1
+DAD,VN,Southeast Asia,0
+DEL,IN,South Asia,0
+DGT,PH,Philippines,1
+DMM,SA,Middle East,0
+DOH,QA,Middle East,0
+DPL,PH,Philippines,1
+DPS,ID,Southeast Asia,0
+DRP,PH,Philippines,1
+DVO,PH,Philippines,1
+DXB,AE,Middle East,0
+EUQ,PH,Philippines,1
+FUK,JP,East Asia,0
+GES,PH,Philippines,1
+GUM,US,Oceania,0
+HAN,VN,Southeast Asia,0
+HKG,HK,East Asia,0
+HND,JP,East Asia,0
+HNL,US,North America,0
+IAO,PH,Philippines,1
+ICN,KR,East Asia,0
+ILO,PH,Philippines,1
+IST,TR,Europe,0
+JED,SA,Middle East,0
+JFK,US,North America,0
+JJN,CN,East Asia,0
+KIX,JP,East Asia,0
+KLO,PH,Philippines,1
+KTI,PH,Philippines,1
+KUL,MY,Southeast Asia,0
+LAO,PH,Philippines,1
+LAX,US,North America,0
+LIH,US,North America,0
+MED,SA,Middle East,0
+MEL,AU,Oceania,0
+MFM,MO,East Asia,0
+MNL,PH,Philippines,1
+MPH,PH,Philippines,1
+MRQ,PH,Philippines,1
+NGO,JP,East Asia,0
+NRT,JP,East Asia,0
+ORD,US,North America,0
+OZC,PH,Philippines,1
+PAG,PH,Philippines,1
+PEK,CN,East Asia,0
+PER,AU,Oceania,0
+PNH,KH,Southeast Asia,0
+POM,PG,Oceania,0
+PPS,PH,Philippines,1
+PUS,KR,East Asia,0
+PVG,CN,East Asia,0
+ROR,PW,Oceania,0
+RUH,SA,Middle East,0
+RXS,PH,Philippines,1
+SEA,US,North America,0
+SFO,US,North America,0
+SGN,VN,Southeast Asia,0
+SIN,SG,Southeast Asia,0
+SPN,US,Oceania,0
+SYD,AU,Oceania,0
+TAC,PH,Philippines,1
+TAG,PH,Philippines,1
+TPE,TW,East Asia,0
+TUG,PH,Philippines,1
+TWT,PH,Philippines,1
+USU,PH,Philippines,1
+VTE,LA,Southeast Asia,0
+XIY,CN,East Asia,0
+XMN,CN,East Asia,0
+YNY,KR,East Asia,0
+YVR,CA,North America,0
+YYZ,CA,North America,0
+ZAM,PH,Philippines,1

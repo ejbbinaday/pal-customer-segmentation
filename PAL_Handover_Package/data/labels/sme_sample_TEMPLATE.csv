@@ -1,0 +1,5 @@
+customer_id,issue_date,true_segment,confidence,notes
+1000000001,2025-03-14,Corporate,High,TMC booking + business cabin 4 days out
+1000000002,2025-06-02,Balikbayan/VFR,Med,US-issued round trip but could be OFW on leave
+1000000003,2025-11-20,Budget/Adventure,High,domestic economy promo
+1000000004,2026-01-09,Unsure,Low,PH-issued outbound intl economy — no rule fits this

@@ -25,7 +25,8 @@ erDiagram
         bool IsCompleteTravelMonth
     }
     FACT {
-        text CustomerSegment "the segment"
+        text CustomerSegment "level 1 — the segment"
+        text SubSegment "level 2 — the sub-type"
         date TravelMonth "when they fly"
         date IssueMonth "when they booked"
         text Route "O and D"
@@ -36,6 +37,9 @@ erDiagram
         real NetFare "measure"
     }
 ```
+
+`dim_segment` and `dim_subsegment` hang off the fact the same way, on `CustomerSegment` and
+`SubSegment`. Together they give you a **two-level drill**: segment, then sub-type within it.
 
 **The date table plays two roles** — travel date and booking date. Make `TravelMonth` the
 active relationship (most visuals are "when did they fly"), and reach the booking side with
@@ -52,29 +56,30 @@ powerbi_export/
 │
 ├── model/                        ✅ LOAD THESE
 │   ├── dim_date.csv                 120 KB — mark as Date table
-│   ├── dim_segment.csv               11 rows — persona cards + segment colours & caveats
-│   ├── scorecard_segment_month.csv  127 KB — ⭐ per-segment scorecards (start here)
-│   ├── fact_flight/                 470 MB — your main fact table
-│   └── fact_dashboard.parquet        29 MB — optional lightweight alternative
+│   ├── dim_segment.csv               13 rows — persona cards + segment colours & caveats
+│   ├── dim_subsegment.csv            28 rows — level 2: the sub-type drill (see §3c)
+│   ├── scorecard_segment_month.csv  471 KB — ⭐ per-segment scorecards (start here)
+│   ├── fact_flight/                 477 MB — your main fact table
+│   └── fact_dashboard.parquet        34 MB — optional lightweight alternative
 │
 ├── qa/
 │   └── sample_100k.csv               33 MB — build + test your DAX here first
 │
 └── detail/
-    └── fact_coupons/                1.4 GB — only if you need Age or UniqueID
+    └── fact_coupons/                1.45 GB — only if you need Age or UniqueID
 ```
 
-**Load `model/`. That's it.** `fact_flight/` is pre-summed to ~20.6M rows instead of 38.1M —
+**Load `model/`. That's it.** `fact_flight/` is pre-summed to ~20.7M rows instead of 38.1M —
 same answers, much lighter — and still supports flight number, O&D and lead-time pickup.
 
-`fact_dashboard.parquet` is a smaller/faster alternative (2.1M rows) if you only need the
+`fact_dashboard.parquet` is a smaller/faster alternative (2.3M rows) if you only need the
 headline visuals — but it has **no** flight number, O&D or `LeadTimeDays`.
 
 `detail/fact_coupons/` is the only place **Age** and **UniqueID** survive; aggregating drops them.
 
 ---
 
-## 3. Build it in seven steps
+## 3. Build it in eight steps
 
 1. **Get Data → Folder →** point at `model/fact_flight/`, Combine & Load. *(Parquet, partitioned
    by year — Power BI handles this natively.)*
@@ -84,9 +89,11 @@ headline visuals — but it has **no** flight number, O&D or `LeadTimeDays`.
    Add a second relationship to `FACT[IssueMonth]` and leave it **inactive**.
 5. **Get Data → Text/CSV →** load `model/dim_segment.csv`, then relate
    `dim_segment[Segment]` → `FACT[CustomerSegment]` (one-to-many, active).
-6. **For scorecards, also load `model/scorecard_segment_month.csv`** and relate
+6. **For the sub-type drill, load `model/dim_subsegment.csv`** and relate
+   `dim_subsegment[SubSegment]` → `FACT[SubSegment]` (one-to-many, active). See §3c.
+7. **For scorecards, also load `model/scorecard_segment_month.csv`** and relate
    `[CustomerSegment]` → `dim_segment[Segment]` and `[TravelMonth]` → `dim_date[Date]`. See §3a.
-7. **Add a page-level filter: `IsCompleteTravelMonth = TRUE`.** Do this before anything else —
+8. **Add a page-level filter: `IsCompleteTravelMonth = TRUE`.** Do this before anything else —
    see note ⚠️ #1 below. Then start building.
 
 ---
@@ -123,7 +130,7 @@ Bookings LY      = CALCULATE ( [Bookings], SAMEPERIODLASTYEAR ( dim_date[Date] )
 Bookings YoY %   = DIVIDE ( [Bookings] - [Bookings LY], [Bookings LY] )
 ```
 
-### The three things that otherwise produce a wrong scorecard
+### The four things that otherwise produce a wrong scorecard
 
 1. **`Bookings` is `sum(IsPrimaryCoupon)`, not a distinct count** — that is what keeps it additive.
    Never swap in `DISTINCTCOUNT`.
@@ -133,6 +140,23 @@ Bookings YoY %   = DIVIDE ( [Bookings] - [Bookings LY], [Bookings LY] )
 3. **Exclude `IsRefund` / `IsNonRev` / `RevMissing` from commercial tiles** (and usually `IsAward` —
    its revenue is taxes only). A clean commercial filter is:
    `IsCompleteTravelMonth && !IsRefund && !IsNonRev && !RevMissing`.
+4. **⚠️ Never filter `IsPrimaryCoupon = TRUE` (or `Bookings > 0`) when you are summing revenue.** It is
+   the right filter for *counting bookings* and the wrong one for *adding money*. A booking's revenue is
+   spread across all its coupons, so keeping only the primary one throws the rest away — and the loss is
+   not small or uniform. On the CY2025 flown, revenue-clean base:
+
+   | Segment | `NetRevenue`, unfiltered | with `Bookings > 0` | lost |
+   |---|--:|--:|--:|
+   | Balikbayan/VFR | $712M | $331M | **−54%** |
+   | OFW/Migrant | $481M | $401M | −17% |
+   | Leisure | $418M | $305M | −27% |
+
+   It bites hardest on exactly the multi-leg segments a revenue view cares most about, and because the
+   result still looks like a plausible revenue number, nothing tells you it happened. **Revenue per
+   booking is `SUM(NetRevenue) / SUM(Bookings)` over unfiltered rows** — the numerator counts every
+   coupon's money, the denominator counts each booking once. That ratio reproduces the independently
+   computed segment figures in `docs/segment-cost-research.md` §3 to within ~7%; the filtered version
+   disagrees with them by more than 2×, which is how the mistake was caught.
 
 **Every flag is guaranteed non-NULL.** They are coalesced to FALSE on write, because a NULL makes
 `IsRefund = FALSE` silently drop those rows and quietly break reconciliation. The ~542 bookings whose
@@ -245,6 +269,49 @@ thing: those come from the requirements document.
 
 ---
 
+## 3c. Level 2 — the sub-type drill, `dim_subsegment.csv`
+
+`CustomerSegment` answers *why they fly*. `SubSegment` splits the five biggest segments into **how they
+book** — planning horizon, one-way vs round-trip, fare tier, connecting or not. It is a plain column on
+every fact table, assigned per booking, so it slices exactly like `CustomerSegment` does.
+
+**28 rows: 20 sub-types across five parents, plus one self-named row for each segment that has none.**
+
+| Parent | Sub-types | Bookings |
+|---|--:|--:|
+| Leisure | 4 | 11,595,711 |
+| OFW/Migrant | 4 | 3,907,805 |
+| Balikbayan/VFR | 4 | 2,871,255 |
+| Outbound International Leisure | 4 | 2,182,074 |
+| Corporate | 4 | 1,168,451 |
+
+**Build the drill:** put `dim_segment[Segment]` and `dim_subsegment[SubName]` into a matrix as a
+hierarchy, or use `dim_subsegment[Segment]` on rows and expand to `[SubName]`. Sort by
+`[SubSegmentSortOrder]` — it is a dense 1..28 rank, parents in `dim_segment` order and sub-types by size
+within a parent. `SubSegmentColorHex` is inherited from the parent, so a level-2 breakdown stays inside
+its parent's colour band.
+
+### Three things to know before you build on it
+
+**1. Segments without sub-types repeat their own name.** MICE's `SubSegment` is `MICE`, not blank. That
+is deliberate: a NULL would drop those eight segments out of every level-2 visual silently, and the
+totals would stop reconciling to `dim_segment`. Filter on `IsSubTyped = TRUE` when you want only the
+genuinely sub-typed rows, and check it before writing "x% of bookings are in sub-type y".
+
+**2. The key is `Parent — sub-name`, and it has to be.** The sub-type names are not unique on their own
+— `one-way · advance · saver` is emitted by **Leisure, OFW/Migrant and Outbound International Leisure**
+alike. Relate on `SubSegment` (the full composite string), and display `SubName` only inside a visual
+already grouped by parent, or three different cohorts silently merge into one bar.
+
+**3. ⚠️ These are useful cuts, not natural kinds — and they inherit every level-1 caveat.** The base is a
+continuum: the sub-types are actionable partitions of a smooth space, chosen because four is a
+business-actionable number, **not** because the data contains four clusters. A booking near a sub-type
+boundary could sit either side. So use them to *target* (a campaign, a fare rule, a service change) and
+never as ground truth — the 🚫 rule in §3a applies here twice over: **do not build an accuracy, recall or
+confidence gauge on `SubSegment`.**
+
+---
+
 ## 4. Starter measures
 
 ```dax
@@ -276,7 +343,7 @@ CALCULATE ( [Net Revenue], USERELATIONSHIP ( dim_date[Date], 'FACT'[IssueMonth] 
 
 ---
 
-## 5. Notes — the four that actually matter
+## 5. Notes — the five that actually matter
 
 ### ⚠️ 1. The data stops on **21 July 2026**. Filter your trend charts.
 
@@ -296,6 +363,7 @@ Every August booking carries the same number whether it was booked yesterday or 
 so it says nothing about *when* something was booked.
 
 **Use `LeadTimeDays` instead** — that's a real booking curve and it *is* comparable year on year.
+But read ⚠️ #5 first: it is a **leg-level** field and averaging it the obvious way is wrong.
 
 ### ⚠️ 3. `PaxCount` is not party size.
 
@@ -306,6 +374,51 @@ It counts flight **sectors**, so it's 1 on virtually every row.
 
 Never `DISTINCTCOUNT`. The column is built so it adds up correctly at every level of the report;
 a distinct count layered on pre-summed data gives the wrong answer.
+
+### ⚠️ 5. `LeadTimeDays` is per **leg**, not per booking — weight it by `Bookings`.
+
+It is **not** bucketed: `fact_flight` keeps it at day level (419 distinct values, −9 to 679). But two
+things about it will bite.
+
+**It varies within a booking.** `LeadTimeDays` is departure − issuance *for that coupon*, so a round
+trip's return leg has a longer lead time than its outbound. **179,327 of 200,000 multi-coupon bookings
+(90%) carry more than one value.** A plain average over coupons therefore measures "how far ahead was
+this *flight* booked", not "how far ahead was this *trip* booked", and it skews long.
+
+**And the table is pre-summed, so you cannot `AVERAGE` the column at all** — every row already stands for
+`Coupons` coupons. You must weight. Which weight you pick decides which question you answer:
+
+```
+-- booking-grain lead time: what the segmentation rules and dim_segment mean
+Avg Lead Days (booking) =
+    DIVIDE ( SUMX ( FACT, FACT[LeadTimeDays] * FACT[Bookings] ), SUM ( FACT[Bookings] ) )
+
+-- leg-grain lead time: how far ahead each flown sector was sold
+Avg Lead Days (leg) =
+    DIVIDE ( SUMX ( FACT, FACT[LeadTimeDays] * FACT[Coupons] ), SUM ( FACT[Coupons] ) )
+```
+
+`Bookings` is `SUM(IsPrimaryCoupon)` and the primary coupon is the booking's **first** leg, so weighting
+by `Bookings` collapses each booking to its first departure — which is exactly the booking-grain
+definition. Verified against `dim_segment[ProfileMedianLeadDays]`, which is computed independently at
+booking grain:
+
+| Segment | weighted by `Coupons` | weighted by `Bookings` | `dim_segment` |
+|---|--:|--:|--:|
+| Leisure | 18 | **15** | 15 |
+| Balikbayan/VFR | 60 | **48** | 48 |
+| OFW/Migrant | 17 | **14** | 14 |
+| Corporate | 7 | **5** | 5 |
+| Outbound International Leisure | 39 | **29** | 29 |
+
+Booking-weighting reproduces the dimension exactly on all five. Coupon-weighting runs 3–12 days long —
+worst on Balikbayan/VFR, the most multi-leg segment. **If a lead-time number on your page disagrees with
+the persona card, this is why.**
+
+**Two more small things:** `LeadTimeDays` is **absent** from `fact_dashboard.parquet` and
+`scorecard_segment_month.csv` — it is rolled away in both, so lead-time visuals must bind to
+`fact_flight/`. And **1,728 coupons have a negative lead time** (down to −9): reissues, where the ticket
+was re-issued after the original departure. Filter `LeadTimeDays >= 0` on booking-curve charts.
 
 ---
 
@@ -337,17 +450,27 @@ Two related caveats:
 ## Segment mix at a glance
 
 Volume and value rank almost inversely — worth defaulting your headline views to **revenue**,
-not passenger count.
+not passenger count. Leisure is 44% of the coupons and 15% of the money; Premium Bleisure and Ultra
+Wealthy Leisure are 2.8% of coupons between them and 11.6% of revenue.
 
 | Segment | % coupons | % revenue |
 |---|---:|---:|
-| Budget/Adventure | 35.6% | 10.8% |
-| Balikbayan/VFR | 19.9% | **29.0%** |
-| OFW/Migrant | 13.8% | 19.7% |
-| Unassigned | 11.3% | 12.7% |
-| Last-Minute | 10.2% | 6.5% |
-| Corporate | 4.5% | 7.9% |
-| Premium Bleisure | 2.7% | **11.6%** |
-| Family · Pilgrimage · Mabuhay | 2.0% | 1.7% |
+| Leisure | 44.3% | 14.9% |
+| Balikbayan/VFR | 19.7% | **28.4%** |
+| OFW/Migrant | 13.7% | **19.6%** |
+| Outbound International Leisure | 11.1% | 14.0% |
+| Corporate | 5.4% | 8.6% |
+| Unassigned | 2.3% | 1.6% |
+| Premium Bleisure | 1.7% | **6.6%** |
+| Ultra Wealthy Leisure | 1.1% | **5.0%** |
+| Intl. Student | 0.3% | 0.8% |
+| Pilgrimage | 0.2% | 0.3% |
+| MICE | 0.2% | 0.1% |
+| Mabuhay Loyalist | 0.0% | 0.0% |
+| Excluded (non-revenue) | 0.0% | 0.1% |
+
+*All 38.1M coupons, unfiltered — apply `IsCompleteTravelMonth` before quoting these in a report.
+Recomputed from `model/fact_flight/` on the 21 Aug 2026 build; the previous version of this table named
+`Budget/Adventure`, `Last-Minute` and `Family`, none of which exist in the shipped taxonomy.*
 
 *Full field dictionary, reconciliation and data-quality detail: `summary.md`.*

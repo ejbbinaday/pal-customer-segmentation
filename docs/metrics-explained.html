@@ -1,0 +1,818 @@
+<title>PAL Validation Scorecard</title>
+
+<style>
+  /* Tokens lifted from docs/defense-brief-2026-08-18.html so this page reads as its companion. */
+  :root {
+    --ground:      #EDF0F2;
+    --surface:     #FFFFFF;
+    --surface-sunk:#E4E9EC;
+    --line:        #CFD8DE;
+    --line-soft:   #DFE6EA;
+    --ink:         #1A2530;
+    --ink-soft:    #55646F;
+    --ink-faint:   #7E8C97;
+    --accent:      #196675;
+    --accent-soft: #CFE3E7;
+    --ok:          #2C6E4E;
+    --ok-soft:     #D6E7DC;
+    --warn:        #8A6318;
+    --warn-soft:   #F0E4CB;
+    --stop:        #8E332A;
+    --stop-soft:   #F1DAD6;
+    --meter-track: #DDE4E8;
+
+    --serif: "Iowan Old Style", Charter, "Bitstream Charter", Georgia, "Times New Roman", serif;
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, "Cascadia Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:      #0D1319;
+      --surface:     #151E26;
+      --surface-sunk:#101820;
+      --line:        #2B3A45;
+      --line-soft:   #22303A;
+      --ink:         #E3E9ED;
+      --ink-soft:    #9AA9B4;
+      --ink-faint:   #74848F;
+      --accent:      #57B4C4;
+      --accent-soft: #1D3C44;
+      --ok:          #63B183;
+      --ok-soft:     #1B3527;
+      --warn:        #CFA455;
+      --warn-soft:   #352911;
+      --stop:        #DD7568;
+      --stop-soft:   #3A1F1B;
+      --meter-track: #24313B;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground:      #0D1319;
+    --surface:     #151E26;
+    --surface-sunk:#101820;
+    --line:        #2B3A45;
+    --line-soft:   #22303A;
+    --ink:         #E3E9ED;
+    --ink-soft:    #9AA9B4;
+    --ink-faint:   #74848F;
+    --accent:      #57B4C4;
+    --accent-soft: #1D3C44;
+    --ok:          #63B183;
+    --ok-soft:     #1B3527;
+    --warn:        #CFA455;
+    --warn-soft:   #352911;
+    --stop:        #DD7568;
+    --stop-soft:   #3A1F1B;
+    --meter-track: #24313B;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--serif);
+    font-size: 17px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 56px 24px 80px;
+    display: flex;
+    flex-direction: column;
+    gap: 44px;
+  }
+
+  /* ── masthead ─────────────────────────────────────────────────────────── */
+  header { display: flex; flex-direction: column; gap: 14px; }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+  h1 {
+    font-size: clamp(30px, 5vw, 44px);
+    line-height: 1.12;
+    margin: 0;
+    font-weight: 600;
+    text-wrap: balance;
+    letter-spacing: -0.015em;
+  }
+  .standfirst {
+    font-size: 19px;
+    color: var(--ink-soft);
+    margin: 0;
+    max-width: 62ch;
+  }
+  .dateline {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--ink-faint);
+    border-top: 1px solid var(--line);
+    padding-top: 12px;
+    line-height: 1.7;
+  }
+
+  /* ── how to read ──────────────────────────────────────────────────────── */
+  .primer {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    padding: 24px 26px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .primer h2 { font-size: 17px; margin: 0; font-weight: 600; }
+  .primer p { margin: 0; color: var(--ink-soft); font-size: 16px; max-width: 66ch; }
+  .primer .demo { margin-top: 4px; }
+
+  /* ── sections ─────────────────────────────────────────────────────────── */
+  section { display: flex; flex-direction: column; gap: 18px; }
+  .qhead { display: flex; flex-direction: column; gap: 7px; }
+  .qhead .tag {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+  .qhead h2 {
+    font-size: 25px;
+    margin: 0;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+  }
+  .qhead .answer {
+    margin: 0;
+    font-size: 17px;
+    color: var(--ink-soft);
+    max-width: 68ch;
+  }
+  .qhead .answer b { color: var(--ink); font-weight: 600; }
+
+  /* ── metric card ──────────────────────────────────────────────────────── */
+  .metric {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--line);
+    border-radius: 3px;
+    padding: 20px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .metric.is-ok   { border-left-color: var(--ok); }
+  .metric.is-warn { border-left-color: var(--warn); }
+  .metric.is-stop { border-left-color: var(--stop); }
+
+  .mtop {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 10px 14px;
+  }
+  .mname { font-size: 18px; font-weight: 600; margin: 0; }
+  .chip {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 2px;
+    white-space: nowrap;
+  }
+  .chip.ok   { color: var(--ok);   background: var(--ok-soft); }
+  .chip.warn { color: var(--warn); background: var(--warn-soft); }
+  .chip.stop { color: var(--stop); background: var(--stop-soft); }
+  .mtop .spacer { flex: 1 1 auto; }
+  .mvalue {
+    font-family: var(--mono);
+    font-size: 26px;
+    font-weight: 600;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+  }
+
+  .means { margin: 0; color: var(--ink-soft); font-size: 16px; max-width: 70ch; }
+  .means b { color: var(--ink); font-weight: 600; }
+
+  /* ── the scale strip ──────────────────────────────────────────────────── */
+  .scale { display: flex; flex-direction: column; gap: 7px; }
+  .track {
+    position: relative;
+    height: 8px;
+    background: var(--meter-track);
+    border-radius: 2px;
+  }
+  .track .fill {
+    position: absolute;
+    inset: 0 auto 0 0;
+    background: var(--accent-soft);
+    border-radius: 2px;
+  }
+  .track .ideal {
+    position: absolute;
+    top: -5px;
+    bottom: -5px;
+    width: 2px;
+    background: var(--ok);
+    transform: translateX(-1px);
+  }
+  .track .pin {
+    position: absolute;
+    top: -5px;
+    bottom: -5px;
+    width: 3px;
+    border-radius: 2px;
+    background: var(--accent);
+    transform: translateX(-1.5px);
+  }
+  .track .pin.warn { background: var(--warn); }
+  .track .pin.stop { background: var(--stop); }
+  .ends {
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--ink-faint);
+    gap: 12px;
+  }
+  .ends span:last-child { text-align: right; }
+
+  .verdict {
+    margin: 0;
+    font-size: 15.5px;
+    color: var(--ink-soft);
+    border-top: 1px solid var(--line-soft);
+    padding-top: 12px;
+    max-width: 72ch;
+  }
+  .verdict b { color: var(--ink); font-weight: 600; }
+  .verdict.flag b { color: var(--stop); }
+
+  code {
+    font-family: var(--mono);
+    font-size: 0.87em;
+    background: var(--surface-sunk);
+    padding: 1px 4px;
+    border-radius: 2px;
+  }
+
+  /* ── the withdrawn box ────────────────────────────────────────────────── */
+  .withdrawn {
+    background: var(--stop-soft);
+    border: 1px solid var(--stop);
+    border-radius: 3px;
+    padding: 20px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .withdrawn h2 { font-size: 17px; margin: 0; font-weight: 600; color: var(--stop); }
+  .withdrawn p { margin: 0; font-size: 16px; color: var(--ink); max-width: 70ch; }
+
+  /* ── glossary table ───────────────────────────────────────────────────── */
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 3px; }
+  table { border-collapse: collapse; width: 100%; background: var(--surface); font-size: 15px; }
+  th, td { text-align: left; padding: 11px 14px; border-bottom: 1px solid var(--line-soft); }
+  th {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    background: var(--surface-sunk);
+    white-space: nowrap;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  td.name { font-weight: 600; white-space: nowrap; }
+
+  footer {
+    border-top: 1px solid var(--line);
+    padding-top: 18px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--ink-faint);
+    line-height: 1.8;
+  }
+
+  @media (max-width: 620px) {
+    .wrap { padding: 36px 16px 60px; gap: 34px; }
+    .mvalue { font-size: 22px; }
+  }
+</style>
+
+<div class="wrap">
+
+  <header>
+    <span class="eyebrow">Philippine Airlines · Customer Segmentation</span>
+    <h1>What each validation number means, and what a good one looks like</h1>
+    <p class="standfirst">
+      Five questions the model has to answer, the measurement behind each, and where we actually
+      landed. No metric appears here without the scale it sits on.
+    </p>
+    <p class="dateline">
+      18 August 2026 · 22,911,450 bookings · 11 segments + Unassigned · revenue in USD<br>
+      Companion to the defence brief. Every figure regenerable from <code>outputs/</code>.
+    </p>
+  </header>
+
+  <div class="primer">
+    <h2>How to read the strips</h2>
+    <p>
+      Every metric below sits on a strip. The left end is the worst possible result — usually
+      "no better than a coin flip" or "nothing changed at all". The right end is perfect. The
+      <b>green line</b> marks the value we'd want; the <b>teal marker</b> is where we landed.
+    </p>
+    <div class="scale demo">
+      <div class="track">
+        <div class="fill" style="width: 72.2%"></div>
+        <div class="ideal" style="left: 100%"></div>
+        <div class="pin" style="left: 72.2%"></div>
+      </div>
+      <div class="ends">
+        <span>worst case — the metric's floor</span>
+        <span>ideal ↑</span>
+      </div>
+    </div>
+    <p>
+      A marker close to the green line is good. A marker near the left end means the measurement
+      couldn't tell anything apart. <b>Where the ideal is unreachable in principle, the strip says so
+      rather than implying we fell short.</b>
+    </p>
+  </div>
+
+  <!-- ─────────────────────────── Q1 ─────────────────────────── -->
+  <section>
+    <div class="qhead">
+      <span class="tag">Question 1 of 5 · construct validity</span>
+      <h2>Are these actually different groups of travellers?</h2>
+      <p class="answer">
+        The segments were drawn by rules, so of course they differ on the rules. The real test is
+        whether they also differ on evidence <b>the rules never saw</b>. <b>They do — 44 of 55
+        segment pairs are clearly distinct, and none are indistinguishable.</b>
+      </p>
+    </div>
+
+    <div class="metric is-ok">
+      <div class="mtop">
+        <p class="mname">Pair separability (AUC), full evidence set</p>
+        <span class="chip ok">Strong</span>
+        <span class="spacer"></span>
+        <span class="mvalue">0.861</span>
+      </div>
+      <p class="means">
+        <b>What it measures:</b> show the model one booking from each of two segments, without telling
+        it which is which. How often does it pick correctly? <b>0.5 means it is guessing.</b> Our
+        median across all 55 pairs is 0.861 — right roughly 86 times in 100.
+      </p>
+      <div class="scale">
+        <div class="track">
+          <div class="fill" style="width: 72.2%"></div>
+          <div class="ideal" style="left: 100%"></div>
+          <div class="pin" style="left: 72.2%"></div>
+        </div>
+        <div class="ends"><span>0.50 · coin flip</span><span>1.00 · perfect ↑</span></div>
+      </div>
+      <p class="verdict">
+        <b>Read as:</b> the segments describe genuinely different booking behaviour, not just
+        different rule outputs. Range across pairs 0.611–0.982; 11 pairs are weakly distinguishable
+        but <b>zero are indistinguishable</b>.
+      </p>
+    </div>
+
+    <div class="metric is-warn">
+      <div class="mtop">
+        <p class="mname">The same test on only the two unimpeachable fields</p>
+        <span class="chip warn">Thin by design</span>
+        <span class="spacer"></span>
+        <span class="mvalue">0.637</span>
+      </div>
+      <p class="means">
+        <b>What it measures:</b> the identical test, restricted to the only two fields that could not
+        possibly leak a rule — booking month and how often the customer books. Two fields cannot
+        separate much.
+      </p>
+      <div class="scale">
+        <div class="track">
+          <div class="fill" style="width: 27.4%"></div>
+          <div class="ideal" style="left: 100%"></div>
+          <div class="pin warn" style="left: 27.4%"></div>
+        </div>
+        <div class="ends"><span>0.50 · coin flip</span><span>1.00 · perfect ↑</span></div>
+      </div>
+      <p class="verdict">
+        <b>Read as:</b> a floor, not a failure — and <b>always say which of the two numbers you are
+        quoting</b>. The strict figure is low because the evidence available to it is thin, which is a
+        consequence of being careful about leakage.
+      </p>
+    </div>
+
+    <div class="metric is-stop">
+      <div class="mtop">
+        <p class="mname">The weakest boundary: OFW/Migrant vs Balikbayan/VFR</p>
+        <span class="chip stop">Unresolved</span>
+        <span class="spacer"></span>
+        <span class="mvalue">0.548</span>
+      </div>
+      <p class="means">
+        <b>What it measures:</b> the same separability test on our single hardest split — 6.8 million
+        bookings distinguished by essentially one bit of information.
+      </p>
+      <div class="scale">
+        <div class="track">
+          <div class="fill" style="width: 9.6%"></div>
+          <div class="ideal" style="left: 100%"></div>
+          <div class="pin stop" style="left: 9.6%"></div>
+        </div>
+        <div class="ends"><span>0.50 · coin flip</span><span>1.00 · perfect ↑</span></div>
+      </div>
+      <p class="verdict flag">
+        <b>Do not claim this improved.</b> An A/B holding method and population fixed and varying only
+        the labels gave 0.730 (old) versus 0.728 (new) — the taxonomy change was neutral here. Overseas
+        workers and homecoming visitors book too similarly for the data we hold to separate them.
+      </p>
+    </div>
+  </section>
+
+  <!-- ─────────────────────────── Q2 ─────────────────────────── -->
+  <section>
+    <div class="qhead">
+      <span class="tag">Question 2 of 5 · criterion validity</span>
+      <h2>Does knowing a customer's segment let us predict anything new?</h2>
+      <p class="answer">
+        <b>Almost nothing — and that is expected rather than disappointing.</b> The segment label is
+        computed <i>from</i> the booking data, so a model that already has the booking data has
+        already got the label's information. The deliverable's value is targeting and shared
+        language, not forecasting.
+      </p>
+    </div>
+
+    <div class="metric is-warn">
+      <div class="mtop">
+        <p class="mname">What the segment label adds on top of the raw data</p>
+        <span class="chip warn">Near zero</span>
+        <span class="spacer"></span>
+        <span class="mvalue">+0.0005</span>
+      </div>
+      <p class="means">
+        <b>What it measures:</b> predict whether a booking is actually flown. Using the raw booking
+        fields alone scores <b>0.906</b>. Adding the segment label on top moves it to 0.906 — a gain
+        of five ten-thousandths. On repeat booking within 180 days the gain is +0.0024.
+      </p>
+      <div class="scale">
+        <div class="track">
+          <div class="fill" style="width: 1%"></div>
+          <div class="ideal" style="left: 100%"></div>
+          <div class="pin warn" style="left: 1%"></div>
+        </div>
+        <div class="ends"><span>+0.00 · adds nothing</span><span>a large gain ↑</span></div>
+      </div>
+      <p class="verdict">
+        <b>Read as:</b> do not sell this model as a prediction engine. It is a way of naming and
+        targeting populations that the raw data already contains but nobody can act on directly.
+      </p>
+    </div>
+
+    <div class="metric is-ok">
+      <div class="mtop">
+        <p class="mname">What the segment label carries on its own</p>
+        <span class="chip ok">Real signal</span>
+        <span class="spacer"></span>
+        <span class="mvalue">0.598</span>
+      </div>
+      <p class="means">
+        <b>What it measures:</b> the same prediction using <i>only</i> the segment name — nothing
+        else. 0.5 would mean the label is meaningless.
+      </p>
+      <div class="scale">
+        <div class="track">
+          <div class="fill" style="width: 19.6%"></div>
+          <div class="ideal" style="left: 100%"></div>
+          <div class="pin" style="left: 19.6%"></div>
+        </div>
+        <div class="ends"><span>0.50 · meaningless label</span><span>1.00 · perfect ↑</span></div>
+      </div>
+      <p class="verdict">
+        <b>Read as:</b> the label is not noise — it beats a coin flip on outcomes it was never built
+        to predict. It just is not <i>additional</i> to the data it came from.
+      </p>
+    </div>
+  </section>
+
+  <!-- ─────────────────────────── Q3 ─────────────────────────── -->
+  <section>
+    <div class="qhead">
+      <span class="tag">Question 3 of 5 · detection power</span>
+      <h2>If a segment existed that we missed, would we have found it?</h2>
+      <p class="answer">
+        A hearing test. We planted fake segments of known size into the real data and checked whether
+        the pipeline could hear them. <b>Yes at 2% of bookings and above. No below about 1%</b> — and
+        that gap is a real blind spot, not a formality.
+      </p>
+    </div>
+
+    <div class="metric is-ok">
+      <div class="mtop">
+        <p class="mname">Smallest segment we can reliably detect</p>
+        <span class="chip ok">Verified 18 Aug</span>
+        <span class="spacer"></span>
+        <span class="mvalue">2%</span>
+      </div>
+      <p class="means">
+        <b>What it measures:</b> the smallest planted group that a majority of our twelve method
+        combinations recovered. <b>Smaller is better</b> — it means a finer ear. At 2% prevalence we
+        find it; at 1% and 0.5% we never do, however distinct the group is made.
+      </p>
+      <div class="scale">
+        <div class="track">
+          <div class="fill" style="width: 20%"></div>
+          <div class="ideal" style="left: 0%"></div>
+          <div class="pin" style="left: 20%"></div>
+        </div>
+        <div class="ends"><span>↑ ideal · detect anything</span><span>10% · very coarse</span></div>
+      </div>
+      <p class="verdict flag">
+        <b>The limitation travels with the claim.</b> A segment below ~1% of bookings — about
+        <b>229,000 bookings</b>, commercially meaningful — could exist and we would not have found it.
+        Quote the majority floor, never the single best method run.
+      </p>
+    </div>
+  </section>
+
+  <!-- ─────────────────────────── Q4 ─────────────────────────── -->
+  <section>
+    <div class="qhead">
+      <span class="tag">Question 4 of 5 · out-of-time stability</span>
+      <h2>Does any of this still hold a year later?</h2>
+      <p class="answer">
+        Two adjacent twelve-month windows, compared on full-population counts. <b>Sizes and
+        composition hold. The model-transfer evidence is weaker than we previously reported</b> —
+        see the withdrawal below.
+      </p>
+    </div>
+
+    <div class="metric is-ok">
+      <div class="mtop">
+        <p class="mname">How much the segment mix shifted in a year</p>
+        <span class="chip ok">Stable</span>
+        <span class="spacer"></span>
+        <span class="mvalue">1.71 pp</span>
+      </div>
+      <p class="means">
+        <b>What it measures:</b> the share of bookings you would have to physically move between
+        segments to turn last year's mix into this year's. <b>0 means nothing moved.</b> Revenue mix
+        is the less stable of the two at 3.36 pp.
+      </p>
+      <div class="scale">
+        <div class="track">
+          <div class="fill" style="width: 17.1%"></div>
+          <div class="ideal" style="left: 0%"></div>
+          <div class="pin" style="left: 17.1%"></div>
+        </div>
+        <div class="ends"><span>↑ ideal · 0 pp, identical</span><span>10 pp · substantial shift</span></div>
+      </div>
+      <p class="verdict">
+        <b>Read as:</b> the segmentation is not a one-year artefact. But note revenue moved twice as
+        much as headcount — <b>a segment holding its size is not evidence its value held</b>. Report
+        both or neither.
+      </p>
+    </div>
+
+    <div class="metric is-warn">
+      <div class="mtop">
+        <p class="mname">Does last year's model still carve this year's data?</p>
+        <span class="chip warn">Methods disagree</span>
+        <span class="spacer"></span>
+        <span class="mvalue">1.24 · 0.89</span>
+      </div>
+      <p class="means">
+        <b>What it measures:</b> fit on last year, apply to this year, and compare against the same
+        method disagreeing with <i>itself</i> inside one period. That self-disagreement is the
+        <b>ceiling, not a baseline</b> — so <b>1.0 means a year of time cost nothing</b>. Our two
+        methods land on opposite sides of it: GMM 1.24, LCA 0.89.
+      </p>
+      <div class="scale">
+        <div class="track">
+          <div class="fill" style="width: 59.3%"></div>
+          <div class="ideal" style="left: 66.7%"></div>
+          <div class="pin" style="left: 82.7%"></div>
+          <div class="pin warn" style="left: 59.3%"></div>
+        </div>
+        <div class="ends"><span>0.0 · a year destroys it</span><span>1.0 ideal ↑ &nbsp;·&nbsp; 1.5</span></div>
+      </div>
+      <p class="verdict flag">
+        <b>Say "on the best-transferring method", not "on this evidence".</b> An annual refit buys
+        little — but one method says it buys nothing and the other says it would help. That is
+        materially weaker than one clean number.
+      </p>
+    </div>
+
+    <div class="metric is-ok">
+      <div class="mtop">
+        <p class="mname">Can a model tell the two years apart at all?</p>
+        <span class="chip ok">Mild, as expected</span>
+        <span class="spacer"></span>
+        <span class="mvalue">0.621</span>
+      </div>
+      <p class="means">
+        <b>What it measures:</b> we ask a model to guess which year a booking came from.
+        <b>0.5 is ideal here</b> — it would mean the two years are interchangeable. Our controls make
+        it readable: random halves of one year score 0.500, while domestic-vs-international scores
+        0.995.
+      </p>
+      <div class="scale">
+        <div class="track">
+          <div class="fill" style="width: 24.2%"></div>
+          <div class="ideal" style="left: 0%"></div>
+          <div class="pin" style="left: 24.2%"></div>
+        </div>
+        <div class="ends"><span>↑ ideal · 0.50, interchangeable</span><span>1.00 · totally different</span></div>
+      </div>
+      <p class="verdict">
+        <b>Read as:</b> the population has measurably shifted, but mildly, and the segment sizes
+        absorbed it. Clear of the "no difference" rail, nowhere near the "obviously different" one.
+      </p>
+    </div>
+  </section>
+
+  <!-- ─────────────────────────── Q5 ─────────────────────────── -->
+  <section>
+    <div class="qhead">
+      <span class="tag">Question 5 of 5 · production monitoring</span>
+      <h2>Is the incoming data changing underneath the model?</h2>
+      <p class="answer">
+        The rules themselves cannot drift — they are code. Drift can only enter through the
+        <b>customers walking in the door</b>. <b>The segment mix is essentially frozen, and one input
+        moved: PAL turned on a new booking channel.</b>
+      </p>
+    </div>
+
+    <div class="metric is-ok">
+      <div class="mtop">
+        <p class="mname">Segment mix stability (PSI)</p>
+        <span class="chip ok">Stable</span>
+        <span class="spacer"></span>
+        <span class="mvalue">0.0028</span>
+      </div>
+      <p class="means">
+        <b>What it measures:</b> how much this year's distribution differs from last year's.
+        <b>0 means identical.</b> The industry convention: above 0.10 investigate, above 0.25 consider
+        rebuilding. We are two orders of magnitude below the first threshold.
+      </p>
+      <div class="scale">
+        <div class="track">
+          <div class="fill" style="width: 0.6%"></div>
+          <div class="ideal" style="left: 0%"></div>
+          <div class="pin" style="left: 0.6%"></div>
+        </div>
+        <div class="ends"><span>↑ ideal · 0, identical</span><span>0.10 investigate · 0.25 rebuild →</span></div>
+      </div>
+      <p class="verdict">
+        <b>Read as:</b> no action needed. 22 of the 23 fields the rules read are equally stable.
+      </p>
+    </div>
+
+    <div class="metric is-warn">
+      <div class="mtop">
+        <p class="mname">Booking channel mix (PSI) — the one flag</p>
+        <span class="chip warn">Explained, not alarming</span>
+        <span class="spacer"></span>
+        <span class="mvalue">0.4111</span>
+      </div>
+      <p class="means">
+        <b>What it measures:</b> the same test on how customers reach us. It trips the rebuild
+        threshold — but <b>93% of the movement is one new channel appearing</b>: NDC went from
+        <b>0 bookings to 366,890</b>. Strip out channels that did not exist before and the same
+        measure reads <b>0.0285 — stable</b>. Alongside it, OTA fell 18.1% → 12.9% and direct
+        web/app rose 32.9% → 37.2%.
+      </p>
+      <div class="scale">
+        <div class="track">
+          <div class="fill" style="width: 5.7%"></div>
+          <div class="ideal" style="left: 0%"></div>
+          <div class="pin warn" style="left: 82.2%"></div>
+          <div class="pin" style="left: 5.7%"></div>
+        </div>
+        <div class="ends"><span>↑ ideal · 0 &nbsp;·&nbsp; 0.0285 excluding the new channel</span><span>0.41 as measured →</span></div>
+      </div>
+      <p class="verdict flag">
+        <b>A metric caveat worth knowing:</b> this measure cannot tell "this category is brand new"
+        from "this category exploded", so launching anything makes it cry wolf. <b>The commercial
+        question is real though:</b> NDC now carries 3.6% of bookings and rising, no rule accounts for
+        it, and booking channel is an input to the Corporate rule.
+      </p>
+    </div>
+  </section>
+
+  <div class="withdrawn">
+    <h2>One number previously circulated is withdrawn</h2>
+    <p>
+      Earlier material quoted the year-on-year transfer test as <b>0.729 against a ceiling of 0.645 —
+      ratio 1.13</b>, read as "an annual refit buys nothing". <b>That figure does not reproduce and
+      should not be used.</b>
+    </p>
+    <p>
+      It came from a run whose sample was silently 43% of what was intended: a database query applied
+      its date filter <i>after</i> drawing the sample rather than before, so it returned about 13,000
+      rows per year instead of 30,000. Corrected and re-run, the same method gives 0.89 and a second
+      method gives 1.24. <b>That a result flipped sides when the sample doubled means the original was
+      noise, not a finding.</b> The defect is fixed, everything affected has been re-run, and no
+      segment label was ever touched by it.
+    </p>
+  </div>
+
+  <section>
+    <div class="qhead">
+      <span class="tag">Reference</span>
+      <h2>Every metric on one page</h2>
+    </div>
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Metric</th><th>In plain terms</th><th>Ideal</th><th>Ours</th><th>Standing</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="name">Pair AUC</td>
+            <td>Can we tell two segments apart on evidence the rules never saw?</td>
+            <td class="num">1.00</td><td class="num">0.861</td><td>Strong</td>
+          </tr>
+          <tr>
+            <td class="name">Pair AUC, strict</td>
+            <td>The same, using only two leak-proof fields</td>
+            <td class="num">1.00</td><td class="num">0.637</td><td>Thin by design</td>
+          </tr>
+          <tr>
+            <td class="name">Weakest pair</td>
+            <td>Overseas workers vs homecoming visitors</td>
+            <td class="num">1.00</td><td class="num">0.548</td><td>Unresolved</td>
+          </tr>
+          <tr>
+            <td class="name">Incremental AUC</td>
+            <td>What the label adds over the raw booking data</td>
+            <td class="num">large</td><td class="num">+0.0005</td><td>Near zero</td>
+          </tr>
+          <tr>
+            <td class="name">Label-only AUC</td>
+            <td>What the label carries by itself</td>
+            <td class="num">1.00</td><td class="num">0.598</td><td>Real signal</td>
+          </tr>
+          <tr>
+            <td class="name">Detection floor</td>
+            <td>Smallest segment we could still find</td>
+            <td class="num">0%</td><td class="num">2%</td><td>Blind below 1%</td>
+          </tr>
+          <tr>
+            <td class="name">Share TVD</td>
+            <td>How much the segment mix moved in a year</td>
+            <td class="num">0 pp</td><td class="num">1.71 pp</td><td>Stable</td>
+          </tr>
+          <tr>
+            <td class="name">Revenue TVD</td>
+            <td>How much the revenue mix moved in a year</td>
+            <td class="num">0 pp</td><td class="num">3.36 pp</td><td>Watch</td>
+          </tr>
+          <tr>
+            <td class="name">Transfer ratio</td>
+            <td>Does last year's model still work this year?</td>
+            <td class="num">≥ 1.0</td><td class="num">1.24 · 0.89</td><td>Methods disagree</td>
+          </tr>
+          <tr>
+            <td class="name">Adversarial AUC</td>
+            <td>Can a model tell the two years apart?</td>
+            <td class="num">0.50</td><td class="num">0.621</td><td>Mild</td>
+          </tr>
+          <tr>
+            <td class="name">Segment-mix PSI</td>
+            <td>Is the customer mix drifting?</td>
+            <td class="num">0</td><td class="num">0.0028</td><td>Stable</td>
+          </tr>
+          <tr>
+            <td class="name">Channel PSI</td>
+            <td>Is the way customers reach us drifting?</td>
+            <td class="num">0</td><td class="num">0.4111</td><td>New channel</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer>
+    Sources: outputs/validate_construct · validate_criterion · validate_temporal · detection_power ·
+    monitor_real<br>
+    Philippine Airlines · anonymous trip-purpose × value segmentation · methodology v1.10
+  </footer>
+
+</div>

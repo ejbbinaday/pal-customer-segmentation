@@ -47,6 +47,18 @@ it was Filipinos buying international economy tickets, now `Outbound Internation
 higher-priority branches: 2,945,686. As a flag it covers every short-lead booking: **4,411,666** —
 including 864,292 OFW/Migrant, 315,333 Corporate and 196,364 Balikbayan/VFR that were short-lead all along
 and invisible as such. **50% more visible short-lead volume without moving a single threshold.**
+(Those three counts are on **v1** labels — correct for "what was invisible before". Under v2 the same
+4,411,666 bookings split 858,318 · 415,411 · 193,897, because the retired Last-Minute branch used to
+outrank those segments. Say which.)
+
+⚠️ **The flag does not ride along with every segment, and the per-segment *rate* is not all behaviour.**
+Three of the eleven rules read `lead_days` too, so three bars of any short-lead-by-segment chart are
+partly or wholly rule-induced: **MICE** (`lead_days >= 45`) and **Ultra Wealthy Leisure**
+(`lead_days >= 30`) are **0% short-lead by construction**, not by behaviour; and **Corporate's
+35.6% is partly circular** — one of its two branches is `any_business AND lead_days <= 7`, which only
+admits bookings that are already short-lead. On the `corp_channel` branch, which carries no lead-time
+condition, Corporate is **23.3%** — still above the 19.26% book average, so the behavioural claim
+survives at a quarter of its apparent size. **Quote 23.3%, not 35.6%.**
 
 ## 3. Validation
 
@@ -102,17 +114,47 @@ the deliverable's value is communication and targeting rather than prediction.
 - **Composition holds where the volume is.** The segments showing drift are the smallest ones — Mabuhay
   (0.03%), Pilgrimage (0.2%), MICE (0.13%) — where a few hundred bookings move a mean. Treat as unresolved
   noise, not established behavioural change.
-- **A model fitted a year earlier carves the later data as well as one fitted on it.** LCA transfer ARI
-  **0.729** against a within-window ceiling of **0.645** — ratio **1.13**. On this evidence a yearly refit
-  buys nothing.
+- **A model fitted a year earlier carves the later data about as well as one fitted on it — on the
+  best-transferring method.** `GMM(full)` transfer ARI **0.740** against a within-window ceiling of
+  **0.595** — ratio **1.24**. So an annual refit buys little.
+  ⚠️ **But the panel disagrees, so state the method.** `LCA` transfers *below* its own ceiling —
+  0.648 against 0.726, ratio **0.89**. Two methods, opposite sides of 1.0. This is weaker evidence than
+  one clean ratio, and "on this evidence a yearly refit buys nothing" overstates it.
+  ⚠️ **The earlier figures — LCA 0.729 / 0.645 / ratio 1.13 — do not reproduce and must not be quoted.**
+  They came from a run whose per-window sample was silently 43% of intended (`load_sample` applied its
+  window filter *below* the reservoir sample, so it returned ~13,000 rows instead of 30,000; found and
+  fixed 18 Aug). That a ratio crossed 1.0 when the sample doubled means the earlier estimate was
+  noise-dominated — V4 reports point estimates with no interval, and the transfer stage needs a
+  multi-seed spread before any ratio is quoted.
 - Outcome fields are excluded throughout as right-censored: `flown_any` runs ~100% early and falls to 30.7%
   in the most recent quarter purely because those bookings have not flown yet.
 
-### ⚠️ V3 — detection power was NOT re-run
+### V3 — detection power: re-run against v2, and it holds
 
-Last run 29 July, on the **old** labels. Its conclusion is method-level (could we find a planted segment if
-one existed — yes at ≥2% prevalence, never below ~1%) so it is not invalidated by relabelling, but **it has
-not been re-verified against the current taxonomy.** Say so if asked.
+Re-run 18 August at `k=11` (the v2 named-segment count; the 29 July run used 10). **The conclusion is
+unchanged.** Reading the *majority* of the 12 method × archetype combinations rather than the luckiest:
+
+| prevalence | majority detection |
+|---|---|
+| 0.50% · 1.0% | **never**, at any distinctness tested |
+| 2.0% | detected at distinctness ≈0.494 |
+| 5.0% | detected at ≈0.219 |
+| 10.0% | detected at ≈0.13 |
+
+So the bounded null stands: **no segment exists in these features at or above 2% of bookings with
+distinctness ≈0.494 or greater** — and the limitation travels with it: **below ~1% of bookings (~229k) a
+segment could exist and this pipeline would not find it.**
+
+⚠️ **Do not quote the single-method minimum.** One combination found a group as faint as 0.114 planted
+silhouette while groups as distinct as 0.567 were missed elsewhere in the grid — that is the luckiest of
+12 draws, not a floor. Quote the majority-rule numbers above.
+
+⚠️ **One instrument failed its own control.** Persistent homology's H0 component count returned median 2,
+75th percentile 4, **maximum 131** across 100 draws of unchanged `w=0` data. A statistic ranging 2–131 on
+identical input cannot detect anything, so this grid draws no conclusion from it. That qualifies the
+28 July report's "1 significant H0 component" — 2 is the modal outcome, so the continuum reading survives,
+but as the centre of a noisy distribution rather than a measurement. The H1 loop-noise ratio and the
+barcode shape are the robust parts of that analysis; the integer count is not.
 
 ## 4. The SME constraint programme
 
@@ -168,13 +210,21 @@ PAL's answer was **"see run first"**, so these are a proposal, not agreed values
 - 23.4% of bookings reclassified
 - The Gulf one-month pattern is real and corridor-specific
 - Every certain SME rule is enforced in code, asserted on every build
+- Segment sizes and composition hold across a twelve-month step, on full-population counts
 
 **Do not say:**
 - That the weakest boundary improved — it did not
 - 0.608 → 0.72 — not the same test
 - 62.7% reclassified — that is mostly a rename
+- **LCA transfer ARI 0.729 / ceiling 0.645 / ratio 1.13 — withdrawn, computed on a 43% sample.**
+  The current numbers are GMM 1.24 and LCA 0.89, and the methods disagree
+- **That Corporate is the most short-lead segment at 35.6%** — one of its rule branches only admits
+  short-lead bookings. 23.3% is the honest figure
+- That MICE or Ultra Wealthy Leisure never book late — they are 0% *by rule construction*
 - That the Gulf pattern is *caused* by employer leave — the fare-rule confound is open
-- Anything from V3 as re-verified — it was not re-run
+- **V3's single-method minimum (0.114 planted silhouette)** — that is the luckiest of 12 draws;
+  quote the majority floors (≈0.494 at 2%, ≈0.219 at 5%)
+- The H0 component count as a clean measurement — it ranges 2–131 on unchanged data
 
 **Known limitations to own before being asked:** no loyalty field, so Mabuhay is unmeasurable at 0.03%;
 no ancillary revenue; segment labels add little incremental prediction over the raw features; detection

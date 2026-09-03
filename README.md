@@ -1,11 +1,19 @@
 # PAL Customer Segmentation
 
 ML framework to auto-classify Philippine Airlines PNRs into actionable revenue segments.
-**The shipped model emits 10 named segments + Unassigned; PAL approved a 13-segment taxonomy on
-17 Aug 2026** (adding MICE, Ultra Wealthy Leisure and Intl. Student, and turning Last-Minute into a
-flag). The two are deliberately kept apart in `src/pal_colors.py` — `SEG_ORDER` is what the model
-emits, `SEG_APPROVED` is what PAL agreed; the waterfall change is pending. See
-`docs/methodology.md` v1.8 and `docs/sme-constraints-intake.md` §7.
+**The shipped model emits 11 named segments + Unassigned = 12 labels** — waterfall v2, shipped
+18 Aug 2026. `src/pal_colors.py` is the source of truth and says so itself: `SEG_ORDER` now *equals*
+`SEG_APPROVED`, because the waterfall change has landed. v2 added MICE, Ultra Wealthy Leisure,
+Intl. Student and Outbound International Leisure; renamed Budget/Adventure → Leisure; dropped Family and
+Digital Nomad; and turned Last-Minute into a booking flag (`SEG_FLAGS`, 19.26% of bookings). v1 emitted
+9 named + Unassigned — do not quote v1 counts. The Power BI export stamps one further label,
+`Excluded (non-revenue)`, on the 15,073 coupons whose customer was dropped at Stage F, so
+`dim_segment.csv` has **13 rows**. See `docs/methodology.md` v1.12 and `docs/sme-constraints-intake.md` §7.
+
+> ⚠️ PAL's 17 Aug approval is recorded elsewhere as a "13-segment taxonomy", which reconciles to today's
+> 11 only if it counted `Digital Nomad` and `Last-Minute` — both removed on 18 Aug (unimplementable in
+> anonymous data; became a flag). `SEG_APPROVED` holds 12 entries, not 13. Worth confirming against the
+> approval record before the number is quoted to PAL.
 
 **The active track is the real 38M-coupon extract.** The customer base is a **continuum**, not a set of
 natural clusters — so the **rule-based purpose×value segmentation is primary** and model-based clustering
@@ -26,6 +34,11 @@ data/PAL-data/ REAL PAL coupon-level extract — 4 gzipped CSVs, ~38M rows, 40 c
                  (git-ignored, local only). newQuery2024 / 2025 / 2026Jan_to_May / 2026Jun_to_2027May
 data/interim/  Derived Parquet built from the raw gz (git-ignored):
                  pal_parquet/   typed, zstd, partitioned by iss_year — the fast pipeline input
+                 pal_subsegment.parquet  level-2 assignment: (customer_id, issue_date, sub_segment)
+                   for the 21.7M bookings in the five sub-typed parents — src/subsegment_assign.py
+                 pal_export_bk.parquet   build cache: booking grain + the level-2 assignment, merged
+                   once so the 38.1M-coupon export scan stays inside its 8 GB memory limit. Rebuilt
+                   automatically when either input is newer
 data/constraints/ SME business constraints (tracked): hard_constraints.csv (15 impossibility rules) +
                  soft_constraints.csv (42 tendencies) + README.md (column + status guide). Now holds the
                  RM-Domestic workbook response, not just our guesses; each row tagged with provenance,
@@ -70,7 +83,7 @@ so they can be run from anywhere (e.g. `python src/hdbscan_final.py`).
 | `src/pca_boundaries.py` | Decision-boundary / PCA zoom | `outputs/boundary_output/` |
 | `src/hdbscan_final.py`  | **Final model** (HDBSCAN → 10 segments) | `outputs/hdbscan_output/` |
 | `src/resample_compare.py`| Resampling study (rejected) | `outputs/resample_output/` |
-| `src/monitor_metrics.py`| Production monitoring (DBCV/PSI/ARI/drift) | `outputs/monitor_output/` |
+| `src/monitor_metrics.py`| Monitoring **metric library** + prototype report (DBCV/PSI/ARI/drift). The real-data entrypoint is `src/monitor_real.py` | `outputs/monitor_output/` |
 | `src/pal_colors.py`     | Shared segment names + palette (imported everywhere) | — |
 
 ## Generators / deliverables
@@ -82,6 +95,7 @@ so they can be run from anywhere (e.g. `python src/hdbscan_final.py`).
 
 | Deck | Source | PNGs |
 |---|---|---|
+| **Final defence deck (pptx)** — built from `docs/defense-slides-outline.md`, themed on PAL's CPT3 template; 26 slides + speaker notes, current v2 numbers. Real pipeline figures throughout: the `reports/study_guide/` EDA charts (lead time/fare tiers, region mix), the PCA overlap figure, the ten-method silhouette sweep, the LCA sub-type Sankey (`src/sankey_subsegment.py` — ML's refinement layer), an 11-row dated iteration ledger, plus matplotlib charts generated from the `outputs/` CSVs (detection floors, 55-pair AUC strip, share-vs-revenue, value bands, short-lead rates, Gulf stay-length, flag-vs-segment) | `assets/final-defense/CPT3_DefenseDeck_V3.pptx` | — (native pptx) |
 | Kick-off executive deck | `assets/kick-off-call/pal_executive_deck.html` | `python src/capture_slides.py` |
 | **Stakeholder deck** — current methodology · business-rule waterfall · success metrics + worked cost calc · SME constraint asks · persona cards | `assets/tuesday-slides/josh-slides.html` | `python src/capture_slides.py --deck tuesday` → `reports/tuesday_slides/` |
 
@@ -138,14 +152,18 @@ python src/detection_power.py --quick    # same, ~1 min, coarse grid, directiona
 python src/validate_temporal.py  # out-of-time stability: do the segments hold a year later? (~5 min) → outputs/validate_temporal/
 python src/validate_temporal.py --quick  # same, ~1 min, directional only
 python src/build_pbip.py      # Power BI project reproducing the revenue/PAX mock-up → outputs/pbip/
-python src/sub_segment.py     # LCA sub-types within large rule segments → outputs/sub_segments/
+python src/sub_segment.py     # LCA sub-types within the 5 largest v2 segments (~2 min) → outputs/sub_segments/
+python src/subsegment_assign.py  # LEVEL 2: assign every booking its sub-type (~30 s) → data/interim/pal_subsegment.parquet
+python src/monitor_real.py    # drift monitoring on real data: segment-mix + rule-input PSI (~1 min) → outputs/monitor_real/
 python src/rule_confidence.py # how *determined* is each rule label? (~1 min) → outputs/rule_confidence/
 python src/check_constraints.py       # validate data/constraints/*.csv against the feature table (~1 min)
 (cd src && python apply_soft_priors.py)  # Stage P: score the 21 live SME tendencies vs the labels (~1 min)
 python src/simulate_waterfall_v2.py   # DESIGN ONLY: proposed taxonomy change, before/after + rule check (~1 min)
 python src/probe_stay_length.py       # SME claim: does stay length split OFW from Balikbayan? (~30 s) → outputs/stay_length/
 (cd src && python probe_constraint_coverage.py)  # all 39 SME rules: evaluable? fires? (~1 min) → outputs/constraint_coverage/
-python src/export_powerbi.py  # Power BI fact table (coupon + agg grain, ~2 min) → outputs/powerbi_export/
+python src/export_powerbi.py  # Power BI star schema, levels 1+2 (~5 min; needs subsegment_assign.py first) → outputs/powerbi_export/
+python src/segment_charts.py  # v2 segment charts: size/revenue, value bands, flag, reclass (~30 s) → outputs/segment_charts/
+python src/sankey_subsegment.py  # one parent → its LCA sub-types, as a Sankey (~2 s) → outputs/segment_charts/fig_s07_sankey_*.{png,json}
 python src/report_figures.py  # real-data EDA + preliminary-cluster figures → outputs/report_real/figs/
 python src/manuscript_figures.py  # manuscript Ch.4 figures from saved CSVs → outputs/report_real/figs/ms_fig*.png
 python src/build_report.py    # embed figures + render → docs/status-report.{html,pdf}
@@ -239,7 +257,8 @@ and −1.1% PAX, not +6.2%/+6.5%) and flags that real `NetRevenue` implies **₱
 a credible fare — units need confirming with PAL before any revenue figure ships.
 `export_powerbi.py` joins the booking-grain `proxy_segment` back down onto the cleaned coupons and writes
 the **preliminary Power BI star schema** into `outputs/powerbi_export/` — row-preserving (coupons in =
-coupons out):
+coupons out). It carries **both levels**: `CustomerSegment` (level 1) and `SubSegment` (level 2, the LCA
+sub-type inside a parent), so it requires `subsegment_assign.py` to have run first:
 
 The folder is laid out as a **self-contained handoff** — zip it and send it:
 
@@ -249,10 +268,11 @@ outputs/powerbi_export/
 ├── summary.md                    field dictionary, reconciliation, caveats
 ├── model/                        ← what Power BI actually loads
 │   ├── dim_date.csv                 1.8k rows — mark as the Date table
-│   ├── dim_segment.csv                11 rows — persona dimension (see below)
-│   ├── scorecard_segment_month.csv  1,835 rows — per-segment scorecards (see below)
-│   ├── fact_flight/                20.6M rows — full dashboard (flight no., O&D, lead time)
-│   └── fact_dashboard.parquet       2.1M rows — fast summary-only alternative
+│   ├── dim_segment.csv                13 rows — persona dimension (see below)
+│   ├── dim_subsegment.csv             28 rows — level-2 dimension (see below)
+│   ├── scorecard_segment_month.csv  3,544 rows — per-segment scorecards (see below)
+│   ├── fact_flight/                20.7M rows — full dashboard (flight no., O&D, lead time)
+│   └── fact_dashboard.parquet       2.3M rows — fast summary-only alternative
 ├── qa/sample_100k.csv             100k rows — build + validate DAX before moving GBs
 └── detail/fact_coupons/           38.1M rows — only for Age / UniqueID
 ```
@@ -267,7 +287,7 @@ departure month — use `LeadTimeDays`).
 
 **`model/scorecard_segment_month.csv` — the per-segment scorecard source.** Grain is segment × travel
 month plus only the flags a scorecard must filter on (`IsInternational`, the two completeness flags, and
-the `IsRefund` / `IsAward` / `IsNonRev` / `RevMissing` exclusions). **1,835 rows / 127 KB**, so a KPI tile
+the `IsRefund` / `IsAward` / `IsNonRev` / `RevMissing` exclusions). **3,544 rows / 471 KB** (it carries `SubSegment` too), so a KPI tile
 never aggregates 20M rows and the BI developer can check totals in Excel first. Every numeric column is
 **additive** (`Coupons`, `Bookings`, `PaxCount`, `NetRevenue`, `NetFare`). **No stored percentages —
 deliberately:** a share is valid only in the filter context that computed it, so shares must be DAX
@@ -289,12 +309,48 @@ informed inference, not findings; and **governance** (`Trust`, `DataCaveat`, `Is
 `DataCaveat` on the card** — persona cards persuade, and a cropped caveat is how "Mabuhay 0.03%" becomes
 "the loyalty programme doesn't matter". Filter `IsModelledSegment = FALSE` out of commercial visuals.
 Full guide: `docs/powerbi-guide.md` §3b.
+
+**`model/dim_subsegment.csv` — the level-2 dimension.** `SubSegment` is the LCA sub-type *inside* a
+parent segment, assigned per booking by `subsegment_assign.py` and related on `SubSegment`. 28 rows: 20
+sub-types across the five biggest parents, plus a self-named row for each segment that has none (MICE's
+`SubSegment` is `MICE`) — a NULL would silently drop those eight segments out of every level-2 visual and
+break reconciliation against `dim_segment`. The key is composite (`Parent — sub-name`) because the names
+are **not** unique alone: `one-way · advance · saver` is emitted by Leisure, OFW/Migrant and Outbound
+International Leisure alike. `IsSubTyped` separates real sub-types from the self-named rows.
+`SubSegmentSortOrder` is a dense 1..28 rank; colour is inherited from the parent. The sub-types are
+**actionable partitions of a continuum, not natural kinds** — target with them, never score with them.
+Full guide: `docs/powerbi-guide.md` §3c.
+`monitor_real.py` is the **real-data drift monitor** (Regime C): it imports the dataset-agnostic metric
+functions from `monitor_metrics.py` and runs segment-mix PSI, per-rule-input PSI and per-segment
+volume/revenue drift across the two censoring-safe 12-month windows defined in `validate_temporal.py`.
+It deliberately does **not** compute DBCV/silhouette or cross-window ARI — those score a fitted
+clustering, and the shipped labeller is deterministic; `outputs/monitor_real/summary.md` says so on the
+page rather than leaving a blank. `sub_segment.py` runs LCA **inside** the five largest v2 segments.
+`segment_charts.py` draws the six **shipped-taxonomy segment charts** — share of bookings vs share
+of revenue, mean revenue per booking, `value_band` mix, short-lead rate, the top v1→v2 reclassification
+flows, and Last-Minute segment-vs-flag — plus a `segment_summary.csv` table view, all aggregated in
+DuckDB over the full 22.9M-booking table so a chart cannot drift from the build.
+`sankey_subsegment.py` draws **one** parent segment fanning into its LCA sub-types (default
+`Balikbayan/VFR`; `--parent` selects another) for the deck's refinement slide — ribbon width is share of
+the parent, fill is median revenue on a single-hue sequential ramp. It **parses
+`outputs/sub_segments/summary.md`** rather than re-fitting the LCA, so the figure cannot disagree with the
+report the docs quote; run `sub_segment.py` first if the taxonomy changes. **The PNG is the diagram only —
+no text** — and a sibling `.json` carries each flow's label anchor in axes fractions, so every label lives
+in PowerPoint as an editable text box: `slide_y = picture_top + (1 - anchor_y) * picture_height`. The
+figure is saved without a tight bounding box precisely so that mapping holds.
 `report_figures.py` draws the real-data EDA + preliminary-cluster (LCA/PCA) figures used in the
 shareable status report; `build_report.py` embeds them into a self-contained
 **`docs/status-report.html`** and renders **`docs/status-report.pdf`** (a colleague-facing summary of
 the approach, methodology, EDA and current status) from the `docs/_status-report.template.html` template.
 
 Key references:
+- **`docs/handover-pack.md`** — **the operating manual handed to PAL (27 Aug)**: deliverables
+  inventory, the nine-command refresh runbook with five post-refresh checks, what "retraining"
+  means here (relabel / refit level 2 / the seven-step rule-change release procedure), how to read
+  the drift monitor (with the NDC alarm as the worked example), the Power BI traps, a two-week KT
+  plan with pass conditions, limitations that must travel, and the four-tier improvement roadmap
+  (data before algorithms). **This is the "handover pack" the old defence deck's limitations slide
+  referenced** — that open item is closed. `handover-pack.html` is the shareable artifact version.
 - **`docs/stakeholder-report.md`** — the **non-technical stakeholder report**: plain-language
   methodology, the full rule waterfall as implemented, ten data-backed **persona cards**, the success
   metrics with a worked peso cost calculation, and the SME asks (hard/soft constraints + labelled
@@ -305,6 +361,39 @@ Key references:
   presenting, so every claim carries its caveat. The `.html` is the shareable version, published
   as a Claude artifact: every claim carries a coloured confidence rail marking it safe to state,
   caveated, or not to be said.
+- **`docs/final-defense-reviewer.md`** — **the final consolidated defence reviewer (25–26 Aug)**:
+  opens with §1.1–§1.4 — every load-bearing concept in three registers (plain English → technical →
+  the number), then the methodology, EDA and results end to end in the same dual register — then:
+  everything that changed after the study guide (level-2 assignment, the two business cases, the
+  k=1/k=2 continuum extensions), a stress test of the three load-bearing argument chains with three
+  fresh findings (the 87.8% segment-stability figure decomposes to 53.4% among repeat customers;
+  the deck still embeds the stale 23 Jul clustering PNGs; methodology.md's V1 section still says
+  45 pairs), a slide-by-slide walkthrough of the **26 Aug rebuilt deck** (28 slides, business-first —
+  the audit found the "10 vs 11 segments" on-deck contradiction and that the validation story moved
+  entirely into Q&A), a 58-question panel Q&A with model answers, and the pre-defence action
+  checklist.
+  Supersedes the study guide and brief on anything dated 21–25 Aug. The companion
+  **`final-defense-reviewer.html`** is the shareable version, published as a Claude artifact —
+  same content with the Q&A as click-to-reveal self-quiz cards.
+- **`docs/defense-script-methodology-results.md`** — **word-for-word talk track for slides 12–18
+  of the 26 Aug rebuilt deck** (methodology + results blocks, 9:05 timed): spoken lines, stage
+  directions, per-slide guardrails aligned to the never-say list, the entry/exit transitions, and
+  five pocket answers for likely interruptions. The older `defense-script.md` covers the
+  superseded 26-slide deck.
+- **`docs/defense-study-guide.md`** — **the defence study companion**: the one-story spine, the
+  seven principles, every technique in plain words with an analogy, the memorize/never-say number
+  tables, a claim·proof·trap map of the 24-slide deck, a drilled question bank with owners, the
+  stale-figures ambush list (older docs still carry v1 numbers), and a three-session study plan.
+- **`docs/defense-slides-outline.md`** — **slide-by-slide outline for the capstone defence deck**:
+  the eight agreed sections with owners (Martin/Josh/Jadd), per-slide headlines and content grounded
+  in the defence brief's numbers, the ⚠️ what-not-to-say guardrails inlined per slide, timing budget,
+  backup-slide list and team Q&A prep. Build the deck from this file; the brief stays authoritative
+  on the numbers.
+- **`docs/metrics-explained.html`** — the **executive companion to the brief**: every validation metric
+  with what it actually measures in plain terms, an analogy, the scale it sits on with the ideal value
+  marked, and where we landed. Written for a reader who should not have to know what an AUC is. Also
+  carries the withdrawal notice for the superseded transfer-ARI figure. Published as a Claude artifact;
+  reuses the brief's design tokens so the two read as one set.
 - **`docs/segment-cost-research.md`** — **answers PAL question A1: what a misclassification costs.**
   Five cost components each sourced from published airline revenue-management and customer-value
   research, our own per-segment economics in confirmed USD (annual value at risk spans **$495–$9,784**),
@@ -341,6 +430,25 @@ Key references:
   replication gate, and a hard stop rule.
   Records which four of the six explanations for "no clusters" are already closed, so they are not re-run.
   Also corrects one kill criterion in `recommendations-plan.md` Phase 4 that relied on the retired H0 detector.
+- **`docs/do-nothing-vs-implement.md`** — **the benefits analysis: what PAL gains by implementing the
+  segmentation vs continuing as it is.** Written for the defence panel and organised by **the five
+  departments that would consume the output** — RM (pricing) · Sales (channels) · Marketing (promos) ·
+  CX (web/app & lounge) · Loyalty (churn) — so every claim maps to a decision someone owns. Measured
+  figures (§4) and assumed parameters (§5) are kept strictly apart, and the decision is resolved by
+  **breakeven rather than forecast** (§7 — 0.116% of avoidable dilution covers year-1 cost, still 4.7%
+  with every placeholder 10x worse at once). Key finding: **Sales and CX need no response assumption at
+  all**, so they are ready first even though RM carries the larger dollars; **Loyalty should wait** — 73.9%
+  of customers are right-censored, so no churn rate exists. §8 lists the eight things it cannot claim.
+- **`docs/business-case-benchmark.md`** — the **top-down, benchmark-derived** business case
+  (imported 23 Aug 2026 from the companion workbook): $77,904/yr actual all-in cost against
+  ~$2.7M/yr risk-adjusted margin, +$7.3M five-year NPV. Carries an import preface naming its
+  reconciliation items against the bottom-up case; manuscript Ch. 5 §§5.2–5.3 argue how the two
+  divide the work (breakeven decides, NPV sizes) and the build-vs-buy comparison.
+- **`docs/subsegment-scoring-plan.md`** — **how level 2 (LCA sub-types) got into the Power BI model** — ✅ built 21 Aug 2026.
+  Today the export carries only `CustomerSegment`; sub-types exist as profiles, not assignments. Scopes the
+  missing scoring pass: the feature space is discrete, so **17,847 cells cover all 21.7M parent bookings** —
+  score cells, join in SQL, and the whole model is a readable CSV. Also lets the 40k sample be dropped
+  (StepMix takes `sample_weight`), lists five encoding blockers, and puts the cost at ~2 days.
 - **`docs/recommendations-plan.md`** — the sequenced plan acting on the 2026-07-28 stress-test findings
   (SME ground truth first, feature-contract gate, GMM confidence layer, pre-registered decision rules,
   and the one gated customer-grain experiment).
@@ -384,9 +492,20 @@ Key references:
 - **`docs/data-dictionary.md`** — authoritative field reference (mirror of the client's
   `DataDictionary.v1.xlsx`), incl. the farebrand → value-tier ladder.
 - **`docs/real-data-plan.md`** — the cleaning → EDA → feature-engineering plan (grain, decisions).
-- **`docs/manuscript-ch4-draft.md`** — first draft of manuscript Chapter 4 (Results, Analysis,
-  Discussion): §4.1 empirical clustering results, §4.2 segment interpretation + validation,
-  §4.3 strategic implications for PAL. All numbers traceable to `outputs/` stage summaries.
+- **`docs/manuscript/manuscript-ch4-draft.md`** — **final draft (v1.1)** of manuscript Chapter 4 (Results,
+  Analysis, Discussion): §4.1 empirical clustering results, §4.2 segment interpretation +
+  validation, §4.3 strategic implications for PAL. Measured on the v2 taxonomy and the 18 Aug
+  validation re-runs, with citations and a census-vs-sample uncertainty statement. All numbers
+  traceable to `outputs/` stage summaries.
+- **`docs/manuscript/manuscript-ch5-draft.md`** — **final draft (v2.0)** of manuscript Chapter 5
+  (Findings, Recommendations, and Conclusions), restructured to the programme outline: §5.1
+  Summary of Technical and Strategic Findings (§5.1.1 technical/ML/behavioural F1–F8, §5.1.2
+  strategic F9–F13), §5.2 the two-route economic case, §5.3 build-vs-buy, §5.4 recommendations,
+  §5.5 limitations and future work, §5.6 Final Project Conclusions.
+- **`docs/manuscript/manuscript-do-nothing-analysis.md`** — **final draft (v1.0)** of manuscript
+  Appendix A: the full do-nothing analysis in manuscript register — five decision owners, the
+  assumption ledger, breakeven at the actual $77,904 budget (0.48%), and the five-year band.
+  Expands Ch. 5 §5.2; the working-document source is `docs/do-nothing-vs-implement.md`.
 - **`docs/eda-report-real-data.md`** — consolidated EDA report on the real 38M-coupon extract
   (raw profile, cleaning, grain confirmations, proxy-segment magnitudes, modelling implications).
   Supersedes `docs/eda-report.md` (prototype sample).

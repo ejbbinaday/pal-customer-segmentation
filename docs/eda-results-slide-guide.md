@@ -82,7 +82,8 @@ rollup is valid.
 
 **On the slide:** three boxes, nothing else.
 
-1. **Most customers fly rarely** — median 2 coupons · only **26.1% ever book twice**
+1. **Most customers fly rarely** — median 2 coupons · only **26.1% book twice inside our window**
+   (**26.5% within 12 months** of their first booking — quote the horizon, never "never return")
 2. **An economy, Philippines-centred airline** — 95.2% economy · **88% in the three cheapest fare brands** · 57.7% domestic
 3. **Clean, but demographically thin** — near-zero operational nulls · **age 57% missing** · award tickets **0.02%**
 
@@ -125,7 +126,7 @@ obvious consequence rather than bad news.
         ↓  group by customer + issue date
 22,911,450 bookings    ONE PURCHASE DECISION  ← the modelling row
         ↓  group by customer
-13,435,365 customers   only 26% book more than once
+13,435,365 customers   only 26% book more than once *in our window*
 ```
 
 **Say:**
@@ -145,9 +146,14 @@ travel.
 **On the slide:** `reports/study_guide/eda_03_lead_value.png`
 
 **Say:**
-> "Left is when people book. Median 25 days out, but look at the spike at zero — **13.3% book inside three
+> "Left is when people book. Median 18 days out, but look at the spike at zero — **19.3% book inside three
 > days.** That's a real last-minute population, and it's why we have a rule for it. Right is what they buy:
 > two-thirds of the book sits in the two cheapest fare brands."
+
+**Grain warning — quote booking-grain numbers on this slide.** The figure is drawn from the 22.9M
+**bookings**, so it is median **18** days and **19.26%** inside three days (= the 4,411,666 the flag
+covers, quoted everywhere else in the deck). Median 25 / 13.3% are the **coupon**-grain figures
+(38.1M coupons); multi-leg trips are planned further ahead, so coupon-weighting looks more advance-booked.
 
 **Watch for:** someone reading the spike at 120 days as a cluster. **It's the display cap, not a finding**
 — say so before they ask.
@@ -162,12 +168,27 @@ travel.
 > **Sea Crew 3.7%** · NDC 2.4% · TMC 1.8%
 
 **Say:**
-> "58% domestic, then East Asia, Southeast Asia and North America. **38.4% of tickets are issued
+> "58% domestic, then East Asia, Southeast Asia and North America. **34.6% of bookings are issued
 > abroad** — that's the diaspora footprint, and it's the single most useful signal we have. Note Sea Crew
 > as its own channel: a contract-driven population that behaves nothing like a leisure traveller."
 
-**If pressed — "why is Europe zero?":** no own-metal service in this extract, so it's an absence of
-operation, not an absence of demand.
+**Grain note:** 34.6% is the **booking**-grain foreign-issue share, which is what belongs next to this
+booking-grain chart. **38.4%** is the **coupon**-grain figure — foreign-issued trips carry more legs, so
+coupon-weighting inflates them. The region bars themselves need no such caveat: domestic is 57.69% of
+bookings and 58.52% of legs, so "58% domestic" is safe at either grain.
+
+**If pressed — "why is Europe zero?":** no own-metal European *sectors* in this extract, so it's an
+absence of operation, not an absence of demand. Precisely: **6,334 bookings do have a European trip
+endpoint** (and 1,740 a South Asian one) via OAL codeshare beyond-points — the bar is built from flown
+own-metal sector endpoints, which is why it reads 0%.
+
+**If pressed — "how do you label a two-stop trip?":** `dest_region = max(intl_region)`, which for a
+multi-region itinerary picks the **alphabetically last** region, not the primary destination. **785,673
+bookings (3.4%) touch more than one international region**, and for **377,331 (1.65% of the book)** the
+bar they sit in is not their final destination's region — systematically pushing trips into *Southeast
+Asia* (it sorts last). Reassigning by final destination moves **SE Asia 11.78% → 10.56%** and **East Asia
+14.80% → 15.67%**; nothing else shifts more than 0.2pp and the ordering is unchanged. Own it as a known,
+measured 1.65% labelling edge, not a defect that changes the story.
 
 ---
 
@@ -201,6 +222,25 @@ operation, not an absence of demand.
 
 **On the slide:** `reports/study_guide/ms_fig1_separation_ceiling.png` (or `clust_02_pca.png` for a
 less technical room — the PCA scatter shows the same thing with no maths).
+
+**If you show `clust_02_pca.png`, know these five things about it:**
+
+| Question you will get | Answer |
+|---|---|
+| "It's only 2 of 16 dimensions" | PC 1 + PC 2 hold **57.7%** of the variance; 4 dims reach 81%. A real view, not a thin shadow — and the 42% off-screen is exactly why ten formal methods follow |
+| "Overlap by eye isn't a measurement" | Rule-segment silhouette **0.091** in the full feature space (0 = groups sit on top of each other). The 2-D view scores −0.16, so the picture is *harsher* than the data — quote **0.091** |
+| "Why nine classes?" | `k* = argmin(BIC)` over k = 3–9, and BIC falls monotonically, so k\* is the **top of the range**. The model wanted more classes than we offered — that *is* the continuum finding. It is **not** paired with the 9 segments on the right |
+| "Stratified by what?" | Nothing — it's a **uniform** reservoir sample (seed 42). Deliberate: balancing by segment or region equalises group sizes and can manufacture structure. The old "stratified" wording was wrong and is fixed |
+| "Isn't the right panel circular?" | Yes, and say so first: the axes are built from the same 11 fields the rules read, so the rules get **home advantage** in this projection — and still form no islands. That makes the overlap harder to dismiss, not easier |
+
+**Regenerated 23 August on v2 labels** — the retired names are gone from the legend, so the v1-era
+warning is discharged for the *files*; **the deck still embeds the 23 Jul versions and needs a
+re-insert** (until then, say "v1 labels, before the redesign" when it goes up). The sweep now starts
+at k = 1: BIC falls 1,148,667 → 928,770 with no elbow anywhere, not even at 2. One new number to
+handle with care: the ARI panel peaks at **0.537 at k = 2**, and that cut is geography (0.909 against
+the domestic/international bit alone; Corporate splits 50/50, its actual domestic mix) — quote it only
+with that qualifier; the customer-structure ceiling is still **0.389 at k = 4**. Silhouette 0.091
+unchanged.
 
 **Say:**
 > "We didn't take one method's word for it. Ten methods, six different families of mathematics. **None of
@@ -322,7 +362,7 @@ less technical room — the PCA scatter shows the same thing with no maths).
 | *"What's Unassigned — is it junk?"* | **The opposite.** It out-earns overseas workers per booking and 18.6% fly premium. It's the largest actionable gap we have. |
 | *"Why is Mabuhay so small?"* | Because there's no loyalty field. The segment is real; our ability to see it is not. **A data request, not a model change.** |
 | *"Which boundary is weakest?"* | Overseas workers vs returning Filipinos — 6.8M bookings split on one bit, and the lowest score in our independent check. |
-| *"Will it survive next year?"* | We tested one 12-month step: sizes hold, and a model fitted a year earlier transfers for free. **But that's one step inside one extract** — not evidence against a demand shock. |
+| *"Will it survive next year?"* | We tested one 12-month step: sizes hold (1.71 pp), and on the best-transferring method a model fitted a year earlier transfers as well as a fresh one (GMM ratio 1.24 — though LCA is 0.89, so the methods disagree). **But that's one step inside one extract** — not evidence against a demand shock. |
 | *"Why does the trend fall off a cliff?"* | It doesn't — the data stops 21 July 2026 and later months are still filling. Always filter to complete travel months. |
 | *"What are you blind to?"* | Three things: any segment under ~1% of bookings; anything needing loyalty tier, stay length or ancillary spend; and behaviour under a shock. |
 

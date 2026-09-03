@@ -454,6 +454,1117 @@ Dashboard Wireframe → Requirements Checklist → [Appendix] Literature
 
 ---
 
+#### 2026-08-27 — The handover pack exists now, and "retraining" is defined as three different actions
+**Domain:** Project Decision
+Wrote `docs/handover-pack.md` (+ `.html`, published as a Claude artifact) — the operating manual
+for PAL's BI team, closing the open item flagged 19 Aug: the old defence deck's limitations slide
+claimed "everything on this slide is also written down in the handover pack" and no artifact by
+that name existed. Contents: deliverables inventory · the nine-command refresh runbook with **five
+post-refresh checks** (rows-in=out assertion, distribution diff, hard-rule assertions, constraint
+sheet, drift verdicts) · **"retraining" disambiguated into three actions** — (a) relabelling is
+automatic and deterministic (rerun = retrain, nothing fits), (b) level-2 LCA refit is occasional
+with three hard-won invariants (`ORDER BY ALL` is load-bearing; weighted BIC is hand-computed
+because `StepMix.bic()` mis-reads weighted cells; sub-types stay provisional), (c) **rule changes
+are a governed seven-step release** (propose → simulate → anchor budget → constraints → palette
+contract → re-audit V1/V4 → paper trail), with waterfall v2 as the worked example · monitoring
+cadence with the NDC alarm as the teaching case · the five Power BI traps (incl. the
+revenue-halving filter) · a **two-week KT plan where every exercise has a pass condition** (incl.
+deliberately breaking a guardrail on day 7) · the limitations that must travel · and the four-tier
+roadmap (data investments → close the validation loop → gated model work → production hardening).
+*Generalises: a handover document is a set of runnable procedures with pass conditions, not a
+description of the system — the test of KT is whether the receiving team can break something safely
+and read the report that catches it. And "retrain" is a dangerous word for a deterministic
+labeller: define the maintenance actions by their triggers, or the new owner will schedule
+retraining that does nothing and skip the rule governance that matters.*
+**Source:** our analysis, 2026-08-27 — `docs/handover-pack.md` v1.0, distilled from `README.md`,
+`docs/methodology.md` v1.12, `docs/installation.md`, `outputs/` stage summaries.
+
+---
+
+#### 2026-08-26 — The deck was rebuilt business-first (28 slides), and the validation story moved entirely into Q&A
+**Domain:** Project Decision
+The defence deck was rebuilt on 26 Aug (`CPT3_DefenseDeck_V3 1.pdf`, 28 pages) — a restructure,
+not an edit: Executive Summary with dollar value up front ($2.7M returns · $272K SaaS avoided ·
+4,612 man-hours · 3 FTEs · Traveler DNA), business case expanded to five slides (do-nothing chart,
+buy-vs-build vendor table, the $360k Traveler DNA system, man-hours), a live Power BI demo, and a
+three-horizon timeline. It also adopts the new bookings-vs-revenue region chart (`eda_02b`).
+**The strategic consequence: the continuum proof, the ten-method benchmark, circularity, and all
+four validation stages are off the slides** — the science is now defended only in Q&A, so backup
+slides (old continuum / honest-validation / V1–V4 scorecard) and the question bank carry the
+technical defence. Audit findings, all in `final-defense-reviewer.md` §3.1/§5/§7: ① slide 6's stat
+tile says **"10 commercial segments"** against slide 16's **"11 Segments Identified"** — an
+on-deck contradiction; ② the limitations slide shrank to 4 owned + 3 in-flight and **dropped
+"labels add little incremental prediction"** — the previously-rehearsed most-likely question is no
+longer owned on-slide; ③ new repo-unsourced numbers lead the deck ($272K reconstructs as cheapest
+vendor $350K+ minus the $77,904 build; the man-hours and $360k bases live in the companion
+workbook); ④ slide 13's PCA legend still carries v1 segment names — the one stale figure that
+survived; ⑤ slide 5 brands the model "Semi-Supervised" — defensible as rules-as-weak-supervision +
+unsupervised refinement, but it needs the scripted one-liner. This supersedes the earlier same-day
+entry's action items about the 20 Aug pptx ("stratified" caption, "20.6M flight rows",
+`clust_01` "≤ 0.34") — those slides no longer exist.
+*Generalises: when a deck is rebuilt for a business audience, the first thing cut is the evidence
+of rigour — and the Q&A preparation must expand by exactly what the slides dropped. Audit a rebuilt
+deck as a new artifact, not a diff: the defects that matter are contradictions between surviving
+slides and inherited numbers whose derivations left the room.*
+**Source:** our analysis, 2026-08-26 — page-by-page read of `~/Downloads/CPT3_DefenseDeck_V3 1.pdf`
+(28 pp) against `docs/defense-brief-2026-08-18.md`, `docs/business-case-benchmark.md`,
+`outputs/sub_segments/`, `src/pal_colors.py`.
+
+---
+
+#### 2026-08-26 — Deck context folded into the reviewer, and the pptx audit found two more stale on-slide details
+**Domain:** Project Decision
+Added a slide-by-slide deck section to `docs/final-defense-reviewer.md` §5 (and the published
+artifact), built by **extracting the 26 slide headlines from the built pptx with python-pptx**
+rather than from the study guide's table — the repo's own "audit against the artifact, not memory"
+rule. Structure confirmed: Problem/TOR Martin (3–4) · EDA+Methodology Josh (5–13) · Dashboard Jadd
+(14–15) · Findings Josh & Jadd (16–22) · Before-handover Josh (23) · Recommendations Martin (24) ·
+Conclusion Josh (25); timing Martin 8 · Josh 20 · Jadd 7 · conclusion 2.
+**Two stale on-slide details the extraction surfaced, both now on the pre-defence checklist:**
+① **slide 8's caption still says "60k stratified sample" — the sample is uniform.** The 19 Aug
+audit fixed the same wrong word in `report_figures.py`'s suptitle but the deck's own text box kept
+it; uniform is also the *correct* choice (stratifying can manufacture structure), so the fix is the
+caption, not the method. ② **slide 15 says "the fact table carries 20.6M flight rows" — it is
+20.7M since the 21 Aug level-2 rebuild** (the deck was built 20 Aug 00:45). Same class as the
+scorecard 1,835 → 3,544 staleness already recorded: the level-2 rebuild moved export-side counts
+after the deck froze.
+*Generalises: a deck freezes the day it is built; any pipeline rebuild after that date should
+trigger a grep of the deck text for the counts that rebuild moves. And a wording fix applied to a
+generator does not propagate to artifacts that copied the old wording — search for the sentence,
+not just the figure.*
+**Source:** our analysis, 2026-08-26 — python-pptx extraction of
+`assets/final-defense/CPT3_DefenseDeck_V3.pptx` vs `outputs/powerbi_export/` counts and
+`src/report_figures.py`; `docs/final-defense-reviewer.md` §5.
+
+---
+
+#### 2026-08-25 — Region mix inverts on revenue: domestic is 58% of bookings and 19% of revenue; North America is 8% and 35%
+**Domain:** Data & Features
+Built the revenue companion to the bookings-per-region chart (`fig_route_region_revenue` in
+`src/report_figures.py` → `outputs/report_real/figs/eda_02b_region_revenue.png`; grouped bars,
+bookings share vs revenue share, same region order, avg $/booking under each label). Measured on all
+22.9M bookings (`rev_pos`, the same field eda_01's value panel uses): **Philippines (domestic)
+57.69% of bookings but 19.34% of revenue ($91/bk)**; **North America inverts hardest — 8.38% of
+bookings, 35.26% of revenue ($1,141/bk, 12.6× domestic)**; East Asia 14.80%/16.90% ($310); Southeast
+Asia 11.78%/13.86% ($319); Middle East 4.03%/6.90% ($464); Oceania 3.32%/7.74% ($631). So the
+segment-level volume–value inversion (Leisure vs Balikbayan) has a clean geographic expression:
+**the domestic network is a volume business, the trans-Pacific network is the revenue business** —
+consistent with Balikbayan/VFR (28.4% of revenue) being heavily North America. Caveats that travel
+with the chart: `dest_region` is the alphabetical-max label (1.65% of bookings mis-regioned, 19 Aug
+entry), and the Europe/South Asia 0% bars mean no own-metal sectors, not no demand.
+*Generalises: any share-of-volume chart in this project should offer its share-of-revenue twin —
+the two rankings disagree at every grain we have tested (segment, sub-type, and now region), and the
+disagreement is usually the commercial finding.*
+**Source:** our analysis, 2026-08-25 — DuckDB over `data/interim/pal_features_booking.parquet`;
+`src/report_figures.py::fig_route_region_revenue`.
+
+---
+
+#### 2026-08-25 — "87.8% of customers never leave their segment" is mostly censoring: 53.4% among repeaters
+**Domain:** Data & Features
+Stress-testing `do-nothing-vs-implement.md` §3 for the defence: its enabling fact — **87.8% of
+customers have `segment_diversity = 1`** — is carried mostly by the **73.9% of customers who book
+exactly once and therefore cannot have diversity > 1** (the same right-censoring §4.5 already owns
+for churn). Measured directly on `pal_features_customer.parquet`: among the **3,512,004 repeat
+customers** (n_bookings > 1), diversity = 1 holds for **53.41%**; among customers with 3+ bookings,
+**38.58%**. Back-of-envelope independence baseline (two bookings drawn independently from the v2
+booking mix, Σpᵢ²) is **~31%**, so repeat customers stick to one segment at roughly **1.7× chance** —
+real, but far weaker than 87.8%. The person-level treatment argument survives via
+`CustomerDominantSegment` (a dominant segment is always defined), but **87.8% must never be quoted
+without the censoring caveat** — a data-scientist panel will decompose it in seconds, and the
+document was written for that panel. Repaired wording and the drill answer live in
+`docs/final-defense-reviewer.md` §3.1 (new doc, 25 Aug — the consolidated defence reviewer:
+current-state deltas since the study guide, stress test of the argument chains, 54-question panel
+Q&A). Same pass confirmed two open items: the defence deck (built 20 Aug 00:45) still embeds the
+23 Jul `clust_01`/`clust_02` PNGs superseded by the 23 Aug renders, and `methodology.md`'s Stage V1
+section still says "45 segment pairs" (10-segment era; shipped run tests 55).
+*Generalises: any "X% of customers are stable" statistic over a fixed window is bounded below by
+the share who only appear once — decompose by opportunity-to-change before quoting stability, or
+the number measures the window, not the customer.*
+**Source:** our analysis, 2026-08-25 — DuckDB probe over `data/interim/pal_features_customer.parquet`
+(13,435,365 customers); `docs/do-nothing-vs-implement.md` §§3, 4.5.
+
+---
+
+#### 2026-08-23 — Chapter 5 restructured to the programme outline: findings split technical/strategic, conclusions move last
+**Domain:** Project Decision
+Rewrote `manuscript-ch5-draft.md` as **v2.0 — "Findings, Recommendations, and Conclusions"** on the
+requested outline: **§5.1 Summary of Technical and Strategic Findings** with **§5.1.1 Technical Machine
+Learning and Behavioural Findings (F1–F8)** and §5.1.2 Strategic and Business Findings (F9–F13), and
+**§5.6 Final Project Conclusions** (the former C1–C4 plus the concluding statement). Sections between
+renumber: economic case §5.3→§5.2 · build-vs-buy §5.4→§5.3 · recommendations §5.5→§5.4 · limitations
+§5.6→§5.5. **Two content additions fell out of the split:** a new behavioural finding (F8 — 87.8%
+segment stability, the 3× repeat floors, the August/December OFW–Balikbayan complementarity, the Gulf
+one-month clock with its confound), which had never been in the findings list despite carrying §4.2.2's
+best domain evidence; and four strategic findings (F10–F13: volume–value inversion, the $645.8M
+mispricing exposure, derived department readiness, the $495–$9,784 misclassification spread) promoted
+from ch. 4/Appendix A prose. Old F8 (identity ceiling) became F9; every F- and §-reference updated in
+ch. 5, the two business-case docs, Appendix A, the README, and the plates artifact.
+*Generalises: a findings list drifts toward whatever chapter wrote it first — restructuring against an
+external outline is a cheap audit that surfaces findings the prose had but the list did not.*
+**Source:** our analysis, 2026-08-23 — `docs/manuscript/manuscript-ch5-draft.md` v2.0.
+
+---
+
+#### 2026-08-23 — DB and CH, computed at last, agree with everything: no internal index finds a k
+**Domain:** Clustering / Methodology
+Ran silhouette, Davies–Bouldin, and Calinski–Harabasz over the k = 1–9 LCA sweep on the standardised
+one-hot (Euclidean) representation of the same 60k sample (seed 42; silhouette sampled at 10k). Saved to
+`outputs/report_real/lca_validity_indices.csv`. **Silhouette 0.074–0.133** (never leaves the <0.25
+no-structure band; max at k = 2, the geography cut). **Davies–Bouldin 2.62–3.03** at every k —
+well-separated clusters run near 1 — with its "best" value at k = 9, the top of the range again.
+**Calinski–Harabasz declines monotonically from k = 2** (6,610 → 3,210), no interior peak. So every
+internal validity index that can be computed on this data agrees with BIC: nothing settles, and the only
+preference any index shows is the trivial domestic/international cut. Folded into ch. 4 §4.1.1(b) (v1.5)
+and the Figure 1 plate (now five panels); the earlier entry's "not applied" answer is upgraded to
+"applied on the representation where they are defined, and they corroborate".
+**Also shipped: Appendix A's six exhibits** (spread ratios + dilution stats · agency dependence ·
+digital/connecting spans · repeat floors · breakeven stats + the five-year band with the 10% path
+deliberately undrawn · readiness table) in the plates artifact, with `[Exhibit A.n]` placeholders in the
+appendix.
+*Generalises: when a metric cannot run in the primary geometry, compute it in the geometry where it is
+defined and report both — "the index does not apply" invites the question; "the index, where computable,
+agrees" closes it.*
+**Source:** our analysis, 2026-08-23 — `outputs/report_real/lca_validity_indices.csv`;
+StepMix k = 1–9, sklearn silhouette/davies_bouldin/calinski_harabasz on the one-hot matrix.
+
+---
+
+#### 2026-08-23 — A stress test designed for a placeholder must be redesigned when the placeholder becomes a measurement
+**Domain:** Project Decision
+Wrote manuscript **Appendix A** (`docs/manuscript/manuscript-do-nothing-analysis.md` v1.0) — the
+do-nothing analysis in manuscript register, expanding Ch. 5 §5.3 from `do-nothing-vs-implement.md`.
+**The carry-over that could not survive unchanged: the sensitivity analysis.** The 21 Aug document
+stressed year-1 cost by 10× because A5 was a placeholder; A5 is now the actual $77,904 budget, and a 10×
+stress on a *measured* number is noise, not diligence. Appendix A restates the stress on what is still
+assumed: halve A8·A9 (dilution pool → $4.04M) → breakeven **1.9%**; add market-rate staffing ($487K
+shadow) → **12.1%**; base case at the actual budget **0.48%** (one in 207). Five-year cumulative cost at
+5%/yr escalation: **$430K = 0.53% of the five-year pool** (supersedes the 0.047% computed on the $18.8K
+placeholder).
+**Also answered from the code, for the defence: which internal validity indices the model actually uses.**
+Silhouette is the cross-method yardstick everywhere (it is the one standard index defined on a precomputed
+non-Euclidean distance); **Davies–Bouldin and Calinski–Harabasz appear only in `monitor_metrics.py`, the
+prototype-track monitor, subordinate to DBCV** — both presuppose Euclidean centroids, undefined under
+Gower on mixed-type features, so they were never applied to the real benchmark. The rationale (with the
+1974/1979 citations) is now one sentence in ch. 4 §4.1.1(b) so the question is answered on the page.
+*Generalises: every sensitivity analysis encodes which inputs it believes are uncertain. When a
+placeholder graduates to a measurement, re-derive the stress on the remaining assumptions — carrying the
+old stress forward either overstates the margin (stressing a known) or hides the new binding uncertainty.*
+**Source:** our analysis, 2026-08-23 — `docs/manuscript/manuscript-do-nothing-analysis.md` §A.7;
+`src/monitor_metrics.py` vs `src/model_zoo.py` grep; `docs/do-nothing-vs-implement.md` §7.
+
+---
+
+#### 2026-08-23 — Two business cases, one decision instrument: the benchmark NPV sizes, the breakeven decides
+**Domain:** Project Decision
+Imported the top-down benchmark business case (companion workbook, Aug 2026) as
+`docs/business-case-benchmark.md` and wrote manuscript **Chapter 5** (`manuscript-ch5-draft.md` v1.0 —
+findings, conclusions, the economic case, build-vs-buy, recommendations). The two cases conflict on cost
+and philosophy, and Ch. 5 §5.3 resolves it by division of labour: the **bottom-up measured case is the
+decision instrument** (breakeven), the **top-down case is conditional sizing** (~$2.7M/yr risk-adjusted,
++$7.3M 5-yr NPV at 10%). **Year-1 cost is now $77,904 actual budget**, superseding the $18,800
+placeholder — breakeven moves 0.116% → **0.48%** of the measured $16.1M dilution exposure (one dollar
+in 207), and 6.1% against the marketing contact lever alone.
+**Three measured conditions attach to the benchmark case, all from our own Ch. 4 results:** ① the
+ancillary lever ($1.23M/yr, 45% of the claimed benefit) rests on revenue the extract does not contain;
+② the retention/churn lever presumes an identity the data lacks (73.9% single-booking, churn not
+computable — the same fact that put Loyalty last in the readiness ordering); ③ the assumed $1.96B
+revenue base is ~⅓ below the extract's measured ~$2.9B/yr ($6.22B/26 months) — conservative in
+direction, but the case should start from the census figures.
+**Build-vs-buy resolves on facts, not price quotes:** actual build cost $77,904/yr ($487K/yr at
+market-rate staffing, NPV still +$5.9M); every vendor case study in the evidence base (KLM, easyJet,
+Alaska…) runs on identified customers, so a bought platform inherits our anonymity ceiling while
+charging licence from day one; and the auditable in-house rules are a functional requirement for a
+taxonomy governed as an instrument. **Recommendation: build (done); the re-evaluation trigger is
+identity-data arrival**, which enables the vendors' strongest levers and ours simultaneously.
+*Generalises: when a top-down and a bottom-up case disagree, do not average them — assign each the
+question it can actually answer, and let the measured one carry the decision. And any benefit lever
+should be classified measured / benchmark-derived / conditional at the point of use, or the biggest
+number in the deck will be the least supported one.*
+**Source:** our analysis, 2026-08-23 — `docs/business-case-benchmark.md` (imported),
+`docs/do-nothing-vs-implement.md` §§5–7, `docs/manuscript-ch5-draft.md` §§5.3–5.4.
+
+---
+
+#### 2026-08-23 — Extending the ARI panel to k=2 finds a 0.54 peak, and it is geography, not customer structure
+**Domain:** Clustering / Methodology
+Regenerating `clust_01_bic_ari.png` with the extended `K_RANGE(1, 10)` surfaced a number no document had:
+ARI against the v2 taxonomy peaks at **0.537 at k = 2** — above the 0.389 (k = 4) every doc quotes as
+"best agreement" — because k = 2 had simply never been fitted. Composition probe of the cut: **ARI 0.909
+against the domestic/international bit alone**; every purely international segment lands ≥94.8% in one
+class; Corporate — the most geographically mixed segment — splits **50.1/49.9**, i.e. its own 57/43
+domestic mix expressed through the other features. So the k = 2 partition is `is_domestic` rediscovered,
+and agreement *falls* toward the taxonomy's own cardinality (0.306 k=3 · 0.389 k=4 · 0.210 k=9). That is
+a sharper statement of the standing conclusion: **unsupervised methods recover the taxonomy's geographic
+spine and none of its finer boundaries.**
+**⚠️ Supersedes the 19 Aug guidance "a regenerated figure must annotate ≤ 0.39":** the shipped figure now
+annotates **≤ 0.54**, and 0.54 must never be quoted without the geography qualifier — the
+customer-structure ceiling is still ~0.39. Reconciled same day: manuscript §4.1.3,
+`pipeline-study-guide.md`, `eda-results-slide-guide.md`, and `reports/study_guide/*.png` refreshed to the
+23 Aug renders. **Still open: the defence deck embeds the 23 Jul PNGs (clust_01 says ≤ 0.34, clust_02
+shows retired segment names) and needs a re-insert.**
+*Generalises: extending a sweep can move a "best over the sweep" headline even when every
+previously-fitted point reproduces exactly. A max is only as stable as the range it was taken over —
+state the range beside the number.*
+**Source:** our analysis, 2026-08-23 — composition probe over `pal_features_booking.parquet` (60k,
+seed 42, StepMix k = 2); `outputs/report_real/figs/clust_01_bic_ari.png`.
+
+---
+
+#### 2026-08-23 — The BIC sweep never tested k=1 or k=2, and extending it strengthens the continuum claim
+**Domain:** Clustering / Methodology
+An examiner-style screen of the ch. 4 final draft asked the first question any continuum claim provokes:
+"is the base one mass or two?" — and the answer was unmeasured, because every sweep starts at k=3
+(`report_figures.py` `K_RANGE = range(3, 10)`; the stress test sweeps 3–12). Ran the probe: identical
+60k reservoir sample, seed 42, identical `codes_for_lca` coding, K extended down to 1.
+**BIC: k=1 1,148,667 · k=2 1,057,599 · k=3 1,014,017 · k=4 988,748** — the k=3 value reproduces the
+19 Aug sweep exactly, verifying the construction. So the monotone decline starts at one component:
+there is no elbow at 2 either, and each added class buys less than the one before (91,068 → 43,582 →
+25,269). The base is not "two masses"; the criterion never finds a place to stop. Folded into ch. 4
+§4.1.1(a); `K_RANGE` is now `range(1, 10)` so the next figure regeneration carries k=1–2 (k=1's
+ARI-vs-proxy is degenerately 0, harmless on the plot; `k_star = argmin` is unaffected, still the top of
+the range).
+**The same screen produced the rest of v1.1's fixes, two worth remembering:** ① the draft had placed the
+taxonomy's 0.091 Euclidean silhouette beside the 0.381 Gower ceiling with no comparability warning —
+exactly the misreading the 19 Aug entry warned against, reproduced by the same author four days later;
+a recorded incomparability needs to travel *with the numbers*, not sit in a log. ② every sampled analysis
+reports single-seed point estimates with no interval, and only V4 had owned that; it is now the seventh
+limit in §4.3.7 and a census-vs-sample paragraph in the preamble says which numbers carry sampling error
+at all.
+*Generalises: when a criterion is monotone over a search range, extend the range downward until it isn't —
+"no elbow from 3" and "no elbow at all" are different claims, and the second costs four minutes to earn.*
+**Source:** our analysis, 2026-08-23 — 60k probe replicating `src/report_figures.py` construction
+(StepMix 3.0.0, seed 42, n_init=2); `docs/manuscript-ch4-draft.md` v1.1.
+
+---
+
+#### 2026-08-23 — Manuscript ch. 4 final draft: v2 throughout, and the sub-type figures switch to population-exact
+**Domain:** Project Decision
+Rewrote `docs/manuscript-ch4-draft.md` as the final draft (v0.1 → v1.0). Everything is now measured on the
+shipped v2 taxonomy and the 18 Aug validation re-runs; every withdrawn or superseded figure from the
+defence brief's never-say list is either absent or quoted only as an explicit disowning (the 1.13 transfer
+ratio, 0.608→0.72, 62.7% reclassified, Corporate 35.6% short-lead, the H0 count, refund AUC).
+**The author's call flagged on 21 Aug is resolved: the manuscript quotes the population-exact level-2
+profiles** (`outputs/sub_segments/population_profiles.md`) — Balikbayan/VFR $322→$962, Corporate $113→$643 —
+**and states that they supersede the sampled ones; the defence deck and `summary.md` keep the sampled
+figures** ($311→$995), since the deck is already built and rehearsed against them. Any reader comparing the
+two documents will find the discrepancy explained in the manuscript's §4.2.5, not discovered.
+**Figure staleness is now tabled in the draft itself:** ms_fig4/5/6 were rendered 8 Aug from pre-re-run
+outputs and need one `python src/manuscript_figures.py` pass (renders from saved outputs, no refits);
+`eda_01_segments.png` and `sub_01_subtypes.png` are 23 Jul v1-label artwork and need `report_figures.py`
+pointed at v2 first. The two OFW↔Balikbayan adversarial checks (13-of-17 markets, seasonality signature)
+are kept but labelled as v1-label measurements that stand because the v2 change moves 1.4% of the branch.
+*Generalises: a final draft is the right moment to resolve every "author's call" the working documents
+carry — and when two shipped artefacts must disagree (population-exact vs sampled), the newer document
+should name the discrepancy and say which is authoritative, so the difference reads as a decision.*
+**Source:** our analysis, 2026-08-23 — `docs/manuscript-ch4-draft.md` v1.0;
+`outputs/sub_segments/population_profiles.md`; `docs/defense-brief-2026-08-18.md` never-say list.
+
+---
+
+#### 2026-08-21 — A benefits case organised by department, and a revenue filter that silently halved a segment
+**Domain:** Project Decision
+Built `docs/do-nothing-vs-implement.md` for the defence panel, then rebuilt it around **the five departments
+that would consume the output** — RM (pricing) · Sales (channels) · Marketing (promos) · CX (web/app &
+lounge) · Loyalty (churn) — rather than around abstract benefit levers. The reframing changed the
+conclusion, because it forces the question "which department can act on this *today*".
+**⚠️ The measurement error worth remembering.** Computing revenue with `Bookings > 0` (equivalently
+`IsPrimaryCoupon = TRUE`) **discards every non-primary coupon's revenue**: Balikbayan/VFR **−54%** ($712M →
+$331M), Leisure −27%, OFW/Migrant −17%. It bites hardest on multi-leg segments and the result still looks
+like a plausible revenue figure. Correct form: `sum(NetRevenue) / sum(Bookings)` over **unfiltered** rows.
+**How it was caught: an independent cross-check, not inspection.** The filtered means contradicted
+`segment-cost-research.md` §3 by more than 2× (Balikbayan $275 vs $615); the corrected means agree with it
+within ~7% across eleven segments ($593/$615 · $82/$80 · $302/$312 · $429/$460). Now documented as the
+fourth scorecard warning in `powerbi-guide.md` §3a, because a BI developer will hit it.
+**Every figure moved.** Corporate's within-label spread **4.31× → 5.63×**; Leisure 2.86 → 3.76;
+Balikbayan 2.58 → 2.68; OFW 1.98 → 1.60; and **Outbound Intl. Leisure 4.26× → 1.29×** — from second-most
+heterogeneous to *most homogeneous*, i.e. the parent where level 2 buys RM almost nothing. Volume-vs-value
+TVD is **36.26% at level 1 ($919M)** and 36.99% at level 2 — level 2 still adds almost nothing on that
+metric (+0.73pp for 2.2× the labels), which is why the doc argues level 2 from within-parent mispricing
+instead: sub-types priced **≥1.25× their parent mean** are 22.9% of parent bookings and **29.7% of parent
+revenue ($645.8M)**; at 1.5×, **3.9% of bookings and 16.4% of revenue**.
+**The department reframing's payoff: the strongest case is not the biggest number.** **Sales and CX need no
+response assumption at all** — prioritisation reallocates effort already being spent, so the measured fact
+*is* the deliverable. Sales: agency dependence spans **6.6×** (Corporate 11.8% → Pilgrimage 78.2%);
+Corporate is **55.5% corporate-channel** (TMC 42.5% + portal 13.0%); **Sea Crew is 27.5% of OFW/Migrant and
+~0% of everything else** — a $136.6M channel that *is* one segment. CX: digital revenue share spans **19×**
+(2.6% → 48.8%) and connecting share **9×** (10.4% → 97.7%), so transfer/lounge is a *Balikbayan/VFR*
+question (49.9% connecting on the largest revenue base), not a premium-cabin one.
+**Loyalty is the department that must wait, and saying so strengthens the case.** **73.9% of customers have
+exactly one booking and `tenure_days = 0`** — in a 26-month window a new customer and a lost one are
+identical, so no churn rate is computable, only a floor on repeat behaviour (12.2% Pilgrimage → 36.4%
+Corporate). `Mabuhay Loyalist` is **100% `ever_award`, 7.8% repeat** — an award-redemption artifact, not a
+loyalty population, pending PAL answer B4.
+**One enabling fact underpins all five:** **87.8% of customers have `segment_diversity = 1`** — they never
+leave their segment, so a segment label on a *person* is stable rather than a per-trip accident.
+**Breakeven, not forecast:** year-1 cost $18,800 (placeholder) against $16.1M avoidable dilution needs
+**0.116%** — one dollar in 859. Ten times worse on every placeholder at once: **4.7%**. The claim is not
+"the benefit is $16M" but "the decision does not depend on knowing the benefit".
+*Generalises: organise a benefits case by who owns the decision, and the readiness ordering falls out of
+the evidence instead of out of preference. And cross-check any aggregate against an independently computed
+one — inspection would never have found a filter that returns a plausible number.*
+**Source:** our analysis, 2026-08-21 — `docs/do-nothing-vs-implement.md`;
+`outputs/powerbi_export/model/fact_flight/` (CY2025, flown, revenue-clean);
+`data/interim/pal_features_customer.parquet`; `docs/segment-cost-research.md` §3.
+
+#### 2026-08-21 — "10 named segments" survived in three docs three days after v2 shipped 11
+**Domain:** Data & Features
+Asked to justify why `dim_segment.csv` has 13 rows against a remembered "10 + 1". The count is right and the
+docs were wrong. Authoritative chain: `proxy_segment` in the built booking table has **12 labels = 11 named
++ Unassigned**; `pal_colors.SEG_ORDER` holds the same 12 and carries the comment *"waterfall v2 shipped, so
+approved and emitted are the same list"*; the 20 Aug learning-log entry already said 11 + Unassigned and
+proved it two ways (12 rows in `profile_drift.csv`, 55 = 11x10/2 pairs in `pairs.csv`). The **13th** row is
+export-only: `Excluded (non-revenue)`, stamped on the **15,073 coupons / 13,127 bookings** whose customer was
+dropped at Stage F and therefore has no booking row to inherit a label from.
+**Still asserting the v1 count on 21 Aug:** `methodology.md`'s at-a-glance table *and* its current-pipeline
+mermaid node (both now fixed), and `README.md`'s opening paragraph — which went further and said *"the
+waterfall change is pending"*, three days after it landed. Corrected. The `10 segments` references in the
+HDBSCAN/Stage-6 sections are **correct** for the superseded prototype track and were left alone; that
+ambiguity is exactly why the wrong number reads as plausible.
+**Unresolved, and only PAL's record can settle it:** the approval is written up as a *"13-segment
+taxonomy"* (17 Aug) while `SEG_APPROVED` holds 12 entries. It reconciles to 11 named only if the 13 counted
+`Digital Nomad` and `Last-Minute`, both removed the next day — unimplementable in anonymous data, and
+demoted to a booking flag. Flagged in the README rather than silently renumbered.
+*Generalises: a stale count is hardest to spot when an older, superseded track makes it a legitimate number
+somewhere else in the same document. "10 segments" was never a typo — it was true of the prototype, so
+grep-and-fix is wrong and every hit needs reading. The tell that the v2 rename never propagated was not the
+count itself but the sentence beside it: "the waterfall change is pending".*
+**Source:** our analysis, 2026-08-21 — `data/interim/pal_features_booking.parquet` (`proxy_segment`,
+12 labels), `src/pal_colors.py` (`SEG_APPROVED`/`SEG_ORDER`/`SEG_RETIRED`),
+`outputs/powerbi_export/model/dim_segment.csv` (13 rows), knowledge base §15 entry 2026-08-20.
+
+#### 2026-08-21 — Level 2 shipped: 21.7M bookings assigned, and three defects only the population could reveal
+**Domain:** Clustering / Methodology
+Built what the scoping entry above proposed. `src/subsegment_assign.py` assigns a level-2 `SubSegment` to
+all **21,725,296** bookings in the five sub-typed parents, and the Power BI export carries it on every fact
+table plus a 28-row `dim_subsegment` (20 sub-types + a self-named row per segment without them + Excluded).
+Deliberately a *separate* entrypoint from `sub_segment.py`, so `summary.md` — which the deck and
+`sankey_subsegment.py` read — is untouched; population profiles go to `population_profiles.md`.
+**Reproducibility does not come from `random_state`.** Under `PRAGMA threads=6` a bare `GROUP BY` returns
+cells in a different order every run, which changes the order StepMix sees and therefore which EM local
+optimum it lands in — two consecutive runs gave **OFW/Migrant different sub-type boundaries**. `ORDER BY
+ALL` on the cell table is load-bearing; verified by hashing the lookup CSVs across two full runs.
+**`name_sub()` collides within a parent, not just across parents.** On the population fit two OFW/Migrant
+classes both round to `one-way · advance · saver`, distinguishable only by connectivity (0% vs 97%) — which
+the name never mentions. Collisions now take a `· connecting` / `· nonstop` qualifier.
+**Adding one string column to a 38.1M-row `PARTITION_BY` COPY OOMs at 8 GB, three ways** — joined at coupon
+grain, joined at booking grain, and with the merge materialised flat. Peak memory scales with
+partitions x threads, so `PRAGMA threads=3` for that one statement keeps the 8 GB contract instead of
+raising it for everyone; the booking-grain merge is cached to `.build/bk.parquet`. Build 2 min → 5 min.
+**A pre-existing level-1 defect fell out of it:** `dim_segment.csv`'s `SegmentSortOrder` had **11 twice**
+(Leisure and `Excluded (non-revenue)`) and no 1, so Power BI ordered those two arbitrarily. Excluded moved
+to 14; `dim_subsegment` uses a dense 1..28 rank so it cannot inherit the same bug. Also refreshed
+`powerbi-guide.md`'s "Segment mix at a glance", which still named **Budget/Adventure, Last-Minute and
+Family** — three labels the shipped taxonomy does not contain.
+**Row growth landed where predicted:** `fact_dashboard` 2,037,886 → 2,267,904 (**1.11x**), `fact_flight`
+20.6M → 20.7M, because the flight grain already groups by most of the LCA's inputs. **Level 1 is
+byte-identical** across the rebuild and all three fact tables reconcile (38,116,259 coupons · 22,924,577
+bookings · 6,219,305,620 revenue); `SubSegment` has no NULLs, no orphans either way, and sits under exactly
+one `CustomerSegment`.
+**Open:** the two fits disagree on Balikbayan/VFR — the population fit splits `far-advance · saver` into
+connecting (median rev **418**) and nonstop (median rev **962**) where the sample gave
+`far-advance · value / supersaver / saver`. The deck, `summary.md` and `manuscript-ch4-draft.md` (still
+"future work") keep the sampled version; reconciling is an author's call.
+*Generalises: a model fitted on a sample hides three classes of defect that only the population shows —
+an encoder that learnt its alphabet from the sample, a naming scheme whose collisions were merely unlikely,
+and a memory profile nobody measured. Fitting the whole population is not just more accurate, it is more
+revealing.*
+**Source:** our analysis, 2026-08-21 — `src/subsegment_assign.py`, `src/export_powerbi.py`,
+`docs/subsegment-scoring-plan.md` §7, `outputs/sub_segments/{model_meta.json,population_profiles.md}`,
+`outputs/powerbi_export/model/dim_subsegment.csv`.
+
+#### 2026-08-21 — Level 2 is not in the Power BI model, and the scoring pass is far cheaper than assumed
+**Domain:** Clustering / Methodology
+Asked whether the Power BI export carries sub-segments. It does not: `fact_coupons`, `fact_flight`,
+`fact_dashboard` and `scorecard_segment_month` all carry `CustomerSegment` only, `dim_segment.csv` is the
+top-level taxonomy (13 rows), and `CustomerDominantSegment` is still a *level-1* label — just resolved per
+traveller instead of per coupon. `export_powerbi.py` never references a sub-type.
+**The cheap route.** `code()` reduces a booking to a fully discrete vector, so the model's input domain is
+enumerable: **17,847 distinct feature cells cover all 21,725,296 bookings in the five parents** (Leisure
+1,281 · OFW/Migrant 5,796 · Balikbayan/VFR 1,175 · Outbound 2,857 · Corporate 6,738). So row-level
+assignment is not a 21.7M-row scoring pass — it is `predict` on ≤6,738 rows per parent plus a SQL join,
+and the resulting level-2 model is a CSV that can be read end to end.
+**The sample can go.** StepMix 3.0.0's `fit` takes `sample_weight`, so fitting the count-weighted cell
+table *is* fitting all 21.7M bookings exactly — verified, not assumed: `score(cells, sample_weight=counts)`
+equals `score(rows replicated by count)` to machine precision. That retires `SAMPLE = 40_000` and the
+reservoir-sampling scar.
+**But `m.bic(X)` then lies.** Its source is `-2*score(X)*X.shape[0] + n_parameters*log(X.shape[0])` —
+unweighted score, N = number of *cells*. On a weighted cell table that is N = 17,847 against the wrong
+likelihood, silently, and `K_RANGE` selection depends on it. Weighted BIC must be hand-computed as
+`-2*score(cells, sample_weight=w)*W + n_parameters*log(W)`.
+**Four defects found in the current sub-segmentation while scoping, all invisible at sample scale:**
+① `dest_region` is coded by `astype("category").cat.codes`, which numbers categories by what the *sample*
+saw — OFW/Migrant's 40k sample sees **6** regions, its population has **7**, so the codes shift on refit
+and the missing level cannot be encoded at all. ② the `value_tier` median-fill is sample-derived (2.0 for
+four parents, **4.0 for Corporate**) against population nulls of 12,426 / 11,647 / 1,411 / 1,014 / 0.
+③ the dropped-constant-column list is part of the model (Balikbayan drops `round_trip` + `foreign_issue`,
+Outbound `foreign_issue`, Leisure `dest_region` — all 11.6M Domestic) and must be persisted, not
+re-derived. ④ `name_sub()` collides *across* parents — `one-way · advance · saver` is emitted by Leisure,
+OFW/Migrant **and** Outbound — so any Power BI key must be composite `Parent — sub_name`.
+*Generalises: a layer fitted on a sample can be silently un-scoreable on the population, and the tell is
+always an encoding that learns its own alphabet from the sample. Check the domain, not the fit.*
+*Also: when the feature space is discrete, "score every row" is the wrong unit of work — score the
+distinct cells and the model becomes auditable as a side effect.*
+**Source:** our analysis, 2026-08-21 — `docs/subsegment-scoring-plan.md`;
+`data/interim/pal_features_booking.parquet` (22,911,450 bookings); `outputs/powerbi_export/**` parquet
+schemas; `src/sub_segment.py`, `src/export_powerbi.py`; `stepmix==3.0.0` source + empirical check.
+
+#### 2026-08-20 — Defence study guide audited against the deck programmatically, not by memory
+**Domain:** Project Decision
+Rather than re-reading the guide, diffed it against the artefact: pulled all 26 slide titles out of the
+pptx with python-pptx and matched them row-by-row to §6's table (**26/26 aligned**), then grepped for every
+superseded figure this week produced. The table was already correct after the two renumbers; the gaps were
+all in §5 and §9, i.e. the tables meant to stop a stale number reaching the room.
+**Added to Memorize:** the 11-segments-vs-12-labels denominators · **Corporate 6 of 10** and Leisure 5 of 10
+weak V1 boundaries · Leisure at **50.6%** · the sub-segmentation's 5×4 = **20 cells** and Balikbayan's
+**$311 → $995** span · and the **strict median 0.637** beside the adaptive 0.861, since §8 already drilled
+that comparison without the guide stating both numbers.
+**Added to Never-say — five traps, all found on 19–20 Aug:** "BIC chose four sub-types" (search ceiling) ·
+"the drift is in the tiny segments" (v1 wording; Premium Bleisure is 7th-largest of twelve) · "13.3% /
+median 25 days" (coupon grain on booking-grain slides) · "74% never return" (right-censored) · "38.4%
+issued abroad" as a booking figure (it is the coupon share; bookings are 34.6%).
+**Added to §9 Stale numbers:** the V4 TVD generation, "transfers for free", "7 of 10 carrying 98.2%", both
+grain traps, and — the one most likely to be quoted at us — **`rule_confidence.py`'s 66.5% / most-contested
+Corporate was computed on v1 labels and the script still hard-codes the v1 ten-branch waterfall**, so there
+is no current figure. Also noted that any printout whose row 19 is not "sub-segments" is a stale deck.
+Closed with a 16-point automated checklist; all pass.
+*Generalises: audit a companion document against the artefact it describes, not against your memory of the
+artefact. The slide titles are extractable, so the table check is a script — and the parts a script cannot
+check (the never-say table) are exactly the parts that rot, because nothing errors when they go stale.*
+**Source:** our analysis, 2026-08-20 — `docs/defense-study-guide.md` vs
+`assets/final-defense/CPT3_DefenseDeck_V3.pptx` (26 slides), `outputs/validate_construct/pairs.csv`.
+
+#### 2026-08-20 — "11 segments" and "12 labels" are both right, and the deck never said why
+**Domain:** Data & Features
+Caught in review: slide 21 quotes **8 of 12** labels for V4 while the taxonomy is **11** segments everywhere
+else, with nothing on the slide reconciling them. Both are correct and the difference is deliberate.
+**11 segments + `Unassigned` = 12 labels the pipeline can stamp.** **V1 tests the 11** — hence
+11×10÷2 = **55 pairs** — and excludes `Unassigned` because it has **no positive definition**: it is
+"nothing else claimed this", so there is no claim to validate. **V4 tests all 12**, because drift in the
+residual bucket *is* informative — if the leftovers change composition, the rules are losing grip on
+something. Verified in `profile_drift.csv`: 12 rows, and `Unassigned` sits in the **stable** column
+(`small`), alongside Leisure · OFW/Migrant · Balikbayan/VFR · Outbound Intl Leisure · Corporate ·
+Ultra Wealthy Leisure · Intl. Student. Slide now reads "8 of 12 labels stable (the 11 segments plus
+Unassigned)" so it is self-explaining.
+**Second wording trap in the same sentence.** The four drifters are `Premium Bleisure` **1.49%** ·
+`Pilgrimage` 0.20% · `MICE` 0.13% · `Mabuhay Loyalist` 0.03% — and **Premium Bleisure is the
+seventh-largest of the twelve, bigger than the other three drifters combined.** So "the four that drift are
+1.9% of the book" is safe; "the drift is in the tiny segments" is not — that is the *v1* shape of the
+sentence surviving into v2 for the second time (the first was "the three smallest segments", corrected
+19 Aug).
+*Generalises: when two counts of the same thing are both correct, the document has to say which denominator
+it is using. A reader who spots the mismatch cannot tell "principled choice" from "arithmetic error" — and
+will assume the second.*
+**Source:** our analysis, 2026-08-20 — `outputs/validate_temporal/profile_drift.csv`,
+`src/validate_construct.py` (`segs = [... if s != "Unassigned"]`), `outputs/validate_construct/pairs.csv`
+(55 rows).
+
+#### 2026-08-20 — The validation slide was titled after one of its four rows; it is now titled after what it is
+**Domain:** Project Decision
+Slide 21 was titled *"44 of 55 boundaries hold on evidence the rules never saw"* — a good sentence about
+**V1 only**, while three of the four rows sat outside it. Worse, the slide never said what it *is*.
+`methodology.md` defines three routes to validation — **circular** (agreement against `proxy_segment`, which
+the rules produced), **Plan A** (~1,000 SME labels, outstanding), **Plan B** (no labels needed) — and
+**slide 21 is Plan B**. Its subject is not "our segments are good" but *"we wrote the labels ourselves and
+have no answer key yet, so here are four checks that need none."* Retitled **"Four independent checks, and
+44 of 55 boundaries hold"** with a kicker: *"V1–V4, our four validation stages — construct · criterion ·
+detection power · out-of-time. None may read a field the rules consumed."* Keeps the deck's house style (an
+assertive title carrying a number) while making the subject and the framework legible.
+**Also written down because it was only ever tacit: "V" is a validation stage, and the ladder is borrowed.**
+V1 **construct** validity and V2 **criterion** validity are the standard validity types from classical
+measurement theory; V3 is statistical **power**; V4 is **reliability across time**. So "why these four?" has
+a real answer — a recognised framework adapted to the problem, not four checks invented ad hoc — and that
+answer is worth more to an academic panel than any single number on the slide. It now leads the speaker
+notes, and `defense-study-guide.md` §6.2 opens with it.
+*Generalises: title a slide after its subject, not after its best row. If three quarters of the content sits
+outside the title, the title is a caption that got promoted.*
+**Source:** our analysis, 2026-08-20 — `docs/methodology.md` §"The validation ladder" vs
+`assets/final-defense/CPT3_DefenseDeck_V3.pptx` slide 21.
+
+#### 2026-08-20 — The validation slide now defines its own units, and a v1 drift count was corrected on the deck
+**Domain:** Project Decision
+Deck slide 21 carried four numbers in AUC (0.861 · ~0.60 · 0.50 coin flip · the 55-pair chart) and **never
+defined AUC**. The chart annotates "coin flip" at 0.50 and "clearly distinct →" at 0.75, which hints at the
+scale without stating it, so a non-technical panellist could follow the shape of the argument but not the
+units. Added a full-width **explainer strip** between the V1–V4 scorecard and the weak-spot banner: one line
+defining AUC operationally ("hand the model one booking from each of two segments and ask which is which;
+AUC is how often it gets the order right"), the two thresholds, and — the part that earns its space —
+**a statement that these are the per-pair *adaptive* anchors, and why fields are withheld per pair.**
+**That discharges a rehearsal guardrail by printing it.** "Say which V1 measure you are quoting" was a note
+Josh had to remember; it is now on the slide, and it also makes slide 13's circularity contract visible
+doing work rather than merely asserted. Room was found without touching the argument: the four V-rows
+tightened from a 0.93 in pitch to 0.82 (their 0.90 in bodies held ~0.34 in of text), and the chart shrank
+from 4.35×3.43 to 3.63×2.86 in with the 1089×858 aspect preserved.
+**Corrected in the same pass:** V4's line read *"drift sits in the three smallest segments"* — the **v1**
+count. Under v2 **four** labels drift (`Mabuhay Loyalist` is_group 0.03% · `Pilgrimage` value_tier 0.2% ·
+`MICE` peak_month 0.13% · `Premium Bleisure` log_rev **1.49%**, which is *not* among the smallest). Now
+reads "8 of 12 labels stable, carrying 98.1% of bookings; the four that drift are 1.9% of the book between
+them" — accurate, and the stronger framing because it leads with what held.
+*Generalises: a slide that quotes a metric should define it on the slide. It costs two lines, it serves the
+half of the room that will not ask, and it converts a spoken guardrail into a printed one — which is the
+only kind that survives a nervous delivery.*
+**Source:** our analysis, 2026-08-20 — `assets/final-defense/CPT3_DefenseDeck_V3.pptx` slide 21 against
+`outputs/validate_construct/summary.md` §0/§2 and `outputs/validate_temporal/summary.md` §4.
+
+---
+
+#### 2026-08-19 — The sub-segment slide became one Sankey instead of five text columns, and rendering it caught two defects
+**Domain:** Project Decision
+The first version of deck slide 19 was a five-column text grid — all 20 sub-types, every number visible,
+and unreadable from the back of a room. Redesigned as **one worked example drawn as a Sankey**
+(`src/sankey_subsegment.py`, new), with the other four parents compressed to a single line of ranges.
+**`Balikbayan/VFR` is the right example:** 12.5% of bookings against 28.4% of revenue, recommendation 1 tells
+PAL to protect it, and every one of its sub-types is a round trip — so the only axis that varies is booking
+horizon, which makes the story one-dimensional and sayable.
+**The encoding does the arguing.** Ribbon width is share of the parent; fill and vertical position are median
+revenue on a **single-hue sequential ramp** (the sanctioned encoding for an ordinal magnitude). Ordering the
+targets by the same value the colour encodes makes the inversion instant: **the thinnest flow (16.9%) earns
+the most ($995) and the fattest (38.8%) the least ($311)**. That is slide 17's volume-versus-value asymmetry
+repeating *inside* a single segment — the same shape one level down, which is worth saying out loud.
+**Two defects that only showed up on looking at the render, not on reading the code.** ① Three-line labels
+**collided** on the two thin flows, because the label stack was taller than the ribbon it annotated — fixed by
+cutting to two lines and pushing label mids apart with a minimum-separation pass plus leader lines, so
+layout is correct at any flow thickness. ② With source and target columns the same height the ribbons ran
+**parallel**, reading as a stacked bar rather than a flow — fixed by giving the targets 74% of the source's
+span so every ribbon visibly tapers. *Neither was visible in the code; both were obvious in the image.*
+**Refined 19 Aug (same day): the PNG is now the diagram only, with every label an editable PowerPoint text
+box.** Text baked into a figure cannot be reworded, restyled or reflowed in the deck, which is a real cost
+for a slide that will be rehearsed against. The split works because the figure is drawn with
+`add_axes((0,0,1,1))` and saved **without** `bbox_inches="tight"`, so axes fractions map linearly onto the
+picture's placement — `slide_y = picture_top + (1 - anchor_y) * picture_height`. The script emits a sibling
+`.json` with each flow's anchor, colour and numbers, and the slide builder reads it, so realignment is
+automatic if the parent or the taxonomy changes. **The geometry constant that matters is `TGT_FRAC`:** taper
+and label spacing pull against each other — at 0.88 the ribbons ran parallel again, at 0.62 the label rows
+came within 0.12 in of each other. 0.75 with a 0.045 gap gives visible taper *and* 0.458 in of clearance for
+a two-line label, which is the balance. A first pass also left the label *frames* overlapping by 0.10 in even
+though the text did not, which would have made the wrong box selectable in PowerPoint; heights cut to 0.40 in.
+**Also settled: the figure parses `outputs/sub_segments/summary.md` rather than re-fitting the LCA.**
+Re-fitting would cost five StepMix sweeps and, worse, create a second set of sub-type numbers that could
+disagree with the report the docs already quote. Ramp validated for lightness monotonicity in OKLab
+(0.884 · 0.757 · 0.560 · 0.392, even gaps); the categorical checks do not apply to a sequential ramp, and
+the sub-3:1 steps are relieved by labelling every flow in ink outside the fill.
+*Generalises: always render the chart and look at it. Label collisions and geometry are invisible in source
+and unmissable in the image — and a diagram whose two node columns are the same height is not a flow chart,
+it is a stacked bar with extra steps. Second lesson: for a figure going into a deck, ship the **marks** as an
+image and the **words** as native text. Emitting the geometry alongside the image is what makes that cheap,
+and the price is one rule — no tight bounding box, or the coordinate mapping silently breaks.*
+**Source:** our analysis, 2026-08-19 — `src/sankey_subsegment.py`,
+`outputs/segment_charts/fig_s07_sankey_balikbayan_vfr.png`, deck slide 19.
+
+#### 2026-08-19 — Only one segment is purely domestic, and `Unassigned` is exactly "domestic premium-cabin travel with no branch"
+**Domain:** Data & Features
+Measured the domestic/international mix of all twelve labels to answer whether `Leisure` is the domestic
+segment. **It is — 100.0% domestic by construction** (`is_domestic AND NOT any_premium`, and `is_domestic`
+is `bool_and(dom_coupon)`), and it is the **only** purely domestic label. Four are purely international
+(`Balikbayan/VFR`, `Outbound International Leisure`, `Premium Bleisure`, `Intl. Student`); the rest are
+mixed, because their branches turn on channel, fare or stay length rather than geography — `Corporate` is
+the most mixed at **57.2% domestic / 42.8% international**, which fits business travel happening at both
+scales.
+**Two mechanisms fall out, both previously undocumented.**
+① **`OFW/Migrant` is 9.6% domestic, and 100.0% of those 375,888 bookings are sea crew.** The `sea_crew`
+branch fires before any geography test, so a seafarer flying Manila–Cebu is OFW/Migrant. Correct by
+design — the channel identifies them definitively — but it means "OFW/Migrant" is not a synonym for
+"international", and any domestic-only cut of the book still contains a sea-crew population.
+② **`Unassigned`'s domestic subset is *identical* to its premium-cabin subset — both exactly 94.5%.** That
+is forced: `is_domestic AND NOT any_premium` routes every other domestic booking to `Leisure`, so a domestic
+booking can only reach `Unassigned` if it has a J/W cabin leg. And no premium branch can catch it —
+`Premium Bleisure` requires `is_international`, `Ultra Wealthy Leisure` requires a long-stay advance round
+trip. **So the 2.47% residual is "domestic premium-cabin travel that the waterfall has no branch for",
+plus a 5.5% sliver of foreign-issued international economy on premium *fare brands*.**
+**This refines the 2026-08-18 entry below**, which read the premium skew as the signature of award
+redemptions, upgrades and staff tickets. A simpler explanation fits: **domestic business and premium economy
+is premium by brand and cheap by price**, which explains the 81.4% Premium value band and the $177 mean
+revenue at once, with no need to posit awards. It also names the missing branch precisely — whatever rule
+finally claims `Unassigned` should be a *domestic premium* rule, not a low-value sweep-up.
+*Generalises: in a first-match-wins waterfall, the residual bucket is fully determined by what the
+catch-all branch excludes. Read the residual as the algebraic complement of the last rule, not as a
+mystery — it is usually one missing branch wearing a vague name.*
+**Source:** our analysis, 2026-08-19 — DuckDB probes over `data/interim/pal_features_booking.parquet`
+against the waterfall CASE block in `src/features_real.py`.
+
+#### 2026-08-19 — The deck had no slide for ML's own output; added one, and the sub-segment k is the same ceiling artefact as the top level
+**Domain:** Project Decision
+The refinement layer — ML's job 1 in our own architecture diagram — was **mentioned on deck slides 8, 10 and
+12 and shown nowhere**. For an ML capstone whose thesis is "rules label, ML checks and refines", the one
+thing ML produces had no slide. Added at **position 19** (after the behaviour charts, before "what
+changed"), five columns from `outputs/sub_segments/summary.md`: LCA inside the five largest v2 parents,
+**four sub-types each = 20 cells**, 40,000 bookings per parent, hash-ordered. Deck is now **26 slides**.
+**The finding worth presenting is the grammar, not the twenty names.** Every parent splits on the same three
+axes — **direction × timing × fare tier** — recovered per parent, unprompted. That is corroboration rather
+than repetition, because each fit saw only one segment.
+**And the commercial point is the value spread *inside* a single segment:** Balikbayan/VFR runs **$311** at
+26 days out to **$995** at 66 days — **3.2× on booking horizon alone**; Corporate spans **$112 → $656** with
+*every* sub-type short-lead, so there the spread is direction and fare rather than timing. OFW (1.7×) and
+Outbound International Leisure (1.2×) are nearly flat — **a negative result that is directly useful: those
+two segments do not need sub-segment pricing.**
+**⚠️ Caught before it reached the slide: `sub_segment.py` has `K_RANGE = range(2, 5)`, so four is the TOP of
+the search range and BIC preferred the maximum in all five parents.** The draft footer said "sub-type count
+chosen by BIC", which would have presented a search boundary as a discovery — the identical error to reading
+`k=9` on the PCA figure as a fitted optimum. Corrected to "four is the most the search offered, and BIC
+wanted all four in every parent — the continuum again, one level down". **That is a real finding in its own
+right: there is no natural number of types inside a segment either, so the continuum is the same shape at
+both levels, and 20 cells is a granularity choice we own rather than a structure we found.**
+*Generalises: whenever a model reports the maximum of its own search range, that is a boundary, not a
+result — check the range before writing the caption. We have now hit this twice in one deck (k=9 at the top
+level, k=4 per parent), which means it is a habit of the tooling, not an accident.*
+**Source:** our analysis, 2026-08-19 — `outputs/sub_segments/summary.md` (18 Aug, v2 parents) ·
+`src/sub_segment.py` `K_RANGE`/`SAMPLE` · deck slide 19 built via python-pptx from the slide-13 template.
+
+#### 2026-08-19 — Slide 22 now owns five limits, and the limitations inventory is reconciled across four documents
+**Domain:** Project Decision
+The limitations material was spread over four places with no single owner, and the counts disagreed:
+`defense-slides-outline.md` §6 specified **five** own-it bullets, `defense-brief-2026-08-18.md` listed five
+in prose, the study guide's slide row said "five limits", and the **built slide showed four** — it had split
+"no loyalty field / no ancillary revenue" into two bullets and dropped both "labels add little incremental
+prediction" and the V4 multi-seed item. Across the whole paper trail there are **nine** candidate
+limitations; the deck now carries five owned plus four in-flight.
+**Added to the deck today:** the V4 multi-seed item (in-flight column) and **"Segment labels add little
+incremental prediction — by design, not by failure"** (owned column, fifth bullet at T=5.80, one line,
+0.15 in clearance above the footer). The second one matters most: `defense-study-guide.md` §7.1 lists
+*"Your segments add almost nothing predictive"* as **the single most likely question of the defence**, so it
+was rehearsed as a reply while the slide whose thesis is "owned, not hidden" left it out.
+**Measured the claim before writing it down** (`outputs/validate_criterion/summary.md`): the label alone
+scores **0.598** on `flown_any` and **0.604** on `rebook_180d` against a 0.50 coin flip, but on top of the
+11 raw features it buys only **+0.0005 to +0.0024** AUC. Two stable outcomes agreeing at ~0.60 makes the
+"real signal, no incremental signal" framing robust rather than cherry-picked. `refund_any` is flagged
+`unstable` (347 events, reads −0.107) and must not be quoted — already in the never-say table.
+**New doc:** `defense-study-guide.md` **§6.1 "Slide 22 in full"** — the first per-slide section for the
+defence deck, in the shape the EDA-results guide uses (on the slide / say / watch for / if pressed), with an
+evidence-source table mapping each limit to the output that produced it. Written because the only document
+with per-slide guidance, `eda-results-slide-guide.md`, covers a **different 13-slide EDA deck** and stops at
+its own slide 13 — so defence slides had one table row each and nothing more.
+**Also noted, not fixed:** the slide's closing line claims *"Everything on this slide is also written down in
+the handover pack"* and **no artefact by that name exists in the repo**. It may live outside git; §6.1 flags
+it as the one sentence on the slide a panellist can ask to see.
+*Generalises: when a claim lives in four documents and none of them owns it, the counts will drift — and the
+build artefact is the one that silently wins. Give every recurring list one home and derive the rest.*
+**Source:** our analysis, 2026-08-19 — `assets/final-defense/CPT3_DefenseDeck_V3.pptx` slide 22 vs
+`docs/defense-slides-outline.md` §6, `docs/defense-brief-2026-08-18.md`, `docs/pipeline-study-guide.md` §7.4;
+numbers from `outputs/validate_criterion/summary.md`.
+
+#### 2026-08-19 — Pre-defence consistency pass executed: two artefacts regenerated, two slides corrected
+**Domain:** Project Decision
+Acted on the audit rather than only recording it. **① `validate_temporal.py --report-only`** rebuilt
+`summary.md` from the saved (correct) CSVs, so the new majority-of-panel logic took effect without
+re-running the analysis — no number could shift. §5 now reads *"The panel disagrees on whether a year-old
+model still carves the data… `GMM(full)` 1.24 · `LCA` 0.89 — 1 of 2 at or above 0.95"* and instructs that no
+refit-cadence claim be made until the stage runs across several seeds. **The `--report-only` flag is the
+reusable lesson**: a script that can regenerate its prose from its own saved outputs lets a reporting fix
+ship without re-opening the computation. **② `monitor_real.py` re-run** (full, ~1 min): the withdrawn LCA
+1.13 is gone from the shipped drift report, replaced by the method-disagreement statement. Segment-mix PSI
+0.0028 STABLE, unchanged. **③ Deck slide 13**: "six 'cannot-be' SME rules" → "six **hard** SME rules"
+(H11 is a `must_be`). **④ Deck slide 22**: added a fourth in-flight item, *"No refit-cadence claim yet: V4
+transfer needs a multi-seed spread."* — the limit `defense-slides-outline.md` §6 had specified and the built
+slide had dropped. Backup at `CPT3_DefenseDeck_V3.backup-before-text-fixes.pptx`; edits made at **run level**
+via python-pptx so character formatting survived, new shapes **deep-copied** from their siblings with fresh
+unique `cNvPr` ids (duplicate ids are what triggers PowerPoint's repair prompt), positioned on the column's
+existing 1.00-inch rhythm at T=5.72 with 0.23 in of clearance above the footer. Verified: 25 slides, zip
+intact, speaker notes preserved on both slides.
+**One thing left deliberately undone.** The monitor's single `RETRAIN` flag is `channel` at PSI 0.4111 —
+but `psi_excl_new` is **0.0285 (STABLE)** and the new category is **NDC**, the channel PAL switched on
+mid-window. The report prints both verdicts side by side, so the design is right, but **no prose sentence
+explains that the alarm is a new category rather than drift** — a reader of a shipped artefact could act on
+"RETRAIN". Adding that sentence is a generator change outside the approved scope; recorded here as the next
+small fix.
+*Generalises: give every report generator a `--report-only` path. Most "the numbers are stale" incidents are
+really "the prose is stale", and the two deserve different costs to fix.*
+**Source:** our analysis, 2026-08-19 — `outputs/validate_temporal/summary.md` §5 ·
+`outputs/monitor_real/summary.md` · `assets/final-defense/CPT3_DefenseDeck_V3.pptx` slides 13 and 22.
+
+#### 2026-08-19 — V4's findings audited for closure: the two we only wrote down are the two that caused the retraction
+**Domain:** Clustering / Methodology
+Went back through every V4 finding and asked whether it was *addressed* or merely *recorded*.
+**Properly closed (2).** ① The **departure-filter censoring trap** is designed around, not annotated:
+`validate_temporal.py` places both windows strictly inside the region where no lead time up to the 365-day
+clip is censored, each spanning twelve calendar months, excludes outcome fields near the extract boundary
+from every comparison, and publishes `censoring.csv` so the exclusion is visible. ② The **~43% sampling
+bug** is fixed at source — `model_zoo.load_sample` wraps the filter in a subquery so the sample sits above
+it, and the docstring carries the measurement (2,077 of 40,000 on a `Corporate` filter; ~13,000 of 30,000
+on V4's windows) plus "verify with `EXPLAIN` before changing this". A fix the next person cannot undo by
+accident.
+**Closed as reporting discipline only (1).** ③ "**Revenue mix is the weaker leg**" (3.36 pp vs 1.71 pp;
+Balikbayan/VFR 29.35% → 26.64% of revenue on flat headcount) lives in the report's own conclusions and in
+the guides, but it is **not on the limitations slide** — arguably the most actionable limit PAL has, since
+revenue share is the number the commercial team acts on.
+**Not closed (2) — and they are precisely the pair that produced the withdrawn 1.13.** ④ The
+**max-over-panel selection effect was still in the code**: `validate_temporal.py` ranked the transfer table
+and reported `.iloc[0]` as "Best drift-adjusted transfer is X". That is the mechanism by which July
+published 1.13 on LCA and the 18 Aug re-run silently switched the headline to GMM with nobody choosing —
+the lesson was written into five documents while the script kept doing the thing. **Fixed today:** the
+stage now prints every method's ratio, counts how many clear 0.95, and only claims transfer holds when a
+**majority of the panel** agrees — V3's own documented majority-rule convention applied to V4 rather than a
+new rule invented. On current numbers it emits *"The panel disagrees… `GMM(full)` 1.24 · `LCA` 0.89 — 1 of
+2 at or above 0.95."* ⑤ The **multi-seed spread is still not implemented** — the transfer stage runs one
+seed and reports point estimates with no interval, which is exactly what let a 1.13 look like a finding.
+Also worth noting the transfer "panel" is only **two** methods, so a 1–1 split is thin by construction;
+widening the panel would buy more than another seed.
+**Deck gap found in the same pass:** `defense-slides-outline.md` §6 lists **five** own-it limits and
+`defense-study-guide.md`'s slide row says "the five limits", but the built slide shows **four** — it split
+"no loyalty field / no ancillary revenue" into two bullets and dropped both "labels add little incremental
+prediction" and "**V4 transfer needs a multi-seed spread**". The outline told the deck to flag it; the deck
+does not.
+*Generalises: a lesson is closed when the generator changes, not when the doc does. Audit findings by asking
+"what would happen on the next run?" — if the answer is "the same wrong thing, more politely documented",
+it is open.*
+**Source:** our analysis, 2026-08-19 — `src/validate_temporal.py` (transfer verdict block),
+`src/model_zoo.py::load_sample`, `outputs/validate_temporal/`, deck slide 22 via python-pptx vs
+`docs/defense-slides-outline.md` §6.
+
+#### 2026-08-19 — A withdrawn number was hard-coded in the drift monitor, so every run republished it
+**Domain:** Project Decision
+Worst instance of the V4 staleness sweep, and the only one a document fix could not have held:
+`src/monitor_real.py` hard-coded "**LCA transfer ARI 0.729 vs a 0.645 within-window ceiling**" in **three
+places** — the module docstring, the `cross_window_ari_note` field of `report.json`, and the generated
+`summary.md` prose — and it had already emitted it to `outputs/monitor_real/summary.md`. That pair is
+**formally withdrawn** (silent ~43% sample; the correct run gives LCA 0.648/0.726 = **0.89**, GMM(full)
+0.740/0.595 = **1.24**), and the monitor is a *shipped* stage-5 artefact that goes to PAL, so every
+scheduled run was republishing a retracted figure into a deliverable. Replaced all three with the
+method-disagreement statement. **`outputs/monitor_real/summary.md` still holds the old line until the
+script is re-run** — `outputs/` is git-ignored and generated, so it was left alone rather than hand-patched.
+*Generalises: withdrawing a number means grepping `src/`, not just `docs/`. A figure quoted inside a
+generator is not a stale sentence — it is a stale sentence with a schedule. And when a retraction lands,
+the search should cover every place the number could be **re-emitted**, in priority order: generators
+first, then deliverables, then prose.*
+**Source:** our analysis, 2026-08-19 — `src/monitor_real.py` lines 18 / 240 / 277 vs
+`outputs/validate_temporal/summary.md` §6.
+
+#### 2026-08-19 — The V4 numbers in the study guides were a generation behind, and one of them was a withdrawn claim
+**Domain:** Clustering / Methodology
+Auditing the deck's eleven-iteration ledger row by row against the scripts and their outputs. **All eleven
+rows check out** — every row maps to a script in `src/` with a report in `outputs/`, so the slide's "the
+trail is re-runnable, not remembered" is literally true. **The stale material was in the study guides, not
+the deck.** `outputs/validate_temporal/summary.md` (18 Aug re-run) reports **share TVD 1.71 pp · revenue TVD
+3.36 pp**, and transfer as **GMM(full) 0.74/0.595 = ratio 1.24** against **LCA 0.648/0.726 = 0.89**. The
+guides still carried the 29 Jul generation — **1.93 pp / 3.21 pp** — and `pipeline-study-guide.md` still
+asserted "**a model fitted a year earlier transfers for free**" with "**0.763 against a 0.746 ceiling — a
+year costs us nothing**", which is the *pre-fix* pair; the LCA version of that claim (0.729 / 0.645 /
+**ratio 1.13**) is **withdrawn** outright, computed on a silent 43% sample. Also stale: "7 of 10 segments
+carrying 98.2%" is the v1-taxonomy profile-drift line; current is **8 of 12 labels carrying 98.1%**.
+**The deck is clean** — a full-text scan of all 25 slides and their notes finds none of the withdrawn or
+superseded numbers (0.729 · 1.13 · 1.93 · 3.21 · 0.114 · "transfers for free" all absent), and
+`defense-brief-2026-08-18.md` and `defense-study-guide.md` both already marked the 1.13 ratio withdrawn.
+Refreshed the figures in `pipeline-study-guide.md` (11 sites), `defense-study-guide.md` (4),
+`methodology.md`, `eda-results-slide-guide.md` and `recommendations-plan.md`, and replaced every flat
+"transfers for free" with the named-method version.
+**Two more ledger-integrity notes.** (1) **The deck's eleven and the study guide's eleven are different
+elevens:** the deck drops the 31 Jul persona row and adds the 17–18 Aug SME/waterfall-v2 row. Both count to
+eleven by coincidence. Added the 17–18 Aug row to the guide's table with a note on the difference — a slide
+that says "eleven dated iterations" should not be backed by a table listing a different eleven. (2) **The
+12 Aug rule-confidence row (66.5% uncontested, Corporate most contested) was computed on v1 labels and has
+not been re-run since waterfall v2**, so the contested share is unknown for the taxonomy actually being
+defended. Marked as such in the ledger; the deck's version of the row quotes no number, so it is safe.
+*Generalises: a figure has a generation, not just a value. When a script is re-run, grep every doc for the
+old value the same day — and when a number is withdrawn, grep for the *sentence* it supported too, because
+the prose outlives the digits.*
+**Source:** our analysis, 2026-08-19 — `outputs/validate_temporal/summary.md` (18 Aug 21:10) vs the guides;
+full-text scan of `assets/final-defense/CPT3_DefenseDeck_V3.pptx` via python-pptx; `src/` ↔ `outputs/`
+row-by-row mapping of the eleven ledger entries.
+
+#### 2026-08-19 — The methodology spec still said the v2 waterfall was unbuilt, three weeks after it shipped
+**Domain:** Project Decision
+Auditing the defence deck's methodology block (slides 10–13) against the repo turned up the spec, not the
+deck, as the stale artefact. `docs/methodology.md` was at v1.10 and its changelog asserted "**the waterfall
+is unbuilt and proxy labels are unmoved**", while its "Current Methodology at a Glance" pipeline line read
+"**PRIMARY DELIVERABLE (the 10 segments)**". Both are false as of 18 Aug: `src/features_real.py` emits the
+v2 `proxy_segment`, verified live on the booking parquet — **12 labels = 11 segments + `Unassigned`**,
+`Unassigned` **9.58% → 2.47%**, `Leisure` **50.61%**, and **62.69% of bookings carry a different label than
+under v1** (mostly the `Budget/Adventure` → `Leisure` rename; genuine reclassification 23.4%). Bumped to
+v1.11 with the shipped distribution recorded, the at-a-glance line corrected, and the v1 ten-segment
+penalty-weight table explicitly scoped as prototype-track. **The deck was right and the spec was wrong** —
+worth noting because the reflex is to trust the doc over the slide.
+**Two smaller reconciliations from the same audit.** (1) **"Six 'cannot-be' SME rules" is five plus one:**
+`status=enforce` in `hard_constraints.csv` selects H08 · H10 · H11 · H12 · H14 · H15, of which **H11 is a
+`must_be` — the only one in the whole sheet**. The count of six is right, the label "cannot-be" is not, and
+two of the six (H14, H15) only became enforceable when PAL approved Ultra Wealthy Leisure and Intl. Student
+on 17 Aug, so six is itself a v2-era number. (2) **`pipeline-study-guide.md` still listed "H₀ persistent
+homology — 1 significant component" as one of six pieces of continuum evidence, with no caveat**, even
+though that statistic was retired for returning 2–131 on unchanged control data — and slide 13 of the deck
+*boasts about retiring it*. Caveat added. The two H0 runs also differ (29 Jul: median 1, p75 3, max 120;
+18 Aug re-run at k=11: median 2, p75 4, max 131); the deck quotes the 18 Aug pair, and `methodology.md` now
+cross-references both so the numbers cannot be read as a contradiction.
+*Generalises: when a deck and a spec disagree, the deck is often the fresher document — it gets rebuilt for
+an audience, the spec gets updated when someone remembers. And a boast about retiring a bad instrument is
+only safe if every document has stopped quoting it.*
+**Source:** our analysis, 2026-08-19 — `assets/final-defense/CPT3_DefenseDeck_V3.pptx` slides 10–13 read via
+python-pptx, against `src/features_real.py`, `src/pal_colors.py`, `data/constraints/hard_constraints.csv`
+and DuckDB probes over `data/interim/pal_features_booking.parquet`.
+
+#### 2026-08-19 — The PCA overlap figure is v1-era artwork, but the finding replicates on v2 — and the v2 ARI is *higher*
+**Domain:** Clustering / Methodology
+`reports/study_guide/clust_02_pca.png` and `clust_01_bic_ari.png` were generated **23 July**, before the
+18 August v2 taxonomy. The PCA legend therefore shows **Budget/Adventure** (renamed Leisure), **Family**
+(dropped) and **Last-Minute** (now a flag) — three names the defence deck's own taxonomy slide declares
+retired. Re-ran the same LCA sweep on the current parquet and v2 labels (60k, seed 42, `n_init=2`):
+
+| k | BIC | ARI vs v1 | ARI vs v2 |
+|---|---|---|---|
+| 3 | 1,014,017 | 0.243 | 0.306 |
+| 4 | 988,748 | **0.319** | **0.389** |
+| 6 | 952,209 | 0.280 | 0.269 |
+| 9 | 928,770 | 0.226 | 0.210 |
+
+**BIC still falls monotonically — "no natural k" holds.** Best agreement moves **0.319 (v1) → 0.389 (v2)**,
+i.e. the redesigned taxonomy agrees *more* with what an unsupervised method finds, while staying inside the
+"moderate" band. A regenerated figure must annotate **≤ 0.39**, not ≤ 0.34 — and 0.389 sits right at the
+0.4 edge of the shaded band, so the sentence "only moderate agreement" needs care rather than deletion.
+Regenerating is therefore **safe and mildly favourable**, but it does not fix the deck by itself: the PNG is
+embedded in `CPT3_DefenseDeck_V3.pptx` and must be re-inserted.
+**Three reading traps in the same figure, now documented:** (1) **`k* = argmin(BIC)` over `range(3,10)`,
+and BIC is monotone — so k\* is always 9, the top of the search range**, not a fitted optimum; it
+coincidentally equals the v1 segment count on the right panel and must not be read as a 9-to-9 pairing.
+(2) The suptitle said **"stratified sample"** but `USING SAMPLE ... (reservoir)` is **uniform** — fixed in
+`src/report_figures.py`; uniform is also the correct choice, since balancing by segment or region equalises
+group sizes and can manufacture structure. (3) Two greys collide in the right panel (slate = Last-Minute,
+dark grey = Unassigned, unlabelled by design).
+**Quantities that make the visual defensible:** PC 1 + PC 2 carry **57.7%** of variance in the 16-column
+matrix (4 dims → 81%), so it is a substantial projection, not a thin shadow; rule-segment **silhouette
+0.091** in the full feature space versus **−0.16** in the 2-D view — the picture *overstates* the overlap,
+so quote 0.091. (Euclidean on the standardised/one-hot matrix; not comparable to the 0.381 Gower ceiling
+from the ten-method sweep, which uses a different distance.)
+*Generalises: a figure whose labels come from a taxonomy is dated the moment the taxonomy changes. Before a
+defence, diff every embedded figure's legend against the current label set — and re-verify the claim on
+current data separately, because stale artwork and a stale finding are different problems with different
+fixes.*
+**Source:** our analysis, 2026-08-19 — re-ran `src/report_figures.py`'s LCA/PCA construction over
+`data/interim/pal_features_booking.parquet`; PNG mtimes vs `src/pal_colors.py` retired-segment block.
+
+#### 2026-08-19 — "74% of customers never return" is a right-censoring artifact; the honest figure needs a horizon
+**Domain:** Data & Features
+The 26.1% repeat rate (73.9% single-booking) pools customers who had **27 months** of observation window
+with customers who had **weeks**. Issuance runs 2024-04 → 2026-07-20 at full volume (earlier issuance
+appears only for very-long-lead travel into the window, so the extract is **left-truncated too**: a
+"first" booking is first-*observed*, not first-ever). Repeat rate by first-booking cohort falls almost
+perfectly with remaining runway: **2024 Q2 40.5% · 2025 Q1 27.0% · 2026 Q1 12.6% · 2026 Q3 2.9%.**
+On a fixed horizon it is **26.5% within 12 months** of the first booking (8.11M customers with a full
+year of runway) and 17.8% within 6 months. So the pooled 26.1% happens to land near a proper 12-month
+rate — but by coincidence of cohort mix, not because that is what it measures. **Say "26% within a year",
+never "74% never return".** Supersedes the phrasing in the 2026-06 plan-review entry below ("for 74%,
+customer ≡ their one booking") — the *conclusion* stands untouched: booking grain was chosen because
+purpose belongs to a purchase, and even at 40% repeat most of the base books once. Nothing downstream
+reads the repeat rate, so no model changes; the fix is wording, in
+`eda-results-slide-guide.md`, `pipeline-study-guide.md`, `defense-study-guide.md`, `eda-report-real-data.md`.
+**Same defect, second number: "avg tenure 82 days" (A5) averages over all 13.4M customers, and the 73.9%
+with one booking contribute a structural zero.** Among customers who did return, first→last issuance spans
+a **median 285 / mean 314 days** — roughly a year, not a quarter. 82 days is arithmetically right and
+rhetorically indefensible; it invites "so nobody stays with PAL for three months?"
+*Generalises: any "share who never came back" computed on a fixed extract is a statement about the window,
+not the customer. Cohort it by entry date before quoting it, or attach an explicit horizon. And never
+average a duration over a population where most members cannot have one.*
+**Source:** our analysis, 2026-08-19 — DuckDB cohort probes over `data/interim/pal_features_booking.parquet`.
+
+#### 2026-08-19 — The region chart's multi-region trips are labelled alphabetically, and it costs 1.65% of the book
+**Domain:** Data & Features
+`dest_region = max(intl_region)` in `src/features_real.py` is an **alphabetical** max, not a
+furthest-point or primary-destination rule. Region labels sort *East Asia < Europe < Middle East < North
+America < Oceania < South Asia < Southeast Asia*, so **Southeast Asia wins every tie**. **785,673 bookings
+(3.43%) touch more than one international region**; for **377,331 (1.65% of all bookings)** the assigned
+region is not the region of their final destination — mostly trips that really end in East Asia (132,936),
+North America (76,802) or Oceania (55,194) being filed under Southeast Asia. Reassigning by final trip
+destination: **SE Asia 11.78% → 10.56%**, **East Asia 14.80% → 15.67%**, North America 8.38% → 8.60%,
+Oceania 3.32% → 3.41%; **domestic 57.69% is unaffected** (`is_domestic` is `bool_and(dom_coupon)`, exact)
+and the bar ordering does not change. Two related facts worth having ready: **7.63% of bookings are
+international journeys carrying a domestic feeder leg** (the domestic network partly *feeds* the
+international one — they are not separate businesses), and the **Europe/South Asia 0% bars mean no
+own-metal sectors**, while **6,334 bookings do have a European trip endpoint** (1,740 South Asian) through
+OAL codeshare beyond-points. Not worth re-running the pipeline for 1.65%, but it must be **quoted as a
+known edge** rather than discovered by a panellist.
+*Generalises: any `max()`/`min()` over a categorical is an alphabetical tiebreak pretending to be a
+business rule. Where a booking can hold several category values, the aggregation choice is a modelling
+decision and needs stating.*
+**Source:** our analysis, 2026-08-19 — DuckDB probes over `data/interim/pal_clean/` joined to
+`data/reference/airport_region.csv`; generator `src/report_figures.py::fig_route_region`.
+
+#### 2026-08-19 — The EDA timing slide was quoting coupon-grain numbers against a booking-grain chart
+**Domain:** Data & Features
+`eda_03_lead_value.png` is drawn from `pal_features_booking.parquet` (22.9M **bookings**), but every
+talking-point doc paired it with **median 25 days / 13.3% inside three days** — which are the **coupon**-grain
+figures from the 38.1M-row extract. At the booking grain the same distribution is **median 18 days, mean 43.3,
+19.26% inside three days**. The direction is structural, not a bug: **coupon-weighting over-counts multi-leg
+trips, and multi-leg trips are planned further ahead**, so any coupon-grain lead time reads as more
+advance-booked than the purchase decisions we actually model. 19.26% is also the number the rest of the deck
+already uses — it is exactly the **4,411,666** bookings `is_last_minute` covers — so the slide was
+contradicting slide 18 by 6 points. Corrected in `eda-results-slide-guide.md`, `pipeline-study-guide.md`,
+`mentor-presentation-guide.md`, and labelled by grain in `eda-report-real-data.md`.
+**Second grain trap on the same chart, right-hand panel:** the bars are `max_tier` — each booking counted at
+its **most expensive** leg — giving **63.11%** in the two cheapest brands (identical to `value_band` = Budget,
+by construction). The **70.6%** figure circulating from the Stage-E proxy sizing is `min_tier <= 2`, i.e.
+bookings with *any* cheap leg (70.68% confirmed). Both are true; they answer different questions. `max_tier`
+is the conservative one and is the only one that may be quoted against this figure.
+*Generalises: a distribution shown at one grain must be described at that grain. When two grains of the same
+extract are both in a deck, every percentage needs its denominator named, or two slides will disagree with
+each other in front of a panel.*
+**Source:** our analysis, 2026-08-19 — DuckDB probes over `data/interim/pal_features_booking.parquet` and
+`data/interim/pal_clean/`; generator `src/report_figures.py::fig_lead_and_value`.
+
+#### 2026-08-18 — V3 re-run against v2: the detection floor holds, and one instrument failed its own control
+**Domain:** Clustering / Methodology
+Re-ran detection power at `k=11` (v2 named-segment count; the 29 Jul run used 10). **The bounded null is
+unchanged**, which is the outcome the brief predicted but had not verified. Majority of the 12
+method × archetype combinations: **never detected at 0.5% or 1.0% prevalence** at any distinctness
+tested; detected at **2.0% from distinctness ≈0.494**, **5.0% from ≈0.219**, **10.0% from ≈0.13**.
+So: *no segment exists in these features at or above 2% of bookings with distinctness ≈0.494 or greater*,
+and *below ~1% (~229k bookings) one could exist unseen*. The archetype spread is only 11 points
+(late_yield 21% of cells, planned_group 29%, random_dir 32%), and the **random direction — which has no
+business story — sits inside the range set by the two plausible ones**, so the floor is a property of the
+method panel, not of the directions we guessed.
+**⚠️ Quote the majority floor, never the best cell.** One combination recovered a group at **0.114**
+planted silhouette while groups as distinct as **0.567** were missed elsewhere in the grid. Both cannot
+be floors — the first is the luckiest alignment out of 12 draws, which is what chance produces at that
+many. *Generalises: a minimum over a panel is a selection effect, exactly like the max-ratio problem V4
+has. Report the consensus and the spread.*
+**The new finding is about our own instrument.** On the `w=0` controls — nothing planted, so the answer
+must be identical every time — persistent homology's H0 gap heuristic returned **median 2, p75 4,
+maximum 131** significant components across 100 draws of 1,200 rows. **A statistic that ranges 2–131 on
+unchanged data cannot screen for anything**, so this grid draws no conclusion from it. The instability is
+the `argmax`-over-sorted-bar-differences gap heuristic, which jumps whenever two adjacent bars are close
+— not the homology. **This qualifies the 28 Jul report**, which cited *one* draw ("1 significant H0
+component") as independent confirmation of the continuum: 2 is the modal and median value, so the reading
+survives, but as the centre of a noisy distribution rather than a measurement. The H1 loop-noise ratio and
+the barcode shape are the robust parts; the integer count is not.
+**Source:** our analysis, `outputs/detection_power/`, 18 Aug 2026.
+
+---
+
+#### 2026-08-18 — V4 re-run on the corrected sample: the transfer-ARI number in the defence brief does not reproduce
+**Domain:** Clustering / Methodology
+Fixing `model_zoo.load_sample`'s filter/sample ordering (entry below) doubled V4's per-window sample from
+~13,000 to the intended 30,000 and re-ran it. **The model-transfer table moved enough to change what can
+be claimed.**
+
+| | earlier run (~13k/window) | corrected run (30k/window) |
+|---|---|---|
+| LCA transfer ARI | 0.729 | **0.648** |
+| LCA within-window ceiling | 0.645 | **0.726** |
+| LCA ratio | **1.13** | **0.89** |
+| GMM(full) ratio | not the reported method | **1.24** (0.740 / 0.595) |
+
+**⚠️ The brief's "LCA transfer ARI 0.729 against a within-window ceiling of 0.645 — ratio 1.13" is not
+reproducible and must not be quoted.** On the correct sample LCA transfers *below* its own ceiling.
+**The qualitative conclusion survives, but only through a different method:** `GMM(full)` reaches ratio
+1.24, so "a model fitted a year earlier carves the later data as well as one fitted on it" still holds —
+on GMM. The two methods now disagree (1.24 vs 0.89), which is materially weaker evidence than one
+method at 1.13, and the honest statement is *"on the best-transferring method"*, not *"on this
+evidence"*.
+*Two generalisations, both cheap and both missed:*
+1. **A ratio that crosses 1.0 when the sample doubles was never a finding.** At 13k the estimate was
+   noise-dominated; nothing in the earlier output said so, because the script reports point estimates
+   with no interval. **V4's transfer stage needs a spread across seeds before any ratio is quoted.**
+2. **`summary.md` reports "best drift-adjusted transfer", i.e. the max ratio over the method panel.**
+   That silently cherry-picks, and it is why the reported method changed from LCA to GMM without anyone
+   choosing. Reporting the max over a panel is a selection effect; report the panel.
+**Unchanged by the fix** (these run on the full population, not the sample): segment-size TVD **1.71 pp**,
+revenue-mix TVD **3.36 pp**, adversarial drift AUC **0.621** against a 0.500 negative and 0.995 positive
+control, and "composition is stable where the volume is" — 8 of 12 segments carrying 98.1% of bookings
+show only negligible-or-small drift, with the drifters all being the smallest segments.
+**Source:** our analysis, `outputs/validate_temporal/`, 18 Aug 2026.
+
+---
+
+#### 2026-08-18 — PAL turned on NDC: 366,890 bookings through a channel that did not exist a year ago
+**Domain:** Airline Industry
+First real-data drift run (`src/monitor_real.py`, Regime C) over two adjacent censoring-safe 12-month
+windows. **The segment mix is essentially frozen — PSI 0.0028 — and 22 of 23 rule inputs are STABLE.**
+The single flag is `channel`, **PSI 0.4111 → RETRAIN**, and the decomposition names the cause:
+**`NDC` has 0 bookings in 2024-05→2025-04 and 366,890 (3.64%) in 2025-05→2026-04.** PAL stood up New
+Distribution Capability inside the extract window. Alongside it, **OTA fell 18.08% → 12.93%** and
+**WEB/APP rose 32.91% → 37.17%** — a genuine intermediated-to-direct shift, but a small one:
+contributions 0.017 and 0.005 against NDC's 0.383.
+**⚠️ The RETRAIN verdict is partly an artifact of the metric.** A category absent from the reference
+window contributes `share x log(share / eps)`, where `eps = 1e-6` is `psi_categorical`'s clipping floor.
+At `eps = 1e-4` the same 3.64% would contribute ~0.21 instead of 0.38. **PSI cannot distinguish "this
+category is new" from "this category exploded"** — so `monitor_real.py` now reports `psi_excl_new`
+alongside `psi`, and on that measure `channel` is **0.0285 — STABLE**.
+*Generalises: any PSI over a categorical with an open value set needs the new-category split, or the
+first time a business launches anything the monitor cries retrain.*
+**Why it matters commercially:** none of this moved a label — `corp_channel` PSI is 0.0002 — so the
+waterfall is unaffected. But a channel carrying 3.6% of bookings and rising is not in any rule, and
+`channel` is a rule input for Corporate. Worth asking PAL whether NDC bookings should read as corporate,
+direct, or neither before the share grows.
+**Source:** our analysis, `outputs/monitor_real/`, 18 Aug 2026.
+
+---
+
+#### 2026-08-18 — Two silent staleness bugs: a per-morsel sample and a palette that still listed dropped segments
+**Domain:** Clustering / Methodology
+Re-pointing ML's stale stages at v2 turned up two defects that had been producing *plausible* output,
+which is the dangerous kind.
+**① `WHERE ... USING SAMPLE n ROWS` samples *before* it filters.** Written flat in one SELECT,
+DuckDB places `RESERVOIR_SAMPLE` **underneath** `FILTER` in the plan (confirmed by `EXPLAIN`): it draws
+n rows from the whole table and only then applies the predicate, so the caller receives
+**`n x selectivity`** rows. `sub_segment.py` asked for 40,000 per parent and got **20,191 for Leisure
+(50.6% of the book) and 2,077 for Corporate (5.1%)** — the yield tracks the segment's share exactly.
+The smallest parent was therefore the thinnest-sampled, precisely where LCA needed the most support.
+It is *deterministic*, which is why it never looked broken.
+**The same pattern is in `model_zoo.load_sample(n, where=...)`, which most of the study scripts use.**
+Blast radius: `validate_temporal` sampled two 12-month windows (~44% of the table each) and so ran on
+**~13,000 rows per window, not the 30,000 it asked for** — that is the sample behind the V4 transfer
+ARI quoted in the defence brief. `kproto_compare`'s per-segment pass is affected the same way.
+`detection_power` and `model_stress_test` pass **no** `where` and are unaffected.
+**Two different fixes, because the two call sites want different things:** `sub_segment` now uses
+`ORDER BY hash(customer_id, issue_date) LIMIT n` (exact, uniform, reproducible, and it needs a precise
+n per parent); `load_sample` wraps the filter in a subquery so the sample sits above it.
+*Generalises: when a sample and a filter share a SELECT, read the plan. A deterministic wrong answer
+is harder to catch than a crash, and "it returned rows" is not evidence it returned the right ones.*
+**② `pal_colors.SEG_ORDER` was still the pre-v2 list** three weeks after v2 shipped — advertising
+`Family`, `Digital Nomad` and `Last-Minute`, omitting `MICE`, `Ultra Wealthy Leisure`, `Intl. Student`
+and `Outbound International Leisure`. The module's own docstring warns that "a chart legend must never
+advertise a segment the model does not assign"; the module was the thing violating it. Now **derived**
+(`SEG_ORDER = list(SEG_APPROVED)`) rather than restated, with `SEG_ORDER_V1` for the superseded
+prototype scripts and an assert that the emitted list can never intersect `SEG_RETIRED`.
+*Generalises: two hand-maintained lists that must agree will eventually not. Derive one from the other,
+or assert the relationship — a comment saying "keep these in sync" is not a mechanism.*
+**Also settled: Regime A is not applicable, not merely unrun.** DBCV, silhouette and cross-window ARI
+score a *fitted clustering*. The deliverable is a deterministic rule waterfall — no clustering, no noise
+class, no density to degrade, and re-applying the rules to the same rows scores ARI 1.0 by construction.
+`monitor_real.py` states this on the page instead of leaving a blank, and points at V4's LCA transfer
+ARI (0.729 vs a 0.645 ceiling) for the stability question that *does* apply.
+**Source:** our analysis, `src/sub_segment.py` · `src/pal_colors.py` · `src/monitor_real.py`, 18 Aug 2026.
+
+---
+
+#### 2026-08-18 — The `is_last_minute` flag is not independent of the waterfall: three rules read `lead_days`
+**Domain:** Clustering / Methodology
+Charting the flag by segment (`src/segment_charts.py`) surfaced an entanglement we had not stated.
+**`is_last_minute` is `lead_days <= 3`, and three of the eleven segment rules also read `lead_days`,
+so three bars in any "short-lead by segment" chart are partly or wholly rule-induced:**
+- **MICE** requires `lead_days >= 45` and **Ultra Wealthy Leisure** requires `lead_days >= 30`. Both are
+  therefore **0% short-lead by construction, not by behaviour** — mutually exclusive with the flag by
+  definition. A chart that shows them at 0% without saying so invites "these travellers never book late".
+- **Corporate is `corp_channel OR (any_business AND lead_days <= 7)`.** The second branch only admits
+  bookings that are already short-lead, so **the segment's headline 35.6% is partly circular**. Split by
+  branch: `corp_channel` (791,571 bookings, **no lead-time condition**) is **23.3%**; the
+  `any_business AND lead_days <= 7` branch (376,880) is **61.4%**. **23.3% is the honest number** — still
+  above the 19.26% book average, so the behavioural claim survives, but at a quarter of its apparent size.
+**This qualifies a sentence in the 18 Aug defence brief** — "a flag rides along with whatever segment the
+booking belongs to" is true of eight segments and false of three. The volume claim is unaffected
+(4,411,666 vs 2,945,686 stands); it is the per-segment *rate* reading that needs the caveat.
+*Generalises: when a flag and a rule read the same feature, every cross-tab of the two is partly a
+tautology. Check the rule text before reading a rate as behaviour.*
+**Also note the denominator trap:** the brief's per-segment short-lead counts (864,292 OFW · 315,333
+Corporate · 196,364 Balikbayan) are computed on **v1** labels — correct for its "invisible under v1"
+framing. Under v2 labels the same 4,411,666 bookings split differently (858,318 · 415,411 · 193,897),
+because the retired Last-Minute branch used to outrank those segments. Both are right; say which.
+**Source:** our analysis, `src/segment_charts.py` + `src/features_real.py` L272–L305, 18 Aug 2026.
+
+---
+
+#### 2026-08-18 — `Unassigned` survived v2 as a *premium* residual, not a low-value one
+**Domain:** Data & Features
+Waterfall v2 cut `Unassigned` from 9.58% to 2.47% (566,126 bookings) by routing three-quarters of it to
+`Outbound International Leisure`. **What is left is 81.4% Premium value band** — against 6.0% Premium
+book-wide, and against 7.4% Budget within `Unassigned` itself. Only the three segments that are premium
+*by definition* rank above it — Ultra Wealthy Leisure 96%, Premium Bleisure 95%, Mabuhay Loyalist 94% —
+so `Unassigned` is **the most premium-skewed population in the book that was not built to be one**.
+Mean revenue is nonetheless only **$177/booking**, the third *lowest* — so the
+fare brand is premium while the ticket value is not, which is the signature of award redemptions,
+upgrades and staff/industry tickets rather than of high-yield commercial traffic.
+**Why it matters:** the standing story about `Unassigned` was "the largest actionable gap" — implicitly
+low-value leftovers to be swept up. It is the opposite population, and it is 32.7% short-lead. Whatever
+rule finally claims it should be designed for a premium-brand, low-revenue, late-booking traveller.
+**Source:** our analysis, `outputs/segment_charts/segment_summary.csv`, 18 Aug 2026.
+
+---
+
 #### 2026-08-18 — Waterfall v2 shipped, and the boundary it was meant to fix did NOT improve
 **Domain:** Clustering / Methodology
 Built waterfall v2 into `src/features_real.py` (11 segments + Unassigned, `is_last_minute` flag,
@@ -2256,4 +3367,17 @@ is now `src/dashboard.py`. See `README.md`.
 ---
 
 *Knowledge base maintained by CPT 3 — PAL Customer Segmentation*
-*Last updated: 18 August 2026*
+*Last updated: 27 August 2026*
+
+#### 2026-09-03 — New Data Extract (Jun 2026–May 2027) Integration & Validation Lift
+**Domain:** Data Source / Methodology
+A new iteration of the data extract introduced 5 critical new fields: `FareBasisCode`, `TourCode`, `RevPaxInd`, `ItinType`, and `FF_Ind`. These were cleanly integrated into the `clean_real.py` and `features_real.py` pipeline across 46.3M rows.
+**Crucial Validation Lift**: Using these fields as validation anchors drastically improved the proxy label's construct validity scores across all tested segment boundaries. For example, the Leisure vs Corporate AUC lifted from 0.636 → 0.878, and Balikbayan vs Pilgrimage lifted from 0.727 → 0.955.
+
+#### 2026-09-03 — Mabuhay Loyalist Expansion
+**Domain:** Segment Definition
+Previously, Mabuhay Loyalist was defined purely by award redemptions (booking class F/G), severely undercounting the segment (0.03% of data). Using the new `FF_Ind` field, the segment definition was expanded to `ff_ind = 1 OR is_award`. This successfully shifted ~17% of total bookings (drawn mostly from Leisure and Outbound Intl Leisure) into the segment while maintaining structural coherence (revenue CV improved from 2.20 to 1.70).
+
+#### 2026-09-03 — Gulf Corridor Fare Artifact vs Behavioral Confound
+**Domain:** Segment Analysis (OFW vs Balikbayan)
+Analysis of the new `FareBasisCode` field resolved the long-standing "30-day stay spike" debate on Gulf routes. Statistical testing (Chi-squared p=0.0) confirmed the 30-day stay spike is heavily concentrated in specific fare families (e.g., TARI, TLFS, TSVF). Because the spike is tied to specific fares rather than distributed evenly across the economy cabin, it is primarily a **fare-rule artifact** (max stay limit) rather than a purely behavioral pattern (employer-mandated leave).

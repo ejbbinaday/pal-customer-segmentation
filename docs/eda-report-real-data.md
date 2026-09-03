@@ -108,8 +108,10 @@ Contact Center 4.7% · **Sea Crew 3.7%** (a distinct, contract-driven population
 
 ### Booking behaviour
 
-- **Lead time** (issue → departure): median **25 days**, mean 53.2, max 679.
-  **13.3% book 0–3 days out** — a large genuine last-minute population.
+- **Lead time** (issue → departure), **coupon grain**: median **25 days**, mean 53.2, max 679.
+  **13.3% of coupons are booked 0–3 days out.** At the booking grain used for modelling (§4) the same
+  distribution is median **18 days**, mean 43.3, **19.26% inside three days** — a large genuine
+  last-minute population. Quote the booking-grain pair anywhere the 22.9M-booking figures are shown.
 - Party size (`Pax Count`): 1–5, mostly solo; group `BookingType` is only 2.6% of coupons.
 
 ---
@@ -126,7 +128,15 @@ The plan's grain assumption — a *booking* = `(customer_id, issue_date)` — ho
 - **All-non-revenue customers:** 12,306 (0.092%) — cleanly excluded before feature engineering.
 - **Loyalty signal is thin:** only 6,259 customers (0.047%) ever used an award ticket; 6.9% ever
   flew premium (J/W); but **26.1% are repeat customers** (≥2 bookings) — repeat behaviour, not
-  loyalty status, is the usable signal. Avg tenure (first→last issuance) is 82 days.
+  loyalty status, is the usable signal. Avg tenure (first→last issuance) is 82 days **across all
+  customers — a number 74% of whom contribute a structural zero** (one booking ⇒ tenure 0). Among
+  customers who actually returned, first→last spans a **median 285 days / mean 314 days**. Quote 285,
+  not 82, if the question is "how long is a relationship".
+  **Right-censoring warning:** 26.1% counts repeats *inside the extract's ~27-month issuance window*
+  (issuance runs 2024-04 → 2026-07-20 at full volume). On a fixed horizon it is **26.5% within 12
+  months** of the first booking (8.11M customers with a full year of runway); by first-booking cohort
+  it falls monotonically with remaining runway — **40.5%** for 2024 Q2 down to **2.9%** for 2026 Q3.
+  Never state the complement as "74% never return".
 
 ---
 

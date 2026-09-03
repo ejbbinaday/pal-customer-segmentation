@@ -1,0 +1,46 @@
+# Full dependencies to run the segmentation PIPELINE (the analysis scripts in src/).
+#
+# requirements.txt         → lean, dashboard-only (used by Streamlit Cloud)
+# requirements-pipeline.txt → this file: everything the ML/EDA scripts need
+# requirements-dev.txt      → ruff / bandit / pre-commit
+#
+# Install:  pip install -r requirements-pipeline.txt
+# Versions captured 2026-07-17 on Python 3.14; wheels also available for 3.11–3.13.
+# Clustering output is sensitive to scikit-learn / hdbscan versions — keep these pinned.
+
+numpy==2.5.1
+pandas==3.0.3
+scikit-learn==1.9.0
+scipy==1.18.0
+hdbscan==0.8.44
+imbalanced-learn==0.14.2
+matplotlib==3.11.0
+seaborn==0.13.2
+
+# large-data layer — real PAL data is ~38M coupon rows / 3.6 GB gz (data/PAL-data/).
+# duckdb streams the gz and aggregates coupon→PNR out of core; pyarrow backs Parquet
+# (data/interim/pal_parquet/); tabulate renders the profiler's markdown tables.
+duckdb==1.5.5
+pyarrow==25.0.0
+tabulate==0.10.0
+
+# mixed-type clustering for the real-data segmentation diagnostic/refinement
+# (LCA = model-based; k-prototypes = hard clusters). See src/cluster_diagnostic.py.
+kmodes==0.12.2
+stepmix==3.0.0
+
+# topological data analysis for the ten-method benchmark (src/model_zoo.py, src/model_stress_test.py).
+# kmapper = the Mapper algorithm (lens → cover → per-patch clustering → graph); ripser = persistent
+# homology (H0/H1 barcodes), the label-free check for "clusters vs continuum vs loops". Both are
+# pure-Python/Cython wheels. GMM, spectral clustering and Support Vector Clustering in that benchmark
+# need nothing beyond scikit-learn above.
+#
+# NOTE: `giotto-tda` — the other common TDA stack — has no Python 3.14 wheel and fails to build from
+# source here. kmapper + ripser cover everything the benchmark needs; don't swap them for giotto.
+kmapper==2.1.0
+ripser==0.6.15
+persim==0.3.8  # ripser dependency (diagram utilities)
+
+# transitive, pinned for reproducibility
+joblib==1.5.3
+threadpoolctl==3.6.0

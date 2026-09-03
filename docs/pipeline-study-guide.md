@@ -37,7 +37,7 @@ this extract. **Lead with these; they make the pivot feel inevitable rather than
 
 | # | Fact | Why it matters |
 |---|---|---|
-| **1** | **Most customers are occasional flyers.** Median customer has 2 coupons; 95% have fewer than 8. Only **26.1% ever book twice** | There is no rich purchase history to cluster on. A customer-level model would be fitting one or two events per person |
+| **1** | **Most customers are occasional flyers.** Median customer has 2 coupons; 95% have fewer than 8. Only **26.1% book twice inside the observation window** — **26.5% within 12 months** of their first booking; the earliest full cohort (first booking 2024 Q2, 27 months of runway) reaches **40.5%** | There is no rich purchase history to cluster on. A customer-level model would be fitting one or two events per person |
 | **2** | **This is overwhelmingly an economy, Philippines-centred airline.** 95.2% economy cabin · **88% of coupons in the three cheapest fare brands** · 57.7% of bookings domestic | The "value axis" is real but compressed into a narrow band. Most of the variance is *where* and *when*, not *how much* |
 | **3** | **The data is clean but demographically thin.** Near-zero nulls on operational fields, but **`Age` is 57% missing** and award tickets are **0.02% of coupons** | Segmentation must lean on **behaviour** — lead time, route, fare tier, channel, issue country — not on who the customer says they are |
 
@@ -64,19 +64,22 @@ behaviour — which is what confirms the customer key persists and the rollup is
 
 **Geography — Manila-centred with strong diaspora corridors.** Top origins MNL 14.4M, CEB 2.3M,
 DVO 2.1M; LAX and ICN lead international. Country of issue: PH 61.6%, then US, SG, JP, HK, CA, KR, AU —
-**the classic OFW/diaspora footprint, and 38.4% of coupons are foreign-issued.** Route regions:
-domestic 57.7% · East Asia 14.8% · SE Asia 11.8% · North America 8.4% · Middle East 4.0% · Oceania 3.3%.
+**the classic OFW/diaspora footprint, and 38.4% of coupons are foreign-issued.** Route regions (**bookings**; 58.5% of *legs* are domestic, so the ~58% holds at both grains):
+domestic 57.69% · East Asia 14.80% · SE Asia 11.78% · North America 8.38% · Middle East 4.03% · Oceania 3.32%.
 South Asia and Europe are ≈0 — no own-metal service in this extract.
 
 **Channel** — WEB/APP 35.4% · Traditional Travel Agency 27.8% · OTA 14.9% · Ticket Office 6.1% ·
 Contact Center 4.7% · **Sea Crew 3.7%** · NDC 2.4% · TMC 1.8%.
 
-**Booking behaviour** — lead time median **25 days**, mean 53.2, max 679. **13.3% book within 3 days** —
-a large, genuine last-minute population, which is why that rule exists at all.
+**Booking behaviour (coupon grain)** — lead time median **25 days**, mean 53.2, max 679. **13.3% of
+coupons are booked within 3 days**. At the **booking** grain we actually model, the same distribution is
+median **18 days**, mean 43.3, and **19.26% inside three days** — a large, genuine last-minute population,
+which is why that rule exists at all. *Use the booking-grain pair (18 / 19.26%) with the figure below;
+19.26% is the 4,411,666 that `is_last_minute` covers.*
 
 ![Timing and value, the two rule axes.](../reports/study_guide/eda_03_lead_value.png)
 
-**Timing and value, the two rule axes.** Left: booking lead time, with the Last-Minute 3-day cut marked — **13.3% of bookings fall inside it**. (The spike at 120 is the display cap, not a real cluster.) Right: value tier is heavily bottom-loaded — two-thirds of the book sits in the two cheapest brands.
+**Timing and value, the two rule axes.** Left: booking lead time, with the Last-Minute 3-day cut marked — **19.26% of bookings fall inside it**. (The spike at 120 is the display cap, not a real cluster.) Right: value tier is heavily bottom-loaded — two-thirds of the book sits in the two cheapest brands.
 
 ![The network shape that drives the rules.](../reports/study_guide/eda_02_region.png)
 
@@ -131,11 +134,17 @@ What we expected                     What we found
 
 ![The chart that changed the project.](../reports/study_guide/clust_01_bic_ari.png)
 
-**The chart that changed the project.** Left: the model-selection score keeps falling as we add groups — **there is no bottom, so there is no natural number of segments**. Right: even at its best, a data-driven grouping agrees with our business taxonomy only ~0.34 (1.0 = identical). 60k stratified sample, k = 3–9.
+**The chart that changed the project.** Left: the model-selection score keeps falling as we add groups — **there is no bottom, so there is no natural number of segments**. Right: the two-class cut agrees at 0.54 — but that split is geography (0.91 against the domestic/international bit alone), not customer structure; past it, a data-driven grouping agrees with our business taxonomy at most ~0.39 (1.0 = identical). 60k **uniform random** sample (reservoir, seed 42 — *not* stratified; balancing by segment or region would equalise group sizes and can manufacture structure), k = 1–9.
+
+> **Figure regenerated 23 August on v2 labels, sweep extended to k = 1.** BIC falls monotonically 1,148,667 (k = 1) → 928,770 (k = 9) — no elbow anywhere, not even at 2. The ARI panel now peaks at **0.537 at k = 2**; a composition probe shows that cut is geography (ARI 0.909 against the domestic/international bit; Corporate splits 50/50, its actual domestic mix). Quote 0.54 only with that qualifier — the customer-structure ceiling is still **0.389 at k = 4** (v1 was 0.319). The defence deck still embeds the 23 Jul version and needs a re-insert.
 
 ![What a continuum looks like.](../reports/study_guide/clust_02_pca.png)
 
 **What a continuum looks like.** The same 60k bookings, twice. Left coloured by what the algorithm found, right by our business rules. **Neither picture has clean gaps between groups** — the colours shade into each other rather than sitting in separate islands.
+
+> **How to read it honestly.** PC 1 + PC 2 carry **57.7%** of the variance in the 16-column feature matrix (4 dims reach 81%), so this is a substantial view, not a thin shadow — but 42% is still off-screen, which is why the formal tests follow. The numeric version of "no clean gaps": rule-segment silhouette is **0.091** in the full feature space (0 = groups sit on top of each other). The *projection* scores −0.16, so the picture overstates the overlap slightly — quote 0.091.
+> **`k=9` on the left is not a fitted optimum.** `k_star = argmin(BIC)` over `K_RANGE = range(3,10)`, and BIC falls monotonically, so k\* is always the **top of the search range**. The model wanted more classes than it was offered — which is the continuum finding, not a chosen number. It coincidentally equals the count of v1 segments on the right; the two 9s are unrelated and must not be read as a 9-to-9 pairing.
+> **Legend is v1** (Budget/Adventure, Family, Last-Minute — all retired or renamed on 18 August), because the PNG predates the v2 taxonomy. The *finding* replicates on v2 (silhouette 0.091 measured on current v2 labels); only the artwork is stale.
 
 **The evidence, from ten methods across six families** (`src/model_stress_test.py`):
 
@@ -143,7 +152,7 @@ What we expected                     What we found
 |---|---|---|
 | LCA BIC across *k* = 3–12 | **No elbow** — falls monotonically | There is no natural number of segments |
 | Gower silhouette, best of 10 methods | **0.381 ceiling** | Even the best partition is weakly separated |
-| H₀ persistent homology | **1 significant component** | Label-free, assumption-free: one blob |
+| H₀ persistent homology | 1 significant component — ⚠️ **noisy statistic, retired as a detector** (2–131 on unchanged control data); 1–2 is the modal value, so the reading holds as the centre of a distribution, never as a measurement. The robust parts are the H1 loop-noise ratio and the barcode shape | Label-free, assumption-free: one blob |
 | TDA-Mapper | separation ≈ 0 | No topological structure |
 | Support Vector Clustering | emergent *k* = 1 | Fragments only by ejecting 43–62% of rows |
 | Median cross-method ARI | **0.41** | The methods don't even agree with each other |
@@ -230,9 +239,14 @@ than a story.*
 | **28 Jul** | `validation_anchors.py` + V1 + V2 | Circularity is real and has *semantic* leaks a name check misses | **Validation stops being blocked on SME labels.** Plan B begins |
 | **28 Jul** | `model_stress_test.py` — 10 methods, 6 families, 8 axes | **GMM(full) beats LCA on the top-level benchmark** (0.849 vs 0.763, and 0.798 vs 0.762 with the circular axis zeroed). Continuum reconfirmed by **four independent new tests**. **Separation ceiling 0.381** | **Pipeline deliberately unchanged.** The benchmark scores *top-level* segmentation; LCA's actual job is *sub*-segmentation. Refinement layer marked **under review pending a stage-matched re-test** |
 | **29 Jul** | `detection_power.py` (V3) — plant segments of known size | Panel recovers planted groups at **≥2%** prevalence; **nothing below ~1%** at any distinctness | The null result becomes **falsifiable**. A **stated blind spot** (~229k bookings) now travels with the continuum claim. H₀ homology **retired as a detector** (1→120 across 100 draws of unchanged data) |
-| **29 Jul** | `validate_temporal.py` (V4) | Shares hold (TVD 1.93 pp); a model fitted a year earlier **transfers for free**; **revenue mix is the weaker leg** (3.21 pp) | Confirms it is not a one-period artefact. Records that **the extract is filtered on *departure*, not issuance** — so naive calendar windows would report a fake lead-time collapse |
+| **29 Jul** | `validate_temporal.py` (V4) | Shares hold (TVD **1.71 pp**); **revenue mix is the weaker leg** (**3.36 pp**); on transfer the methods **disagree** — GMM(full) ratio **1.24**, LCA **0.89** — so name the method, never say "transfers for free" flat *(the 29 Jul run reported 1.93/3.21 and an LCA ratio of 1.13; that ratio is **withdrawn** — 43% sample)* | Confirms it is not a one-period artefact. Records that **the extract is filtered on *departure*, not issuance** — so naive calendar windows would report a fake lead-time collapse |
 | **31 Jul** | Persona dimension + per-segment scorecard for BI | Persona cards persuade, so caveats must ship *as columns* | `dim_segment.csv` splits **measured** / **editorial** / **governance** columns so a reader can tell evidence from assertion |
-| **12 Aug** | `rule_confidence.py` (§10.2) | 66.5% of labels uncontested; **Corporate is the most contested segment despite its ×10 penalty** | Gives us a **sampling frame for the SME ask** and a proposed `SegmentConfidence` column |
+| **12 Aug** | `rule_confidence.py` (§10.2) | 66.5% of labels uncontested (**v1 labels** — not re-run since waterfall v2); **Corporate is the most contested segment despite its ×10 penalty** | Gives us a **sampling frame for the SME ask** and a proposed `SegmentConfidence` column |
+| **17–18 Aug** | `check_constraints.py` · `probe_constraint_coverage.py` · `simulate_waterfall_v2.py` → `features_real.py` | **39 SME rules in, all 24 open questions answered.** `Family` and `Digital Nomad` fail on definition; `Budget/Adventure` is a rename; `Last-Minute` is a flag, not a segment | **Waterfall v2 ships.** 11 segments + `Unassigned`, `Unassigned` **9.58% → 2.47%**, six hard rules asserted at build. PAL approves the taxonomy |
+
+> **Which eleven?** The defence deck's ledger slide drops the 31 Jul persona row and adds this 17–18 Aug
+> row — both tables hold eleven, but they are not the same eleven. The deck's selection is the right one
+> for a defence; this table keeps 31 Jul because the BI governance decision matters to a maintainer.
 
 ### The three decisions a reviewer is most likely to challenge
 
@@ -291,7 +305,7 @@ the critical path to Power BI.
 22,911,450 bookings     one purchase decision  ← THE MODELLING ROW. One booking = one purpose.
         │  GROUP BY customer_id
         ▼
-13,435,365 customers    one person             only 26% book more than once
+13,435,365 customers    one person             only 26% book more than once *in-window*
         │  join segment back DOWN
         ▼
 38,116,259 coupons      + CustomerSegment      ← what Power BI receives
@@ -563,7 +577,7 @@ Sub-segments (LCA)      ✓ BIC · silhouette · split-half  →   (inherits the
 | **V1** construct | Held-out ROC-AUC, gradient boosting on independent anchors | 0.608–0.965; controls clean at ≈0.50 |
 | **V2** criterion | AUC ladder → *signal retained*, *incremental value* | 0.324 / ≈0.002 |
 | **V3** detection power | Best-F1 recovery of planted segments | detects at ≥2% prevalence |
-| **V4** temporal | TVD · adversarial AUC · transfer ARI | 1.93 pp / 0.61 / 0.763 |
+| **V4** temporal | TVD · adversarial AUC · transfer ratio | 1.71 pp / 0.61 / GMM 1.24 vs LCA 0.89 |
 | **Rule confidence** (§10.2) | Rule competition · runner-up · boundary fragility | 66.5% uncontested |
 | **The actual optimisation target** | **Asymmetric cost matrix + per-segment recall** | **built and tested — awaiting ground truth** |
 
@@ -627,9 +641,9 @@ Three questions, in order. They work for every metric in this document and most 
 | **Incremental value** | *Does the label tell us anything the raw data didn't already?* | You describe someone as "a Corporate traveller". Did that add anything the **booking details** hadn't already told us? | ≈0 means no | **≈0.002** — essentially nothing. The segments are a **summary, not new information** |
 | **F1 / precision / recall** | *Did we find the group — and is everyone we found actually in it?* | **Recall:** of the real Corporate bookings, how many did we catch? **Precision:** of the ones we called Corporate, how many really were? **F1** balances the two, because either alone is gameable — call *everything* Corporate and recall is perfect | 0 to 1 | Used in the planted-segment test |
 | **Detection power** (the *test*, not a metric) | *If a segment existed that we're missing, would we spot it?* | **A smoke-alarm test.** You light a small, controlled fire to check the alarm works. We plant fake segments of known size into the real data and see whether our methods find them | — | Finds them at **≥2%** of bookings; **blind below ~1%** |
-| **TVD** | *How much did the pie chart move between two periods?* | Lay last year's pie chart over this year's. **Add up how much each slice changed**, and halve it. That is the number | 0 to 1 (quoted in percentage points) · **small = stable** | **1.93 pp** on segment sizes — very stable. **3.21 pp** on revenue mix — the weaker leg |
+| **TVD** | *How much did the pie chart move between two periods?* | Lay last year's pie chart over this year's. **Add up how much each slice changed**, and halve it. That is the number | 0 to 1 (quoted in percentage points) · **small = stable** | **1.71 pp** on segment sizes — very stable. **3.36 pp** on revenue mix — the weaker leg |
 | **Adversarial AUC** | *Can a model tell which year a booking came from?* | Show someone a booking with the date hidden. **If they can guess the year, something changed.** If they can't, the population held still | 0.5 = unchanged · 1.0 = totally different | **0.61** — mildly changed, against controls at 0.49 and 0.99 |
-| **Transfer ARI** | *If we'd built the model a year earlier, would it still work today?* | Fit on last year, apply to this year, and see whether you get the same groups as building fresh. **The trick is what you compare against** — not a perfect 1.0, but the method disagreeing with *itself* on two halves of the same year. That is the realistic ceiling | Compare to the ceiling, not to 1.0 | **0.763 against a 0.746 ceiling** — a year costs us *nothing* |
+| **Transfer ARI** | *If we'd built the model a year earlier, would it still work today?* | Fit on last year, apply to this year, and see whether you get the same groups as building fresh. **The trick is what you compare against** — not a perfect 1.0, but the method disagreeing with *itself* on two halves of the same year. That is the realistic ceiling | Compare to the ceiling, not to 1.0 | **The methods disagree** — GMM(full) 0.74 against a 0.595 ceiling (**ratio 1.24**, above it), LCA 0.648 against 0.726 (**0.89**, below it). Quote both, or say "on the best-transferring method" |
 | **PSI** | *Has the incoming data drifted away from what we built on?* | A **smoke detector for data.** It watches the shape of arriving bookings and goes off when they stop resembling the ones the model was built for | **<0.1 fine · 0.1–0.25 watch · >0.25 investigate** | Specified, not yet wired |
 | **Per-segment recall + cost matrix** | *Of the real Corporate bookings, how many did we catch — and what did the misses cost?* | **Not all mistakes cost the same.** Missing a Corporate booking costs ~10× missing a Budget one, so we count the **pesos of error**, not the percentage of error | Lower cost is better | **Built and tested — awaiting ground truth.** This is the real target |
 
@@ -936,16 +950,16 @@ time in half and re-ask everything.
 
 | Measure | Result | Plain reading |
 |---|---|---|
-| **Share stability** (TVD) | **1.93 pp** ✅ | Did the pie chart move? Barely |
-| **Profile drift** | 7 of 10 segments negligible, carrying **98.2%** of bookings | Catches the failure a size report hides: **a segment can hold its share while its members change underneath** |
+| **Share stability** (TVD) | **1.71 pp** ✅ | Did the pie chart move? Barely |
+| **Profile drift** | 8 of 12 labels negligible, carrying **98.1%** of bookings | Catches the failure a size report hides: **a segment can hold its share while its members change underneath** |
 | **Adversarial AUC** | **0.61** (controls 0.49 / 0.99) | Can a model guess which year a booking came from? Mildly — so **real shift happened that the segment sizes absorbed** |
-| **Transfer ARI** | **0.763** vs a **0.746** ceiling | Fit last year, score this year. **A year costs us nothing** |
-| **Revenue-mix stability** (TVD) | **3.21 pp** ⚠️ | The weaker leg — see the limitations below |
+| **Transfer ratio** | GMM(full) **1.24** · LCA **0.89** | Fit last year, score this year. **The methods disagree** — bounded, not settled |
+| **Revenue-mix stability** (TVD) | **3.36 pp** ⚠️ | The weaker leg — see the limitations below |
 
 
 ![V4 — sizes hold, value moves.](../reports/study_guide/ms_fig6_temporal_stability.png)
 
-**V4 — sizes hold, value moves.** Two adjacent 12-month issuance windows on full-population counts. **Left: segment sizes barely move (1.93 pp). Right: revenue mix moves further (3.21 pp)** — Balikbayan/VFR loses 2.7 pp of revenue share on a flat headcount share. A segment holding its size is not evidence its value held.
+**V4 — sizes hold, value moves.** Two adjacent 12-month issuance windows on full-population counts. **Left: segment sizes barely move (1.71 pp). Right: revenue mix moves further (3.36 pp)** — Balikbayan/VFR loses 2.7 pp of revenue share on a flat headcount share. A segment holding its size is not evidence its value held.
 
 > **Two design points worth quoting.** *Profile drift is stratified, and must be* — a uniform sample would
 > give Mabuhay Loyalist about **nine rows**, so exactly the segments whose stability we know least would
@@ -1052,7 +1066,7 @@ gauge; there is no honest number to put in it.**
 | 13,435,365 | customers · only **26%** book more than once |
 | 9 + 1 | named segments + Unassigned (**9.6%**) · Digital Nomad **not implemented** |
 | 0.381 | Gower silhouette ceiling across all ten methods |
-| 1.93 pp | segment-share drift across a 12-month step |
+| 1.71 pp | segment-share drift across a 12-month step |
 | 1,504 vs 74 | Premium Bleisure vs Budget/Adventure, avg revenue per booking |
 | 2026-07-21 | the extract boundary — everything after is forward book |
 | Python 3.14 · DuckDB · Parquet | fully open source, no proprietary platform in the loop |
@@ -1129,7 +1143,7 @@ You already have these; quote them as the evidence base (details in §7):
 | V1 construct | held-out AUC on anchors the rules never saw | 0.608–0.965; controls clean at ≈0.50 |
 | V2 criterion | signal retained / incremental value | 0.324 / ≈0.00 → lossy re-encoding |
 | V3 detection power | planted-segment recovery floor | detects ≥2% prevalence; blind below ~1% |
-| V4 out-of-time | TVD + transfer ARI over a 12-month step | 1.93 pp shares; transfers for free |
+| V4 out-of-time | TVD + transfer ratio over a 12-month step | 1.71 pp shares; transfer disputed (GMM 1.24, LCA 0.89) |
 
 **None of these can confirm the segment *names*.** Only SME labels can. Say
 *"behaviourally validated; segment names not externally confirmed"* every time.

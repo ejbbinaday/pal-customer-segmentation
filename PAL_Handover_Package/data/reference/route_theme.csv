@@ -1,0 +1,33 @@
+airport,theme,provenance,in_network
+BKK,asian_tourist_hub,SME,1
+ICN,asian_tourist_hub,SME,1
+NRT,asian_tourist_hub,SME,1
+SIN,asian_tourist_hub,SME,1
+CDG,catholic_pilgrimage,SME,0
+FCO,catholic_pilgrimage,SME,0
+LIS,catholic_pilgrimage,SME,0
+TLV,catholic_pilgrimage,SME,0
+GUM,diaspora_north_america,ours,1
+JFK,diaspora_north_america,ours,1
+LAX,diaspora_north_america,ours,1
+ORD,diaspora_north_america,ours,1
+SEA,diaspora_north_america,ours,1
+SFO,diaspora_north_america,ours,1
+YVR,diaspora_north_america,ours,1
+YYZ,diaspora_north_america,ours,1
+IAO,domestic_leisure,SME,1
+MPH,domestic_leisure,SME,1
+PPS,domestic_leisure,SME,1
+USU,domestic_leisure,SME,1
+HKG,east_asia_hub,ours (SME grouping refuted),1
+TPE,east_asia_hub,ours (SME grouping refuted),1
+DMM,gulf_labour,SME,1
+DOH,gulf_labour,SME,1
+DXB,gulf_labour,SME,1
+RUH,gulf_labour,SME,1
+JED,islamic_pilgrimage,SME,1
+MED,islamic_pilgrimage,SME,1
+CTS,premium_holiday,SME,1
+HNL,premium_holiday,SME,1
+MEL,premium_holiday,SME,1
+SYD,premium_holiday,SME,1

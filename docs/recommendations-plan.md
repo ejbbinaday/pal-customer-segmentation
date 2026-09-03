@@ -288,9 +288,11 @@ nothing at any distinctness**, which is a bound the deliverable must state rathe
 implicit. It also retired the H0 significant-component count as a detector (1 → 120 across draws of unchanged
 data). Full results: `outputs/detection_power/summary.md`; KB §15 (2026-07-29).
 
-**B4 is done (2026-07-29).** Shares hold across a 12-month step (TVD 1.93 pp, full population) and a model
-fitted a year earlier transfers for free (ratio 1.02 against a within-window ceiling). Two caveats it
-surfaced: **revenue mix is less stable than headcount** (TVD 3.21 pp; Balikbayan/VFR 29.35%→26.64% of
+**B4 is done (2026-07-29; figures refreshed from the 18 Aug re-run).** Shares hold across a 12-month step
+(TVD **1.71 pp**, full population). On model transfer the methods **disagree** — GMM(full) ratio **1.24**,
+LCA **0.89** — so the claim holds only on the best-transferring method; the 29 Jul ratio of 1.02 and the
+LCA 1.13 are superseded, and 1.13 is **withdrawn** (43% sample). Two caveats it
+surfaced: **revenue mix is less stable than headcount** (TVD **3.36 pp**; Balikbayan/VFR 29.35%→26.64% of
 revenue on a flat share), and the extract is **departure-filtered**, which invalidates calendar-year windows
 for any future temporal work. **B6 is now the highest-value remaining Tier-1 item** — weak supervision would
 put an accuracy estimate on the labels with no gold data, and it is the last Tier-1 axis untouched.

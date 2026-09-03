@@ -1,9 +1,61 @@
 # PAL Customer Segmentation — ML Pipeline Methodology
 
 **Client:** Philippine Airlines (PAL)
-**Version:** v1.9 — 18 August 2026
+**Version:** v1.11 — 19 August 2026
 
 > **Changelog**
+> - **v1.11 (19 Aug 2026):** **Waterfall v2 is built and shipped — this spec had still described it as
+>   unbuilt.** `src/features_real.py` emits the v2 `proxy_segment` (plus `proxy_segment_v1`, retained for
+>   before/after comparison only), verified on `data/interim/pal_features_booking.parquet`: **12 distinct
+>   labels = 11 segments + `Unassigned`**, `Unassigned` **9.58% → 2.47%**, `Leisure` **50.61%** of the book,
+>   then OFW/Migrant 17.06 · Balikbayan/VFR 12.53 · Outbound International Leisure 9.52 · Corporate 5.10 ·
+>   Premium Bleisure 1.50 · Ultra Wealthy Leisure 0.69 · Pilgrimage 0.19 · Intl. Student 0.18 · MICE 0.12 ·
+>   Mabuhay Loyalist 0.03. **62.69% of bookings carry a different label than under v1**, of which the
+>   majority is the `Budget/Adventure` → `Leisure` rename (genuine reclassification is 23.4%).
+>   `Last-Minute` ships as a booking flag on **19.26%** of bookings, not as a segment. **Six hard rules
+>   carry `status=enforce`** in `data/constraints/hard_constraints.csv` (H08 · H10 · H11 · H12 · H14 · H15 —
+>   five `cannot_be` and H11, the only `must_be` in the sheet) and are asserted against every build by
+>   `assert_hard_constraints()`, which reads the CSV rather than a copy of it. Also corrected here: the
+>   at-a-glance pipeline said "the 10 segments". **No new modelling in this entry — it records what shipped
+>   on 18 Aug and closes the doc-vs-code gap.** ⚠️ `Leisure` at 50.61% keeps the "missing middle rung"
+>   taxonomy question live (see knowledge base §15, 17 Aug).
+> - **v1.10 (18 Aug 2026):** **ML's stale jobs re-pointed at v2; monitoring runs on real data for the
+>   first time; no modelling change.** ① `sub_segment.py` was still sub-typing `Budget/Adventure` and
+>   `Last-Minute` — a renamed segment and a retired one — so every sub-type it published was keyed on a
+>   label the waterfall no longer emits. Parents are now the **five largest v2 segments**
+>   (Leisure · OFW/Migrant · Balikbayan/VFR · Outbound International Leisure · Corporate). Fixing it
+>   surfaced a **sampling defect**: `USING SAMPLE n ROWS (reservoir, seed)` under `PRAGMA threads>1`
+>   samples per morsel and returned **2,077 of 40,000 rows for Corporate**, so the smallest parent was
+>   also the thinnest-sampled. Replaced with a hash-ordered `LIMIT` — exact, uniform, reproducible.
+>   ② **`monitor_real.py` is new**: Regime-C drift on the real booking table, using the two
+>   censoring-safe windows from `validate_temporal.py`. **Segment-mix PSI 0.0028 (STABLE)** and 22 of 23
+>   rule inputs stable. The one flag is **`channel` PSI 0.4111 → RETRAIN**, and the decomposition shows
+>   **93% of it is the arrival of `NDC` — 0 bookings in the reference window, 366,890 in the current
+>   one.** Excluding new categories the same feature is **0.0285 → STABLE**. ⚠️ A new category's PSI
+>   contribution is `share x log(share/eps)`, so the headline verdict is partly a function of the
+>   clipping floor; the report now prints both numbers. ③ **Regime A (DBCV/silhouette/noise) and
+>   cross-window ARI are declared not applicable** rather than left unrun — they score a fitted
+>   clustering, and the deliverable has none. ④ `pal_colors.SEG_ORDER` **was still the pre-v2 list**
+>   (advertising `Family`, `Digital Nomad`, `Last-Minute`; omitting `MICE`, `Ultra Wealthy Leisure`,
+>   `Intl. Student`, `Outbound International Leisure`) — exactly the failure its own docstring warns
+>   against. It is now **derived from `SEG_APPROVED`**, with `SEG_ORDER_V1` kept for the four superseded
+>   prototype scripts whose input still carries the old labels, and an assert that the emitted list can
+>   never contain a retired segment. ⑤ **A second, wider instance of the sampling defect was found in
+>   `model_zoo.load_sample(n, where=...)`** — the pattern `FROM t {where} USING SAMPLE n ROWS` puts
+>   `RESERVOIR_SAMPLE` *below* `FILTER` in the plan, so the caller gets `n x selectivity` rows.
+>   `validate_temporal` was therefore running on **~13,000 rows per window instead of 30,000**;
+>   `kproto_compare` carried its own copy of the same query and is fixed identically.
+>   `detection_power` and `model_stress_test` pass no `where` and were unaffected; `validate_criterion`
+>   already hash-ordered. ⑥ **V4 re-run on the corrected sample, and its headline changed** —
+>   `GMM(full)` transfer ARI **0.740 / ceiling 0.595 / ratio 1.24**, but `LCA` now transfers *below* its
+>   ceiling (0.648 / 0.726 / **0.89**). ⚠️ **The previously reported LCA 0.729 / 0.645 / 1.13 is
+>   withdrawn.** The methods land on opposite sides of 1.0, so the claim must name the method; and
+>   `summary.md` reporting the *best* ratio over the panel is a selection effect that silently switched
+>   the headline method. Full-population figures are unaffected (share TVD 1.71 pp, revenue TVD 3.36 pp,
+>   adversarial AUC 0.621). ⑦ **V3 re-run at `k=11` and the bounded null holds**: majority detection
+>   never at 0.5–1.0% prevalence, from distinctness ≈0.494 at 2%, ≈0.219 at 5%, ≈0.13 at 10%. New
+>   caveat: the **H0 component count returned 2–131 on unchanged control data** and is not usable as a
+>   detector, which qualifies (without overturning) the 28 Jul continuum confirmation.
 > - **v1.9 (18 Aug 2026):** **PAL answered all 24 open questions; taxonomy now settled at 11 segments +
 >   `Unassigned`. Still no modelling change — the waterfall is unbuilt and proxy labels are unmoved.**
 >   Answers filed verbatim at `wishlist/pal-questions-answered-2026-08-18.csv`. Five changed the design:
@@ -188,9 +240,9 @@ validator and a refiner in this design, never the labeller — see the approach 
 gz → typed Parquet → Stage C clean+flag (coupon grain; farebrand → value tier 1-7)
 → Stage F features: coupon → BOOKING (customer_id, issue_date) → customer  (+ airport→region
      and airport→route-theme joins; stay_nights / dep_dow / turn_dest / route_theme are descriptive only)
-→ RULE WATERFALL: purpose×value proxy segmentation   ← PRIMARY DELIVERABLE (the 10 segments)
-→ Stage X export: segment joined back down to coupon grain → Power BI star schema
-   ├── LCA refinement       sub-segments oversized parents   ← ML's job 1
+→ RULE WATERFALL: purpose×value proxy segmentation   ← PRIMARY DELIVERABLE (11 segments + Unassigned)
+→ Stage X export: both levels joined back down to coupon grain → Power BI star schema
+   ├── LCA refinement       sub-segments oversized parents   ← ML's job 1, NOW ASSIGNED per booking
    ├── Stages V1-V4         test whether the boundaries hold ← ML's job 2
    └── PSI / ARI monitoring drift on the input distribution  ← ML's job 3
 → pending SME ground truth for non-circular validation
@@ -215,12 +267,12 @@ flowchart TB
   BK["<b>22.9M bookings</b> — the modelling row<br/><i>one purchase decision = one purpose</i>"]:::stage
   CU["<b>13.4M customers</b> — rollup<br/><i>only 26% book more than once</i>"]:::stage
 
-  RULE["<b>RULE WATERFALL — THE DELIVERABLE</b><br/>priority order, first match wins<br/>10 named segments + Unassigned"]:::primary
+  RULE["<b>RULE WATERFALL — THE DELIVERABLE</b><br/>priority order, first match wins<br/>11 named segments + Unassigned"]:::primary
 
   X["<b>Stage X</b> · export to coupon grain"]:::out
-  BI["<b>Power BI star schema</b><br/>facts + <code>dim_date</code> + <code>dim_segment</code><br/>38,116,259 rows in = out"]:::out
+  BI["<b>Power BI star schema</b><br/>facts + <code>dim_date</code> + <code>dim_segment</code> + <code>dim_subsegment</code><br/>38,116,259 rows in = out"]:::out
 
-  LCA["<b>Refine</b> · LCA<br/>sub-segment oversized parents<br/><i>informs, never relabels</i>"]:::ml
+  LCA["<b>Refine</b> · LCA<br/>sub-segment oversized parents<br/><i>assigns level 2, never relabels level 1</i>"]:::ml
   VAL["<b>Test</b> · Stages V1-V4<br/>are the boundaries real?<br/><i>can re-open the rules</i>"]:::ml
   MON["<b>Monitor</b> · PSI · ARI<br/>has the world drifted?"]:::ml
 
@@ -294,8 +346,8 @@ the SME ask is the critical path even though Plan B is complete.
 |---|---|
 | **Problem type** | Started as unsupervised segmentation; **reframed as rule-based labelling with model-based validation** after the data showed no natural clusters |
 | **Unit of analysis** | The **booking** = `(customer_id, issue_date)` — one purchase decision, one trip purpose. 22.9M rows, rolled up to 13.4M customers |
-| **The model** | A **prioritised rule waterfall** ("first match wins") over observable booking attributes → **10 named segments + Unassigned**. Value axis is PAL's authoritative **farebrand ladder** (tiers 1–7) |
-| **What fits/learns** | Nothing, at the top level — the segment assignment is deterministic and auditable. Models are used *below* it (sub-segmentation) and *around* it (validation, drift) |
+| **The model** | A **prioritised rule waterfall** ("first match wins") over observable booking attributes → **11 named segments + Unassigned** (12 labels; `pal_colors.SEG_ORDER`). The Power BI export adds a 13th, `Excluded (non-revenue)`, for coupons with no booking row. Value axis is PAL's authoritative **farebrand ladder** (tiers 1–7) |
+| **What fits/learns** | Nothing, at the top level — the segment assignment is deterministic and auditable. Models are used *below* it (sub-segmentation, now assigned per booking as `SubSegment` and shipped in the Power BI model) and *around* it (validation, drift) |
 | **Lens** | **Anonymous trip-purpose × value** — no loyalty/CRM join required. A named industry approach (Sabre's anonymous segmentation) |
 | **Scoring a new booking** | Apply the same waterfall. No inference, no drift in the labeller itself — drift can only enter through the input distribution, which is what monitoring watches |
 | **Output** | `proxy_segment` at booking grain → joined down to all 38.1M coupons → Power BI star schema |
@@ -312,9 +364,10 @@ common way to misread this document.
 | **Rule waterfall** (priority CASE) | Assigns the segment | `features_real.py` | ✅ **In pipeline — primary** |
 | **Farebrand value ladder** | Ordinal value axis, tiers 1–7 | `clean_real.py` | ✅ In pipeline |
 | **Negative learning** (impossibility rules) | Rules out invalid segments before labelling | rule design | ✅ Retained as design principle |
-| **LCA** (Latent Class Analysis) | Sub-segments oversized parent segments | `sub_segment.py` | ✅ In pipeline — refinement layer, **under review** |
+| **LCA** (Latent Class Analysis) | Sub-segments oversized parent segments; **assigns** the level-2 `SubSegment` on every booking | `sub_segment.py` (profiles) · `subsegment_assign.py` (assignment) | ✅ In pipeline — refinement layer, **under review** |
 | **GMM** (full covariance) | Beat LCA on the top-level benchmark (0.849 vs 0.763) | `model_zoo.py` | ⏸️ **Candidate** — needs a stage-matched re-test before replacing LCA |
-| **PSI · ARI · centroid/volume drift** | Production monitoring, retrain triggers | `monitor_metrics.py` | 📋 Specified, not yet wired |
+| **PSI · volume/revenue drift** | Production monitoring, retrain triggers | `monitor_real.py` | ✅ Run on real data 18 Aug 2026 — segment-mix PSI **0.0028**, one flagged input (`channel`) |
+| **DBCV · silhouette · cross-window ARI** | Clustering quality + stability | `monitor_metrics.py` | ⛔ **Not applicable** to a deterministic rule labeller — see below. Library retained; prototype report only |
 | **Asymmetric cost matrix + per-segment recall** | The optimisation target — business cost, not accuracy | Stage 7 | ✅ Built, **awaiting ground truth** |
 | **Gradient-boosted classifiers on held-out anchors** | Construct + criterion validity (V1, V2) | `validate_construct.py`, `validate_criterion.py` | ✅ Run |
 | **Planted-segment injection** | Detection power — bounds the null result (V3) | `detection_power.py` | ✅ Run |
@@ -402,10 +455,13 @@ separation** — *stability without separation is not structure.*
 - **Out-of-time stability (2026-07-29) — the segmentation is not a one-period artefact.**
   `src/validate_temporal.py` splits the extract into two adjacent 12-month **issuance** windows
   (2024-05→2025-04 vs 2025-05→2026-04; 9.77M vs 10.08M bookings) and re-asks every stability question.
-  **Segment shares hold** — TVD **1.93 pp** on full-population counts, largest single move
-  `Budget/Adventure` −1.49 pp. **A model fitted a year earlier transfers for free** — GMM(full) transfer ARI
-  **0.763** against a within-window *ceiling* of 0.746 (ratio 1.02). **Composition is stable where the
-  volume is**: 7 of 10 segments show negligible-or-small drift and carry **98.2%** of bookings; the three
+  **Segment shares hold** — TVD **1.71 pp** on full-population counts (the 29 Jul run reported 1.93 pp).
+  **On transfer the methods disagree** — GMM(full) 0.74 against a within-window *ceiling* of 0.595
+  (**ratio 1.24**, above its ceiling) but LCA 0.648 against 0.726 (**0.89**, below it), so the claim is
+  "a model fitted a year earlier transfers as well *on the best-transferring method*", not on this evidence
+  flat. ⚠️ The 29 Jul pair (GMM 0.763 / 0.746, ratio 1.02) and the LCA 0.729 / 0.645 / 1.13 are both
+  superseded; the LCA one is **withdrawn** (43% sample). **Composition is stable where the
+  volume is**: 8 of 12 labels show negligible-or-small drift and carry **98.1%** of bookings; the three
   moderate-or-larger drifters are the three smallest segments (1.8% combined) and are reported as
   **unresolved, not as behaviour change**. Two cautions: **revenue mix is the weaker leg** (TVD 3.21 pp —
   `Balikbayan/VFR` fell 29.35%→26.64% of revenue on a flat headcount share, so *a segment holding its size
@@ -592,7 +648,8 @@ where **>50% of the panel agrees**, with the unanimous floor reported beside it.
 
 **The `w=0` controls retired one of our own instruments.** Re-running H0 persistent homology 100 times on
 unchanged data — where the answer must be identical every time — returned **median 1, p75 3, maximum 120**
-significant components. A statistic with that range on unchanged data cannot screen for anything, so this
+significant components (the 18 Aug re-run at `k=11` reproduced the same defect at **median 2, p75 4, maximum
+131** — quote the 18 Aug pair, which is what the defence deck uses). A statistic with that range on unchanged data cannot screen for anything, so this
 stage draws **no detection conclusion from H0 at all**. The instability is the *gap heuristic* (`argmax` over
 differences in sorted bar lengths, which jumps whenever two adjacent bars are close), not the homology. This
 qualifies rather than overturns the v1.0 continuum result: 1 is the modal and median value, so the reading
@@ -714,7 +771,13 @@ This document describes the end-to-end machine learning pipeline for the PAL Cus
 
 ## Target Segments
 
-The model targets ten segments:
+> **Scope: this is the v1 / prototype-track target list** (ten segments, the penalty-weight table the
+> baseline pipeline was built against). The **shipped taxonomy is v2 — 11 segments + `Unassigned`**, with
+> `Family` and `Digital Nomad` dropped, `Budget/Adventure` renamed `Leisure`, `Last-Minute` converted to a
+> booking flag, and `MICE` · `Ultra Wealthy Leisure` · `Intl. Student` · `Outbound International Leisure`
+> added. See the v1.11 changelog entry and [Current Methodology at a Glance](#current-methodology-at-a-glance).
+
+The prototype track targeted ten segments:
 
 | # | Segment | Penalty Weight |
 |---|---------|---------------|
@@ -1059,10 +1122,12 @@ These rules are not implemented in the current pipeline because the required fie
 ---
 
 *Document prepared for Philippine Airlines internal use.*
+*v1.10 — 18 August 2026 (ML's stale jobs re-pointed at v2: `sub_segment.py` was still sub-typing a renamed and a retired segment; `monitor_real.py` is new and runs Regime-C drift on the real table for the first time — segment-mix PSI 0.0028, one flagged input (`channel` 0.4111, of which 93% is NDC arriving from zero); Regime A declared not applicable to a deterministic labeller; fixed a DuckDB reservoir-sampling shortfall (2,077/40,000 rows) and a `SEG_ORDER` still listing dropped segments — no modelling change)*
 *v1.9 — 18 August 2026 (PAL answers all 24 questions: Family and Digital Nomad dropped, Budget/Adventure renamed Leisure, Gulf rule made directional, Catholic pilgrimage hubs withdrawn, H13 unblocked via a group-indicator proxy, revenue confirmed as USD. Taxonomy settled at 11 segments + Unassigned; waterfall still unbuilt — no modelling change)*
 *v1.8 — 17 August 2026 (PAL settles the taxonomy: 10 → 13 segments, Last-Minute becomes a flag, SME 'Leisure' = Budget/Adventure, and `stay_nights` is spent as a rule input so `dep_month` stays a validation anchor — enforced by check_constraints.py. Waterfall unchanged and sized: Budget/Adventure would reach 50.3% of the book, which re-opens the leisure ladder — no modelling change)*
 *v1.7 — 17 August 2026 (Stage F emits `stay_nights`, `dep_dow`, `turn_dest`, `route_theme` plus a new `route_theme.csv` reference, in response to the RM-Domestic SME constraint sheet; all four are descriptive — the waterfall is untouched and no proxy label moved. `stay_nights` is NULL on one-ways by definition and build-time asserted, because that missingness pattern IS the `round_trip` rule bit. Anchor tier table corrected: only `dep_month` and `n_bookings` are Tier-A — no modelling change)*
 *v1.6 — 12 August 2026 (rule-confidence diagnostics: internal confidence measured on the full population — 66.5% of bookings match exactly one rule, Corporate is the most contested segment at 6.4% uncontested despite its ×10 penalty, and the Last-Minute 3-day cut is the most consequential arbitrary constant in the model; `DaysBeforeMonthEnd` figures corrected — no modelling change)*
+*v1.12 — 21 August 2026 (**count corrected: the waterfall emits 11 named segments + Unassigned, not 10** — the at-a-glance table and the pipeline diagram were still on the v1 count after waterfall v2 shipped on 18 Aug, contradicting `pal_colors.SEG_ORDER`, the built table and the 20 Aug knowledge-base entry. The prototype/HDBSCAN references to "10 segments" are correct for that superseded track and are left alone. Also: the refinement layer stops being descriptive: `subsegment_assign.py` assigns a level-2 `SubSegment` to all **21,725,296** bookings in the five sub-typed parents and the Power BI export ships it on every fact table plus a 28-row `dim_subsegment`. No top-level change — level-1 figures are byte-identical across the rebuild. Method: the LCA feature space is discrete, so **17,847 distinct cells cover all 21.7M bookings**; StepMix is fitted on the count-weighted cell table, which is the whole population exactly, retiring the 40k sample for the assignment path. ⚠️ `StepMix.bic()` is unusable on a weighted cell table (unweighted score, N = cells) so weighted BIC is hand-computed. `summary.md` and the deck keep the sampled profiles; population profiles land separately in `outputs/sub_segments/population_profiles.md`, and Balikbayan/VFR's sub-types differ between the two fits)*
 *v1.5 — 31 July 2026 (birds-eye view: pipeline + validation-ladder diagrams, the model of record, and a technique inventory statused in-pipeline / candidate / diagnostic / dropped; Stage X adds `scorecard_segment_month.csv` for per-segment scorecards, asserted to reconcile)*
 *v1.4 — 31 July 2026 (Stage X ships `dim_segment.csv`, the persona dimension: measured behaviour recomputed per build, editorial persona text, and `Trust`/`DataCaveat` governance columns kept separate so evidence is distinguishable from assertion — no modelling change)*
 *v1.3 — 29 July 2026 (out-of-time stability: segment shares hold across a 12-month issuance step (TVD 1.93 pp, full population) and a model fitted a year earlier transfers for free (ratio 1.02 vs a within-window ceiling); revenue mix is the weaker leg (TVD 3.21 pp); the extract is departure-filtered, so calendar-year windows are invalid — plus v1.2 detection power: the null is bounded at ≥2% prevalence and we are blind below ~1%)*
