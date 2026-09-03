@@ -24,14 +24,23 @@ by a ten-method benchmark across six families (2026-07-28) and bounded by a dete
 The **`sample-features.csv` baseline** (HDBSCAN on penalty-weighted features → nearest-centroid mapping)
 is retained as the reference implementation.
 
+## Phase 2 Updates & Final Handover
+* **New Features (45-Column Data):** Pipeline now ingests and parses `FareBasisCode`, `TourCode`, `FF_Ind`, `Rev_Pax_Ind`, and `Itin_Type`. 
+* **Model Uplift:** Construct validity (AUC) separating Corporate vs Leisure increased massively from 0.63 to **0.87**.
+* **Loyalist Expansion:** `FF_Ind` integration unlocked the Mabuhay Loyalist segment, expanding capture from 0.03% to ~17% of total bookings.
+* **Handover Package:** A fully self-contained, low-code operational wrapper was built for the client. See `PAL_Handover_Package/README.md`.
+
 ## Repository layout
 
 ```
+PAL_Handover_Package/  Self-contained, low-code operational wrapper for the client.
+                 Contains the exact executable pipeline scripts (src/), the business rules (data/constraints/),
+                 and the automated runner (`run_pal_pipeline.py`). See `PAL_Handover_Package/README.md`.
 data/raw/      Source datasets (not all tracked — see .gitignore)
                  sample-features.csv   real Jan-2025 PAL snapshot (29,999 rows, 27 cols) — baseline
                  (also holds legacy inputs for the superseded prototype track; not part of any deliverable)
-data/PAL-data/ REAL PAL coupon-level extract — 4 gzipped CSVs, ~38M rows, 40 cols, 2024–2027
-                 (git-ignored, local only). newQuery2024 / 2025 / 2026Jan_to_May / 2026Jun_to_2027May
+data/PAL-data/ REAL PAL coupon-level extract — 4 gzipped CSVs, ~46M rows, 45 cols, 2024–2027
+                 (git-ignored, local only). newQuery2024 / 2025 / 2026 / 2027
 data/interim/  Derived Parquet built from the raw gz (git-ignored):
                  pal_parquet/   typed, zstd, partitioned by iss_year — the fast pipeline input
                  pal_subsegment.parquet  level-2 assignment: (customer_id, issue_date, sub_segment)
